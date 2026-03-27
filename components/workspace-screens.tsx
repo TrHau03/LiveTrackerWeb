@@ -323,7 +323,7 @@ export function LivestreamsScreen() {
           {livestreams.map((live) => (
             <Link
               key={live.id}
-              href={`/livestreams/${encodeURIComponent(live.id)}`}
+              href={`/livestreams/detail?liveId=${encodeURIComponent(live.id)}`}
               className="group rounded-[28px] border border-[var(--border)] bg-[var(--surface-strong)] p-5 transition duration-300 hover:-translate-y-1 hover:border-[color:var(--primary-soft)] hover:shadow-[var(--shadow-soft)]"
             >
               <div className="flex items-center justify-between gap-4">
