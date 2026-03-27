@@ -1,0 +1,21 @@
+services:
+  - type: web
+    name: live-tracker-web
+    env: node
+    plan: starter
+    
+    # Build command
+    buildCommand: npm run build
+    
+    # Start command - for standalone mode
+    startCommand: node .next/standalone/server.js
+    
+    # Environment
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 3000
+      
+    # Auto-deploy on push
+    autoDeploy: true
