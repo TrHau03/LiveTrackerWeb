@@ -11,7 +11,7 @@ export const INSTAGRAM_OAUTH_BACKEND_ORIGIN =
   "https://livetracker-ulz2.onrender.com";
 export const INSTAGRAM_OAUTH_START_URL =
   process.env.NEXT_PUBLIC_INSTAGRAM_OAUTH_START_URL ??
-  `${INSTAGRAM_OAUTH_BACKEND_ORIGIN}/api/instagram/auth/start`;
+  `${INSTAGRAM_OAUTH_BACKEND_ORIGIN}/api/instagram-auth/start`;
 export const INSTAGRAM_CONNECTION_STATUS_URL =
   process.env.NEXT_PUBLIC_INSTAGRAM_CONNECTION_STATUS_URL ??
   `${INSTAGRAM_OAUTH_BACKEND_ORIGIN}/api/v1/instagram-auth/status`;
