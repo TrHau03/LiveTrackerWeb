@@ -6,7 +6,7 @@ import { absoluteUrl } from "@/lib/site";
 export const metadata: Metadata = {
   title: "Customers",
   description:
-    "Màn hình quản lý customer LiveTracker, gồm danh sách hồ sơ, tags và lịch sử khách hàng.",
+    "Màn hình customer intelligence với hồ sơ, tags và lịch sử tương tác trong trải nghiệm SaaS tối giản.",
   alternates: {
     canonical: absoluteUrl("/customers"),
   },
@@ -15,4 +15,3 @@ export const metadata: Metadata = {
 export default function CustomersPage() {
   return <CustomersScreen />;
 }
-

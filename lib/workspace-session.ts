@@ -1,17 +1,23 @@
-export type SessionSettings = {
-  baseUrl: string;
-  accessToken: string;
-  refreshToken: string;
-  adminToken: string;
+export type AuthUser = {
+  id: string;
+  fullName: string;
+  email: string;
+  role: string;
+  avatar?: string;
 };
 
-export const SESSION_STORAGE_KEY = "live-tracker-web.integration-session";
+export type SessionSettings = {
+  accessToken: string;
+  refreshToken: string;
+  user: AuthUser | null;
+};
+
+export const SESSION_STORAGE_KEY = "live-tracker-web.auth-session";
 
 export const DEFAULT_SESSION: SessionSettings = {
-  baseUrl: "http://localhost:3000",
   accessToken: "",
   refreshToken: "",
-  adminToken: "",
+  user: null,
 };
 
 export function parseStoredSession(source: string | null): SessionSettings {
@@ -28,4 +34,3 @@ export function parseStoredSession(source: string | null): SessionSettings {
     return DEFAULT_SESSION;
   }
 }
-

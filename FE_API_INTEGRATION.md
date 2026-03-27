@@ -9,6 +9,10 @@ Tài liệu này tổng hợp toàn bộ API hiện có dưới `src/modules` đ
 - API prefix mặc định: `/api/v1`
 - Local mặc định theo `src/main.ts`: `http://localhost:3000/api/v1`
 - Ngoại lệ không dùng prefix:
+  - `/ul/*`
+  - `/web/open/*`
+  - `/web/product/:id`
+  - `/web/profile/:id`
   - `/web/admin/*`
   - `/`
 
@@ -66,6 +70,22 @@ Một số endpoint trả file stream, SSE hoặc trả object trực tiếp.
   - `multipart/form-data`
 - SSE:
   - `text/event-stream`
+
+### Universal Link / Web callback
+
+- `/ul/*` là route dùng chung cho app mobile và web callback
+- Mobile app đã setup Universal Link:
+  - OS sẽ mở app trước khi request chạm server
+- Nếu request `/ul/*` thật sự tới server:
+  - `source=web` hoặc `state` resolve ra `web`:
+    - backend redirect `302` sang `https://app.livetracker.vn/...`
+  - `source=app` hoặc `state` resolve ra `app`:
+    - backend giữ behavior Universal Link cũ
+  - không có marker:
+    - backend fallback theo browser detection hiện tại
+- Khuyến nghị cho OAuth/callback:
+  - web luôn gắn `state/source = web`
+  - app luôn gắn `state/source = app`
 
 ### Lưu ý về quyền
 
@@ -1020,14 +1040,91 @@ Các route này phục vụ web admin page, không phải JSON API cho app, như
 | `GET` | `/web/admin/subscriptions` | Cookie `adminToken` | Render subscriptions page |
 | `GET` | `/` | No | Redirect `302` sang `/web/admin/dashboard` |
 
-## 16. Module không có controller public
+## 16. Universal Links / Web Fallback
+
+Các route này không nằm dưới `/api/v1`.
+
+### Universal Link routes
+
+| Method | Path | Auth | Notes |
+|---|---|---|---|
+| `GET` | `/ul` | No | Universal Link root |
+| `GET` | `/ul/*` | No | Dùng chung cho mobile + web callback |
+
+### `/ul/*` behavior
+
+- Nếu app mobile đã cài:
+  - iOS/Android sẽ mở app ở mức OS, server thường không bị hit
+- Nếu request tới server với marker web:
+  - ví dụ `?source=web`
+  - hoặc `state=web`
+  - hoặc `state` là JSON/base64 JSON chứa `source/platform/client = web`
+  - backend redirect `302` sang `https://app.livetracker.vn/<same-path><same-query>`
+- Nếu request tới server với marker app:
+  - ví dụ `?source=app`
+  - hoặc `state=app`
+  - backend trả `200 text/plain` để giữ flow Universal Link cho app
+- Nếu không có marker:
+  - backend fallback theo browser detection hiện tại
+
+### Web fallback routes
+
+| Method | Path | Auth | Notes |
+|---|---|---|---|
+| `GET` | `/web/open` | No | HTML fallback mở app |
+| `GET` | `/web/open/*` | No | HTML fallback theo path động |
+| `GET` | `/web/product/:id` | No | HTML fallback product |
+| `GET` | `/web/profile/:id` | No | HTML fallback profile |
+
+### Instagram OAuth callback recommendation
+
+- Nếu login Instagram bắt đầu từ web `app.livetracker.vn`:
+  - đặt `redirect_uri` về route Universal Link, ví dụ:
+    - `https://livetracker-ulz2.onrender.com/ul/instagram-auth-callback`
+  - bắt buộc gắn thêm marker web:
+
+```text
+state=web
+```
+
+  - hoặc payload rõ hơn:
+
+```json
+{"source":"web"}
+```
+
+- Nếu login bắt đầu từ app mobile:
+  - dùng cùng `redirect_uri`
+  - gắn `state=app` hoặc payload tương đương
+- Kết quả:
+  - `web` → callback được chuyển sang `https://app.livetracker.vn/instagram-auth-callback?...`
+  - `app` → Universal Link vẫn mở app như cũ
+
+## 17. App utility / callback endpoints
+
+Các endpoint dưới đây nằm dưới `/api/v1/app`.
+
+| Method | Path | Auth | Request | Response |
+|---|---|---|---|---|
+| `GET` | `/app/health` | No | none | Health check |
+| `GET` | `/app/ping` | No | none | `pong` |
+| `GET` | `/app/revoke-permission-callback` | No | `query: signed_request` | Callback Meta deauthorize |
+| `POST` | `/app/request-data-deletion-callback` | No | `body: signed_request` | Callback Meta data deletion |
+| `POST` | `/app/revoke-permission` | No | `body: { email }` | Thu hồi quyền theo email |
+| `GET` | `/app/request-data-deletion` | No | `query: { email }` | Xóa dữ liệu theo email |
+| `POST` | `/app/request-data-deletion` | No | `body: { email }` | Xóa dữ liệu theo email |
+| `POST` | `/app/lazada-callback` | No | body tự do | Callback Lazada, hiện placeholder |
+| `POST` | `/app/instagram-auth-callback` | No | body/query tự do | Callback Instagram auth, hiện placeholder |
+| `GET` | `/app/livetracker/open` | No | none | Legacy HTML mở app |
+
+## 18. Module không có controller public
 
 Các module dưới `src/modules` hiện không expose controller API riêng:
 
 - `compliance`
 - `firebase`
 
-## 17. Gợi ý FE implementation
+## 19. Gợi ý FE implementation
 
 ### Axios/fetch wrapper
 
@@ -1042,6 +1139,16 @@ Các module dưới `src/modules` hiện không expose controller API riêng:
 - Nên parse `event.data` như JSON string
 - Khi disconnect thủ công, gọi endpoint `/comments/live/:liveId/stream/disconnect` hoặc endpoint theo `connectionId`
 
+### Instagram OAuth
+
+- Web flow:
+  - luôn gắn `state=web` hoặc state object có `source: "web"`
+  - callback `/ul/*` sẽ redirect về `app.livetracker.vn`
+- App flow:
+  - luôn gắn `state=app` hoặc state object có `source: "app"`
+  - callback `/ul/*` sẽ giữ Universal Link behavior cũ
+- Không nên rely vào `user-agent` để phân biệt web/app cho OAuth callback
+
 ### Upload
 
 - `users/me/message-template/images`: field file là `file`
@@ -1053,4 +1160,3 @@ Các module dưới `src/modules` hiện không expose controller API riêng:
 
 - `GET /orders/export/excel` trả file stream
 - FE nên gọi với `responseType: "blob"` rồi tạo download file phía client
-

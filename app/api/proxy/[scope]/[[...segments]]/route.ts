@@ -4,6 +4,7 @@ export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 const API_PREFIX = "/api/v1";
+const BASE_API_URL = process.env.API_URL ?? "";
 const INTERNAL_HEADERS = new Set([
   "host",
   "connection",
@@ -14,6 +15,18 @@ const INTERNAL_HEADERS = new Set([
   "x-access-token",
   "x-refresh-token",
   "x-admin-token",
+]);
+const STRIP_RESPONSE_HEADERS = new Set([
+  "connection",
+  "content-encoding",
+  "content-length",
+  "keep-alive",
+  "proxy-authenticate",
+  "proxy-authorization",
+  "te",
+  "trailer",
+  "transfer-encoding",
+  "upgrade",
 ]);
 
 type ForwardedBody =
@@ -55,15 +68,15 @@ async function handleProxyRequest(
   context: RouteContext,
 ): Promise<Response> {
   const params = await context.params;
-  const baseUrl = normalizeBaseUrl(request.headers.get("x-backend-base-url"));
+  const baseUrl = normalizeBaseUrl(BASE_API_URL);
 
   if (!baseUrl) {
     return NextResponse.json(
       {
         success: false,
-        message: "Missing x-backend-base-url header.",
+        message: "Missing API_URL environment variable.",
       },
-      { status: 400 },
+      { status: 500 },
     );
   }
 
@@ -84,7 +97,7 @@ async function handleProxyRequest(
     baseUrl,
   });
 
-  const responseHeaders = new Headers(attempt.response.headers);
+  const responseHeaders = sanitizeResponseHeaders(attempt.response.headers);
   if (attempt.refreshedAccessToken) {
     responseHeaders.set(
       "x-refreshed-access-token",
@@ -98,6 +111,16 @@ async function handleProxyRequest(
     statusText: attempt.response.statusText,
     headers: responseHeaders,
   });
+}
+
+function sanitizeResponseHeaders(source: Headers): Headers {
+  const headers = new Headers(source);
+
+  STRIP_RESPONSE_HEADERS.forEach((header) => {
+    headers.delete(header);
+  });
+
+  return headers;
 }
 
 function normalizeBaseUrl(baseUrl: string | null): string {

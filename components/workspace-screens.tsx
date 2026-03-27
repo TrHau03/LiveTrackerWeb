@@ -1,20 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import {
-  startTransition,
-  useDeferredValue,
-  useEffect,
-  useRef,
-  useState,
-} from "react";
+import { startTransition, useDeferredValue, useEffect, useRef, useState } from "react";
 
+import { InstagramLinkPanel } from "@/components/instagram-link-panel";
 import { useSession } from "@/components/session-provider";
 import {
   asRecord,
   extractApiData,
   extractCollection,
-  findFirstNumber,
   formatCurrency,
   formatDateTime,
   formatNumber,
@@ -25,328 +19,71 @@ import {
   proxyRequest,
   streamProxyRequest,
 } from "@/lib/proxy-client";
+import type { SessionSettings } from "@/lib/workspace-session";
 
-type LoadState = "idle" | "loading" | "ready" | "error";
-
-type RequestState<T> = {
-  status: LoadState;
+type AsyncState<T> = {
+  status: "idle" | "loading" | "ready" | "error";
   data: T | null;
   error: string;
 };
 
-type LiveStreamStatus = "idle" | "connecting" | "live" | "stopped" | "error";
-
 type Primitive = string | number | boolean | null | undefined;
 
+const CONTROL_CLASS =
+  "h-12 rounded-[18px] border border-[var(--border)] bg-[var(--surface-elevated)] px-4 text-sm text-[var(--foreground)] outline-none transition focus:border-[var(--primary)] focus:ring-4 focus:ring-[color:var(--primary-soft)]";
+const PRIMARY_BUTTON_CLASS =
+  "inline-flex h-12 items-center justify-center rounded-[18px] bg-[linear-gradient(135deg,_var(--primary)_0%,_var(--primary-strong)_100%)] px-4 text-sm font-semibold text-white shadow-[0_18px_40px_rgba(10,132,255,0.22)] transition hover:-translate-y-0.5";
+const SECONDARY_BUTTON_CLASS =
+  "inline-flex h-12 items-center justify-center rounded-[18px] border border-[var(--border)] bg-[var(--surface-strong)] px-4 text-sm font-medium text-[var(--foreground)] transition hover:-translate-y-0.5 hover:border-[color:var(--primary-soft)]";
+
 export function DashboardScreen() {
-  const { isReady, patchSession, session } = useSession();
+  const { logout, patchSession, session } = useSession();
   const [state, setState] = useState<
-    RequestState<{
-      profile: unknown;
+    AsyncState<{
       dashboard: unknown;
       subscription: unknown;
+      orders: unknown;
       notifications: unknown;
     }>
   >({
-    status: "idle",
+    status: "loading",
     data: null,
     error: "",
   });
 
   useEffect(() => {
-    if (!isReady || !session.baseUrl || !session.accessToken) {
-      return;
-    }
-
     let cancelled = false;
 
-    async function loadDashboard() {
-      setState((current) => ({
-        ...current,
-        status: "loading",
-        error: "",
-      }));
-
-      const requests = await Promise.allSettled([
-        proxyRequest(session, { path: "/users/me" }),
-        proxyRequest(session, { path: "/users/me/metrics/dashboard" }),
-        proxyRequest(session, { path: "/subscriptions/user/my-subscription" }),
-        proxyRequest(session, {
-          path: "/notifications",
-          query: { page: 1, limit: 5 },
-        }),
-      ]);
-
-      if (cancelled) {
-        return;
-      }
-
-      requests.forEach((result) => {
-        if (result.status === "fulfilled") {
-          syncSessionFromResponse(result.value.response, patchSession);
-        }
-      });
-
-      const firstFailure = requests.find(
-        (result) => result.status === "rejected",
-      );
-
-      if (firstFailure?.status === "rejected") {
-        setState({
-          status: "error",
-          data: null,
-          error: firstFailure.reason instanceof Error ? firstFailure.reason.message : "Không thể tải dashboard.",
-        });
-        return;
-      }
-
-      setState({
-        status: "ready",
-        data: {
-          profile: (requests[0] as PromiseFulfilledResult<Awaited<ReturnType<typeof proxyRequest>>>).value.data,
-          dashboard: (requests[1] as PromiseFulfilledResult<Awaited<ReturnType<typeof proxyRequest>>>).value.data,
-          subscription: (requests[2] as PromiseFulfilledResult<Awaited<ReturnType<typeof proxyRequest>>>).value.data,
-          notifications: (requests[3] as PromiseFulfilledResult<Awaited<ReturnType<typeof proxyRequest>>>).value.data,
-        },
-        error: "",
-      });
-    }
-
-    loadDashboard();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [isReady, patchSession, session]);
-
-  const profile = asRecord(extractApiData(state.data?.profile));
-  const dashboardMetrics = asRecord(extractApiData(state.data?.dashboard));
-  const subscription = asRecord(extractApiData(state.data?.subscription));
-  const notifications = extractCollection(state.data?.notifications).slice(0, 5);
-
-  const metricCards = [
-    {
-      label: "Orders",
-      value: summarizeMetric(dashboardMetrics.orders),
-      tone: "sunset" as const,
-    },
-    {
-      label: "Comments",
-      value: summarizeMetric(dashboardMetrics.comments),
-      tone: "ocean" as const,
-    },
-    {
-      label: "Lives",
-      value: summarizeMetric(dashboardMetrics.lives),
-      tone: "forest" as const,
-    },
-    {
-      label: "Customers",
-      value: summarizeMetric(dashboardMetrics.customers),
-      tone: "sand" as const,
-    },
-  ];
-
-  return (
-    <div className="space-y-6 pb-24 lg:pb-0">
-      <ScreenHero
-        eyebrow="Dashboard"
-        title="Tổng quan vận hành LiveTracker"
-        description="Theo dõi profile hiện tại, metrics dashboard, subscription và thông báo mới nhất trên cùng một màn hình."
-        actions={
-          <div className="flex flex-wrap gap-3">
-            <QuickLink href="/livestreams" label="Mở Livestreams" />
-            <QuickLink href="/orders" label="Mở Orders" />
-            <QuickLink href="/customers" label="Mở Customers" />
-          </div>
-        }
-      />
-
-      {!session.accessToken ? (
-        <ConnectionEmptyState />
-      ) : null}
-
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        {metricCards.map((metric) => (
-          <MetricCard
-            key={metric.label}
-            label={metric.label}
-            value={metric.value}
-            tone={metric.tone}
-          />
-        ))}
-      </div>
-
-      <div className="grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
-        <Panel
-          title="Workspace profile"
-          eyebrow="Identity"
-          description="Thông tin người dùng hiện tại và subscription đang hoạt động."
-        >
-          {state.status === "loading" ? (
-            <LoadingBlock />
-          ) : state.status === "error" ? (
-            <ErrorBlock message={state.error} />
-          ) : (
-            <div className="grid gap-4 md:grid-cols-2">
-              <DetailTile
-                label="Full name"
-                value={
-                  pickString(profile, ["fullName", "username", "email"]) ||
-                  "Chưa có"
-                }
-              />
-              <DetailTile
-                label="Email"
-                value={pickString(profile, ["email"]) || "Chưa có"}
-              />
-              <DetailTile
-                label="Role"
-                value={pickString(profile, ["role"]) || "Authenticated"}
-              />
-              <DetailTile
-                label="Subscription"
-                value={
-                  pickString(subscription, ["type", "name"]) || "Chưa xác định"
-                }
-              />
-              <DetailTile
-                label="Phone"
-                value={pickString(profile, ["phone"]) || "Chưa có"}
-              />
-              <DetailTile
-                label="Updated"
-                value={formatDateTime(profile.updatedAt)}
-              />
-            </div>
-          )}
-        </Panel>
-
-        <Panel
-          title="Notifications"
-          eyebrow="Realtime"
-          description="5 notification gần nhất từ backend."
-        >
-          {state.status === "loading" ? (
-            <LoadingBlock />
-          ) : notifications.length === 0 ? (
-            <EmptyBlock message="Chưa có notification nào để hiển thị." />
-          ) : (
-            <div className="space-y-3">
-              {notifications.map((item, index) => {
-                const title =
-                  pickString(item, ["title", "message", "type"]) ||
-                  `Notification ${index + 1}`;
-
-                return (
-                  <article
-                    key={`${title}-${index}`}
-                    className="rounded-[24px] border border-slate-900/10 bg-[#fffaf4] p-4"
-                  >
-                    <div className="flex flex-wrap items-center gap-2">
-                      <MiniBadge
-                        tone={pickBoolean(item, ["isRead"]) ? "neutral" : "sunset"}
-                      >
-                        {pickBoolean(item, ["isRead"]) ? "Read" : "Unread"}
-                      </MiniBadge>
-                      <MiniBadge tone="ocean">
-                        {pickString(item, ["type"]) || "general"}
-                      </MiniBadge>
-                    </div>
-                    <h3 className="mt-3 text-sm font-semibold text-slate-950">
-                      {title}
-                    </h3>
-                    <p className="mt-2 text-xs leading-6 text-slate-600">
-                      {pickString(item, ["body", "content", "message"]) ||
-                        "Không có nội dung chi tiết."}
-                    </p>
-                    <p className="mt-3 text-[11px] uppercase tracking-[0.18em] text-slate-400">
-                      {formatDateTime(
-                        pickString(item, ["createdAt", "updatedAt"]),
-                      )}
-                    </p>
-                  </article>
-                );
-              })}
-            </div>
-          )}
-        </Panel>
-      </div>
-
-      <Panel
-        title="Metrics breakdown"
-        eyebrow="Business"
-        description="Hiển thị các block object chính từ endpoint `/users/me/metrics/dashboard` để kiểm tra vận hành nhanh."
-      >
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          {Object.entries(dashboardMetrics)
-            .filter(([key]) => key !== "period")
-            .slice(0, 8)
-            .map(([key, value]) => (
-              <article
-                key={key}
-                className="rounded-[24px] border border-slate-900/10 bg-[#f9f4ec] p-4"
-              >
-                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-                  {key}
-                </p>
-                <p className="mt-3 text-3xl font-semibold tracking-[-0.04em] text-slate-950">
-                  {formatNumber(summarizeMetric(value))}
-                </p>
-                <pre className="mt-4 overflow-auto text-xs leading-6 text-slate-600">
-                  {JSON.stringify(value, null, 2)}
-                </pre>
-              </article>
-            ))}
-        </div>
-      </Panel>
-    </div>
-  );
-}
-
-export function LivestreamsScreen() {
-  const { isReady, patchSession, session } = useSession();
-  const [search, setSearch] = useState("");
-  const [refreshKey, setRefreshKey] = useState(0);
-  const deferredSearch = useDeferredValue(search);
-  const [state, setState] = useState<RequestState<unknown>>({
-    status: "idle",
-    data: null,
-    error: "",
-  });
-
-  useEffect(() => {
-    if (!isReady || !session.baseUrl || !session.accessToken) {
-      return;
-    }
-
-    let cancelled = false;
-
-    async function loadLives() {
-      setState((current) => ({
-        ...current,
-        status: "loading",
-        error: "",
-      }));
-
+    async function load() {
       try {
-        const result = await proxyRequest(session, {
-          path: "/lives/my-lives",
-          query: {
-            page: 1,
-            limit: 12,
-            search: deferredSearch || undefined,
-          },
-        });
+        const [dashboard, subscription, orders, notifications] =
+          await Promise.all([
+            proxyRequest(session, { path: "/users/me/metrics/dashboard" }),
+            proxyRequest(session, { path: "/subscriptions/user/my-subscription" }),
+            proxyRequest(session, {
+              path: "/orders/user/my-orders",
+              query: { page: 1, limit: 6 },
+            }),
+            proxyRequest(session, {
+              path: "/notifications",
+              query: { page: 1, limit: 4 },
+            }),
+          ]);
 
         if (cancelled) {
           return;
         }
 
-        syncSessionFromResponse(result.response, patchSession);
+        handleAuthSync([dashboard.response, subscription.response, orders.response, notifications.response], patchSession, logout);
+
         setState({
           status: "ready",
-          data: result.data,
+          data: {
+            dashboard: dashboard.data,
+            subscription: subscription.data,
+            orders: orders.data,
+            notifications: notifications.data,
+          },
           error: "",
         });
       } catch (error) {
@@ -357,84 +94,229 @@ export function LivestreamsScreen() {
         setState({
           status: "error",
           data: null,
-          error: error instanceof Error ? error.message : "Không thể tải livestreams.",
+          error: error instanceof Error ? error.message : "Unable to load dashboard.",
         });
       }
     }
 
-    loadLives();
+    load();
 
     return () => {
       cancelled = true;
     };
-  }, [deferredSearch, isReady, patchSession, refreshKey, session]);
+  }, [logout, patchSession, session]);
 
-  const livestreams = extractCollection(state.data).map((item) => {
-    const shop = asRecord(item.shop);
-    const user = asRecord(item.user);
-    const routeId =
-      pickString(item, ["id", "_id"]) || pickString(item, ["igLiveId"]);
-
-    return {
-      id: routeId,
-      igLiveId: pickString(item, ["igLiveId"]) || routeId,
-      title:
-        pickString(shop, ["name"]) || `Livestream ${pickString(item, ["igLiveId"]) || routeId}`,
-      isLive: pickBoolean(item, ["isLive"]) ?? false,
-      totalComment:
-        pickNumber(item, ["totalComment", "totalComments"]) ?? 0,
-      totalOrder: pickNumber(item, ["totalOrder", "totalOrders"]) ?? 0,
-      lastWebhookAt: pickString(item, ["lastWebhookAt", "updatedAt", "createdAt"]),
-      owner:
-        pickString(user, ["fullName", "name"]) ||
-        pickString(item, ["userId"]) ||
-        "Current user",
-      shopName: pickString(shop, ["name"]) || "Chưa có shop",
-    };
-  });
+  const metrics = asRecord(extractApiData(state.data?.dashboard));
+  const ordersMetric = compactMetric(metrics.orders);
+  const commentsMetric = compactMetric(metrics.comments);
+  const livesMetric = compactMetric(metrics.lives);
+  const customersMetric = compactMetric(metrics.customers);
+  const subscription = asRecord(extractApiData(state.data?.subscription));
+  const recentOrders = extractCollection(state.data?.orders).slice(0, 4);
+  const notifications = extractCollection(state.data?.notifications).slice(0, 4);
 
   return (
-    <div className="space-y-6 pb-24 lg:pb-0">
-      <ScreenHero
-        eyebrow="Livestreams"
-        title="Danh sách live đang nghe webhook"
-        description="Lấy từ endpoint `/lives/my-lives`. Mỗi live mở ra màn chi tiết comment listener dùng SSE và iframe Instagram."
-        actions={
-          <div className="flex flex-wrap gap-3">
-            <button
-              type="button"
-              onClick={() => setRefreshKey((current) => current + 1)}
-              className="inline-flex rounded-full bg-[#102b3b] px-4 py-2 text-sm font-semibold text-white"
-            >
-              Refresh list
-            </button>
-          </div>
-        }
+    <div className="space-y-8 pb-28 lg:pb-6">
+      <Hero
+        label="Commerce Overview"
+        title={`Welcome back, ${session.user?.fullName || "team"}.`}
+        description="Một góc nhìn gọn, nhanh và rõ cho mọi thứ đang diễn ra quanh livestream commerce của bạn."
       />
 
-      {!session.accessToken ? <ConnectionEmptyState /> : null}
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <StatCard label="Orders" value={ordersMetric.primary} accent="blue" />
+        <StatCard label="Comments" value={commentsMetric.primary} accent="cyan" />
+        <StatCard label="Livestreams" value={livesMetric.primary} accent="indigo" />
+        <StatCard label="Customers" value={customersMetric.primary} accent="slate" />
+      </div>
+
+      <div className="grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
+        <Panel title="Recent orders" action={<LinkPill href="/orders" label="View all" />}>
+          {state.status === "loading" ? <LoadingState /> : null}
+          {state.status === "error" ? <ErrorState message={state.error} /> : null}
+          {state.status === "ready" && recentOrders.length === 0 ? (
+            <EmptyState message="Chưa có đơn hàng nào gần đây." />
+          ) : null}
+
+          <div className="space-y-3">
+            {recentOrders.map((order, index) => (
+              <article
+                key={`${pickString(order, ["id", "_id", "orderCode"]) || index}`}
+                className="rounded-[24px] border border-[var(--border)] bg-[var(--surface-strong)] px-4 py-4"
+              >
+                <div className="flex items-center justify-between gap-4">
+                  <div>
+                    <p className="text-sm font-semibold text-[var(--foreground)]">
+                      {pickString(order, ["orderCode", "code"]) || "Order"}
+                    </p>
+                    <p className="mt-1 text-xs text-[var(--muted)]">
+                      {pickString(order, ["igName", "customerName"]) || "Customer"}
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-sm font-semibold text-[var(--foreground)]">
+                      {formatCurrency(pickNumber(order, ["totalPrice", "amount"]) ?? 0)}
+                    </p>
+                    <p className="mt-1 text-xs text-[var(--muted)]">
+                      {formatDateTime(pickString(order, ["createdAt", "updatedAt"]))}
+                    </p>
+                  </div>
+                </div>
+              </article>
+            ))}
+          </div>
+        </Panel>
+
+        <div className="space-y-6">
+          <InstagramLinkPanel />
+
+          <Panel title="Plan">
+            <div className="rounded-[26px] border border-[var(--border)] bg-[linear-gradient(135deg,_rgba(10,132,255,0.14)_0%,_rgba(90,200,250,0.08)_100%)] px-5 py-5">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[var(--muted)]">
+                Current subscription
+              </p>
+              <p className="mt-3 text-3xl font-semibold tracking-[-0.04em] text-[var(--foreground)]">
+                {pickString(subscription, ["type", "name"]) || "Free"}
+              </p>
+              <div className="mt-5 grid grid-cols-2 gap-3">
+                <MiniMetric
+                  label="Order limit"
+                  value={formatNumber(pickNumber(subscription, ["orderLimit"]) ?? 0)}
+                />
+                <MiniMetric
+                  label="Shop limit"
+                  value={formatNumber(pickNumber(subscription, ["shopLimit"]) ?? 0)}
+                />
+              </div>
+            </div>
+          </Panel>
+
+          <Panel title="Signals">
+            <div className="space-y-3">
+              {notifications.length === 0 ? (
+                <EmptyState message="Không có tín hiệu mới." compact />
+              ) : (
+                notifications.map((notification, index) => (
+                  <article
+                    key={`${pickString(notification, ["id", "_id"]) || index}`}
+                    className="rounded-[22px] border border-[var(--border)] bg-[var(--surface-strong)] px-4 py-4"
+                  >
+                    <div className="flex items-center gap-2">
+                      <Tag tone={pickBoolean(notification, ["isRead"]) ? "muted" : "blue"}>
+                        {pickBoolean(notification, ["isRead"]) ? "Read" : "New"}
+                      </Tag>
+                    </div>
+                    <p className="mt-3 text-sm font-semibold text-[var(--foreground)]">
+                      {pickString(notification, ["title", "message", "type"]) || "Notification"}
+                    </p>
+                    <p className="mt-2 text-xs leading-6 text-[var(--muted)]">
+                      {pickString(notification, ["body", "content", "message"]) || "No details available."}
+                    </p>
+                  </article>
+                ))
+              )}
+            </div>
+          </Panel>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export function LivestreamsScreen() {
+  const { logout, patchSession, session } = useSession();
+  const [query, setQuery] = useState("");
+  const search = useDeferredValue(query);
+  const [state, setState] = useState<AsyncState<unknown>>({
+    status: "loading",
+    data: null,
+    error: "",
+  });
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function load() {
+      try {
+        const response = await proxyRequest(session, {
+          path: "/lives/my-lives",
+          query: {
+            page: 1,
+            limit: 12,
+            search: search || undefined,
+          },
+        });
+
+        if (cancelled) {
+          return;
+        }
+
+        handleAuthSync([response.response], patchSession, logout);
+        setState({
+          status: "ready",
+          data: response.data,
+          error: "",
+        });
+      } catch (error) {
+        if (cancelled) {
+          return;
+        }
+
+        setState({
+          status: "error",
+          data: null,
+          error: error instanceof Error ? error.message : "Unable to load livestreams.",
+        });
+      }
+    }
+
+    load();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [logout, patchSession, search, session]);
+
+  const livestreams = extractCollection(state.data).map((live) => ({
+    id: pickString(live, ["id", "_id"]) || pickString(live, ["igLiveId"]),
+    title:
+      pickString(asRecord(live.shop), ["name"]) ||
+      pickString(live, ["igLiveId"]) ||
+      "Livestream",
+    isLive: pickBoolean(live, ["isLive"]) ?? false,
+    comments: pickNumber(live, ["totalComment", "totalComments"]) ?? 0,
+    orders: pickNumber(live, ["totalOrder", "totalOrders"]) ?? 0,
+    updatedAt: pickString(live, ["lastWebhookAt", "updatedAt", "createdAt"]),
+    owner:
+      pickString(asRecord(live.user), ["fullName", "name"]) ||
+      session.user?.fullName ||
+      "Owner",
+    igLiveId: pickString(live, ["igLiveId"]) || "instagram-live",
+  }));
+
+  return (
+    <div className="space-y-8 pb-28 lg:pb-6">
+      <Hero
+        label="Livestreams"
+        title="Realtime sessions"
+        description="Theo dõi từng phiên livestream, đi thẳng vào room comment và nhìn toàn cảnh luồng bán hàng tức thời."
+      />
 
       <Panel
-        title="Live registry"
-        eyebrow="Webhook"
-        description="Tìm kiếm theo từ khóa và mở thẳng vào feed comment realtime."
-      >
-        <div className="mb-5 flex flex-col gap-3 md:flex-row md:items-center">
+        title="All livestreams"
+        action={
           <input
-            value={search}
-            onChange={(event) => setSearch(event.target.value)}
-            placeholder="Tìm theo igLiveId hoặc shop"
-            className="h-12 flex-1 rounded-2xl border border-slate-900/10 bg-white px-4 text-sm outline-none transition focus:border-[#ed6f57] focus:ring-4 focus:ring-[#ed6f57]/15"
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder="Search live"
+            className={`${CONTROL_CLASS} w-full md:w-64`}
           />
-          <div className="rounded-full bg-[#f1ece4] px-4 py-2 text-sm text-slate-600">
-            {livestreams.length} live trên trang hiện tại
-          </div>
-        </div>
-
-        {state.status === "loading" ? <LoadingBlock /> : null}
-        {state.status === "error" ? <ErrorBlock message={state.error} /> : null}
+        }
+      >
+        {state.status === "loading" ? <LoadingState /> : null}
+        {state.status === "error" ? <ErrorState message={state.error} /> : null}
         {state.status === "ready" && livestreams.length === 0 ? (
-          <EmptyBlock message="Không có livestream nào khớp với bộ lọc hiện tại." />
+          <EmptyState message="Không tìm thấy livestream nào." />
         ) : null}
 
         <div className="grid gap-4 xl:grid-cols-2">
@@ -442,26 +324,27 @@ export function LivestreamsScreen() {
             <Link
               key={live.id}
               href={`/livestreams/${encodeURIComponent(live.id)}`}
-              className="rounded-[28px] border border-slate-900/10 bg-[#fffaf4] p-5 transition hover:-translate-y-0.5 hover:border-[#ed6f57]/35 hover:bg-white"
+              className="group rounded-[28px] border border-[var(--border)] bg-[var(--surface-strong)] p-5 transition duration-300 hover:-translate-y-1 hover:border-[color:var(--primary-soft)] hover:shadow-[var(--shadow-soft)]"
             >
-              <div className="flex flex-wrap items-center gap-2">
-                <MiniBadge tone={live.isLive ? "forest" : "neutral"}>
-                  {live.isLive ? "Live" : "Offline"}
-                </MiniBadge>
-                <MiniBadge tone="sunset">Webhook</MiniBadge>
+              <div className="flex items-center justify-between gap-4">
+                <Tag tone={live.isLive ? "blue" : "muted"}>
+                  {live.isLive ? "Live" : "Paused"}
+                </Tag>
+                <span className="text-xs text-[var(--muted)]">
+                  {formatDateTime(live.updatedAt)}
+                </span>
               </div>
-              <h3 className="mt-4 text-xl font-semibold tracking-[-0.03em] text-slate-950">
+
+              <h2 className="mt-4 text-2xl font-semibold tracking-[-0.04em] text-[var(--foreground)]">
                 {live.title}
-              </h3>
-              <p className="mt-2 break-all text-sm text-slate-600">
-                {live.igLiveId}
-              </p>
+              </h2>
+              <p className="mt-2 text-sm text-[var(--muted)]">{live.igLiveId}</p>
 
               <div className="mt-5 grid grid-cols-2 gap-3">
-                <InlineMetric label="Comments" value={formatNumber(live.totalComment)} />
-                <InlineMetric label="Orders" value={formatNumber(live.totalOrder)} />
-                <InlineMetric label="Owner" value={live.owner} />
-                <InlineMetric label="Webhook" value={formatDateTime(live.lastWebhookAt)} />
+                <MiniMetric label="Comments" value={formatNumber(live.comments)} />
+                <MiniMetric label="Orders" value={formatNumber(live.orders)} />
+                <MiniMetric label="Owner" value={live.owner} />
+                <MiniMetric label="Status" value={live.isLive ? "Active" : "Standby"} />
               </div>
             </Link>
           ))}
@@ -472,34 +355,22 @@ export function LivestreamsScreen() {
 }
 
 export function LiveDetailScreen({ liveId }: { liveId: string }) {
-  const { isReady, patchSession, session } = useSession();
-  const [liveState, setLiveState] = useState<RequestState<unknown>>({
-    status: "idle",
+  const { logout, patchSession, session } = useSession();
+  const [liveState, setLiveState] = useState<AsyncState<unknown>>({
+    status: "loading",
     data: null,
     error: "",
   });
   const [comments, setComments] = useState<Record<string, unknown>[]>([]);
-  const [events, setEvents] = useState<string[]>([]);
-  const [streamStatus, setStreamStatus] = useState<LiveStreamStatus>("idle");
-  const [connectionId, setConnectionId] = useState("");
+  const [streamState, setStreamState] = useState<"connecting" | "live" | "stopped" | "error">("connecting");
   const abortRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
-    if (!isReady || !session.baseUrl || !session.accessToken) {
-      return;
-    }
-
     let cancelled = false;
 
-    async function loadLive() {
-      setLiveState((current) => ({
-        ...current,
-        status: "loading",
-        error: "",
-      }));
-
+    async function load() {
       try {
-        const [liveResult, commentsResult] = await Promise.all([
+        const [liveResponse, commentsResponse] = await Promise.all([
           proxyRequest(session, { path: `/lives/${liveId}` }),
           proxyRequest(session, {
             path: `/comments/live/${liveId}/cursor`,
@@ -511,15 +382,14 @@ export function LiveDetailScreen({ liveId }: { liveId: string }) {
           return;
         }
 
-        syncSessionFromResponse(liveResult.response, patchSession);
-        syncSessionFromResponse(commentsResult.response, patchSession);
+        handleAuthSync([liveResponse.response, commentsResponse.response], patchSession, logout);
 
         setLiveState({
           status: "ready",
-          data: liveResult.data,
+          data: liveResponse.data,
           error: "",
         });
-        setComments(extractCollection(commentsResult.data));
+        setComments(extractCollection(commentsResponse.data));
       } catch (error) {
         if (cancelled) {
           return;
@@ -528,283 +398,254 @@ export function LiveDetailScreen({ liveId }: { liveId: string }) {
         setLiveState({
           status: "error",
           data: null,
-          error: error instanceof Error ? error.message : "Không thể tải dữ liệu live.",
+          error: error instanceof Error ? error.message : "Unable to load livestream.",
         });
       }
     }
 
-    loadLive();
+    load();
 
     return () => {
       cancelled = true;
     };
-  }, [isReady, liveId, patchSession, session]);
+  }, [liveId, logout, patchSession, session]);
 
   useEffect(() => {
-    if (!isReady || !session.baseUrl || !session.accessToken) {
-      return;
-    }
-
     const controller = new AbortController();
     abortRef.current = controller;
+
     startTransition(() => {
-      setStreamStatus("connecting");
+      setStreamState("connecting");
     });
 
     streamProxyRequest(
       session,
-      {
-        path: `/comments/live/${liveId}/stream`,
-      },
+      { path: `/comments/live/${liveId}/stream` },
       (event) => {
-        setStreamStatus("live");
-        setEvents((current) => {
-          const next = [event.data, ...current];
-          return next.slice(0, 12);
+        startTransition(() => {
+          setStreamState("live");
         });
 
-        const parsed = safelyParseJson(event.data);
-        const payload = asRecord(parsed);
-
-        if (pickString(payload, ["connectionId"])) {
-          setConnectionId(pickString(payload, ["connectionId"]));
-        }
-
+        const payload = safelyParseEvent(event.data);
         const nextComment = asRecord(payload.comment);
-        if (Object.keys(nextComment).length > 0) {
-          setComments((current) => dedupeComments([nextComment, ...current]));
+        if (Object.keys(nextComment).length === 0) {
+          return;
         }
+
+        setComments((current) => dedupeComments([nextComment, ...current]).slice(0, 40));
       },
       controller.signal,
     )
       .then((response) => {
-        if (response) {
-          syncSessionFromResponse(response.headers, patchSession);
-          if (!response.ok) {
-            setStreamStatus("error");
-          }
+        if (!response) {
+          return;
+        }
+
+        handleAuthSync([response], patchSession, logout);
+        if (!response.ok) {
+          startTransition(() => {
+            setStreamState("error");
+          });
         }
       })
       .catch(() => {
         if (!controller.signal.aborted) {
-          setStreamStatus("error");
+          startTransition(() => {
+            setStreamState("error");
+          });
         }
       });
 
     return () => {
       controller.abort();
     };
-  }, [isReady, liveId, patchSession, session]);
+  }, [liveId, logout, patchSession, session]);
 
   const live = asRecord(extractApiData(liveState.data));
   const shop = asRecord(live.shop);
   const user = asRecord(live.user);
-  const liveMetrics = [
-    {
-      label: "IG live ID",
-      value: pickString(live, ["igLiveId", "id", "_id"]) || liveId,
-    },
-    {
-      label: "Shop",
-      value: pickString(shop, ["name"]) || "Chưa có",
-    },
-    {
-      label: "Owner",
-      value: pickString(user, ["fullName", "name"]) || "Current user",
-    },
-    {
-      label: "Webhook",
-      value: formatDateTime(pickString(live, ["lastWebhookAt", "updatedAt"])),
-    },
-  ];
-
-  async function handleReloadComments() {
-    if (!session.accessToken) {
-      return;
-    }
-
-    await proxyRequest(session, {
-      path: `/lives/${liveId}/comments/reload`,
-    });
-  }
-
-  async function handleStopStream() {
-    abortRef.current?.abort();
-    setStreamStatus("stopped");
-
-    if (!connectionId) {
-      return;
-    }
-
-    try {
-      await proxyRequest(session, {
-        path: `/comments/live/${liveId}/stream/disconnect/${connectionId}`,
-        method: "POST",
-      });
-    } catch {
-      // Ignore disconnect cleanup failure.
-    }
-  }
+  const instagramHandle = resolveInstagramHandle(live, shop, user);
+  const instagramUrl = buildInstagramUrl(instagramHandle);
+  const liveTitle =
+    pickString(shop, ["name"]) || pickString(live, ["igLiveId"]) || "Livestream";
 
   return (
-    <div className="space-y-6 pb-24 lg:pb-0">
-      <ScreenHero
-        eyebrow="Livestream detail"
-        title={`Comment listener cho live ${liveId}`}
-        description="Màn hình này lấy chi tiết live, tải danh sách comment gần nhất và nối SSE stream để nghe webhook realtime."
-        actions={
-          <div className="flex flex-wrap gap-3">
-            <button
-              type="button"
-              onClick={handleReloadComments}
-              className="inline-flex rounded-full bg-[#102b3b] px-4 py-2 text-sm font-semibold text-white"
-            >
-              Reload comments
-            </button>
-            <button
-              type="button"
-              onClick={handleStopStream}
-              className="inline-flex rounded-full border border-slate-900/10 bg-white px-4 py-2 text-sm font-semibold text-slate-700"
-            >
-              Stop stream
-            </button>
-          </div>
-        }
+    <div className="space-y-8 pb-28 lg:pb-6">
+      <Hero
+        label="Live Room"
+        title={liveTitle}
+        description="Comment feed chạy realtime để đội sale nắm đơn, bắt tín hiệu khách hàng và phản ứng ngay trong luồng live."
       />
 
-      <div className="grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
+      <div className="grid gap-6 xl:grid-cols-[1.12fr_0.88fr]">
         <Panel
-          title="Realtime comment feed"
-          eyebrow="SSE"
-          description="Nguồn dữ liệu từ `/comments/live/:liveId/stream` và `/comments/live/:liveId/cursor`."
+          title="Comment stream"
+          action={
+            <div className="flex items-center gap-2">
+              <Tag tone={streamState === "live" ? "blue" : streamState === "error" ? "danger" : "muted"}>
+                {formatStreamState(streamState)}
+              </Tag>
+              <button
+                type="button"
+                onClick={() => {
+                  abortRef.current?.abort();
+                  setStreamState("stopped");
+                }}
+                className={SECONDARY_BUTTON_CLASS}
+              >
+                Stop
+              </button>
+            </div>
+          }
         >
-          <div className="mb-5 flex flex-wrap items-center gap-2">
-            <MiniBadge
-              tone={
-                streamStatus === "live"
-                  ? "forest"
-                  : streamStatus === "error"
-                    ? "danger"
-                    : "neutral"
-              }
-            >
-              {streamStatus}
-            </MiniBadge>
-            <MiniBadge tone="ocean">
-              {comments.length} comments loaded
-            </MiniBadge>
-            {connectionId ? <MiniBadge tone="sand">{connectionId}</MiniBadge> : null}
-          </div>
+          {liveState.status === "loading" ? <LoadingState /> : null}
+          {liveState.status === "error" ? <ErrorState message={liveState.error} /> : null}
+          {comments.length === 0 ? <EmptyState message="Chưa có comment realtime." /> : null}
 
-          {liveState.status === "loading" ? <LoadingBlock /> : null}
-          {liveState.status === "error" ? (
-            <ErrorBlock message={liveState.error} />
-          ) : null}
-
-          <div className="space-y-3">
-            {comments.length === 0 ? (
-              <EmptyBlock message="Chưa nhận được comment nào cho live này." />
-            ) : (
-              comments.map((comment, index) => {
-                const customer = asRecord(comment.customer);
-                return (
-                  <article
-                    key={`${pickString(comment, ["id", "_id"]) || index}`}
-                    className="rounded-[24px] border border-slate-900/10 bg-[#fffaf4] p-4"
-                  >
-                    <div className="flex items-center justify-between gap-3">
-                      <div>
-                        <p className="text-sm font-semibold text-slate-950">
-                          {pickString(comment, ["igUsername", "username"]) ||
-                            pickString(customer, ["igName", "name"]) ||
-                            "Instagram user"}
-                        </p>
-                        <p className="mt-1 text-[11px] uppercase tracking-[0.18em] text-slate-400">
-                          {formatDateTime(
-                            pickString(comment, ["createdAt", "updatedAt"]),
-                          )}
-                        </p>
-                      </div>
-                      <div className="flex flex-wrap gap-2">
-                        <MiniBadge tone="ocean">
-                          Qty {formatNumber(pickNumber(comment, ["quantity"]) ?? 1)}
-                        </MiniBadge>
-                        <MiniBadge tone="sunset">
-                          {formatCurrency(pickNumber(comment, ["price"]) ?? 0)}
-                        </MiniBadge>
-                      </div>
-                    </div>
-                    <p className="mt-4 text-sm leading-7 text-slate-700">
-                      {pickString(comment, ["text", "message", "content"]) ||
-                        "Không có nội dung comment."}
+          <div className="max-h-[760px] space-y-3 overflow-y-auto pr-1">
+            {comments.map((comment, index) => (
+              <article
+                key={`${pickString(comment, ["id", "_id"]) || index}`}
+                className="rounded-[24px] border border-[var(--border)] bg-[var(--surface-strong)] px-4 py-4 shadow-[var(--shadow-soft)]"
+              >
+                <div className="flex items-center justify-between gap-4">
+                  <div>
+                    <p className="text-sm font-semibold text-[var(--foreground)]">
+                      {pickString(comment, ["igUsername", "username"]) || "Instagram user"}
                     </p>
-                  </article>
-                );
-              })
-            )}
+                    <p className="mt-1 text-xs text-[var(--muted)]">
+                      {formatDateTime(pickString(comment, ["createdAt", "updatedAt"]))}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Tag tone="muted">
+                      Qty {formatNumber(pickNumber(comment, ["quantity"]) ?? 1)}
+                    </Tag>
+                    <Tag tone="blue">
+                      {formatCurrency(pickNumber(comment, ["price"]) ?? 0)}
+                    </Tag>
+                  </div>
+                </div>
+                <p className="mt-4 text-sm leading-7 text-[var(--foreground-soft)]">
+                  {pickString(comment, ["text", "content", "message"]) || "No message"}
+                </p>
+              </article>
+            ))}
           </div>
         </Panel>
 
         <div className="space-y-6">
-          <Panel
-            title="Instagram iframe"
-            eyebrow="Preview"
-            description="Nhúng trực tiếp `instagram.com`. Trên thực tế Instagram thường chặn iframe bằng header bảo mật, nên có sẵn link mở tab mới."
-          >
-            <div className="overflow-hidden rounded-[28px] border border-slate-900/10 bg-slate-950">
-              <iframe
-                src="https://www.instagram.com/"
-                title="Instagram preview"
-                loading="lazy"
-                className="h-[420px] w-full bg-white"
-                referrerPolicy="strict-origin-when-cross-origin"
-              />
-            </div>
-            <p className="mt-4 text-sm leading-7 text-slate-600">
-              Nếu iframe bị chặn, đó là giới hạn từ phía Instagram chứ không phải
-              lỗi giao diện.
-            </p>
-            <a
-              href="https://www.instagram.com/"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="mt-4 inline-flex rounded-full bg-[#ed6f57] px-4 py-2 text-sm font-semibold text-white"
-            >
-              Open Instagram in new tab
-            </a>
-          </Panel>
-
-          <Panel
-            title="Live metadata"
-            eyebrow="Context"
-            description="Thông tin tóm tắt từ endpoint `/lives/:id`."
-          >
-            <div className="grid gap-3">
-              {liveMetrics.map((item) => (
-                <DetailTile key={item.label} label={item.label} value={item.value} />
-              ))}
-            </div>
-          </Panel>
-
-          <Panel
-            title="Recent stream events"
-            eyebrow="Debug"
-            description="12 event gần nhất từ SSE stream."
-          >
-            {events.length === 0 ? (
-              <EmptyBlock message="Chưa có event nào từ stream." />
-            ) : (
-              <div className="space-y-3">
-                {events.map((event, index) => (
-                  <pre
-                    key={`${index}-${event.slice(0, 24)}`}
-                    className="overflow-auto rounded-[22px] border border-slate-900/10 bg-[#f9f4ec] p-4 text-xs leading-6 text-slate-700"
-                  >
-                    {event}
-                  </pre>
-                ))}
+          <Panel title="Instagram companion">
+            <div className="overflow-hidden rounded-[30px] border border-[var(--border)] bg-[linear-gradient(180deg,_rgba(9,13,22,0.98)_0%,_rgba(17,24,39,1)_100%)] shadow-[var(--shadow-soft)]">
+              <div className="flex items-center gap-3 border-b border-white/10 px-4 py-3 text-white/70">
+                <div className="flex items-center gap-1.5">
+                  <span className="h-2.5 w-2.5 rounded-full bg-[#ff5f57]" />
+                  <span className="h-2.5 w-2.5 rounded-full bg-[#ffbd2e]" />
+                  <span className="h-2.5 w-2.5 rounded-full bg-[#28c840]" />
+                </div>
+                <div className="min-w-0 rounded-full border border-white/10 bg-white/5 px-4 py-1 text-xs font-medium text-white/72">
+                  <span className="block truncate">
+                    {instagramHandle
+                      ? `instagram.com/${instagramHandle}`
+                      : "instagram.com"}
+                  </span>
+                </div>
               </div>
-            )}
+
+              <div className="space-y-5 p-5">
+                <div className="rounded-[26px] border border-white/10 bg-white/6 p-5 text-white">
+                  <div className="flex items-center justify-between gap-4">
+                    <div className="flex items-center gap-3">
+                      <span className="flex h-12 w-12 items-center justify-center rounded-[18px] bg-[linear-gradient(135deg,_rgba(255,255,255,0.2)_0%,_rgba(255,255,255,0.06)_100%)] text-sm font-semibold text-white">
+                        {liveTitle.slice(0, 1).toUpperCase()}
+                      </span>
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-semibold text-white">
+                          {liveTitle}
+                        </p>
+                        <p className="mt-1 text-xs text-white/60">
+                          {instagramHandle ? `@${instagramHandle}` : "Instagram live"}
+                        </p>
+                      </div>
+                    </div>
+                    <span className="rounded-full bg-emerald-400/14 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-300">
+                      {pickBoolean(live, ["isLive"]) ? "Live signal" : "Preview"}
+                    </span>
+                  </div>
+
+                  <p className="mt-5 text-2xl font-semibold tracking-[-0.04em] text-white">
+                    Open the real Instagram view without broken embeds.
+                  </p>
+                  <p className="mt-3 text-sm leading-7 text-white/68">
+                    Instagram chặn việc nhúng trực tiếp trong iframe. Panel này
+                    giữ đúng context phiên live để đội vận hành mở nhanh ở tab mới
+                    mà không gặp lỗi `refused to connect`.
+                  </p>
+
+                  <div className="mt-5 grid grid-cols-3 gap-3">
+                    <CompanionMetric
+                      label="Comments"
+                      value={formatNumber(
+                        pickNumber(live, ["totalComment", "totalComments"]) ??
+                          comments.length,
+                      )}
+                    />
+                    <CompanionMetric
+                      label="Orders"
+                      value={formatNumber(
+                        pickNumber(live, ["totalOrder", "totalOrders"]) ?? 0,
+                      )}
+                    />
+                    <CompanionMetric
+                      label="Updated"
+                      value={compactDate(
+                        pickString(live, ["lastWebhookAt", "updatedAt"]),
+                      )}
+                    />
+                  </div>
+                </div>
+
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <MiniMetric
+                    label="IG handle"
+                    value={instagramHandle ? `@${instagramHandle}` : "Open homepage"}
+                  />
+                  <MiniMetric
+                    label="Owner"
+                    value={
+                      pickString(user, ["fullName", "name", "username"]) ||
+                      session.user?.fullName ||
+                      "Owner"
+                    }
+                  />
+                </div>
+
+                <div className="flex flex-col gap-3 sm:flex-row">
+                  <a
+                    href={instagramUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className={`${PRIMARY_BUTTON_CLASS} flex-1`}
+                  >
+                    Open Instagram
+                  </a>
+                  <Link href="/livestreams" className={`${SECONDARY_BUTTON_CLASS} flex-1`}>
+                    Back to livestreams
+                  </Link>
+                </div>
+              </div>
+            </div>
+          </Panel>
+
+          <Panel title="Overview">
+            <div className="grid gap-3">
+              <MiniMetric label="IG Live ID" value={pickString(live, ["igLiveId"]) || liveId} />
+              <MiniMetric label="Shop" value={pickString(shop, ["name"]) || "Unknown"} />
+              <MiniMetric label="Owner" value={pickString(user, ["fullName", "name"]) || session.user?.fullName || "Owner"} />
+              <MiniMetric label="Comments" value={formatNumber(pickNumber(live, ["totalComment", "totalComments"]) ?? comments.length)} />
+              <MiniMetric label="Orders" value={formatNumber(pickNumber(live, ["totalOrder", "totalOrders"]) ?? 0)} />
+              <MiniMetric label="Last activity" value={formatDateTime(pickString(live, ["lastWebhookAt", "updatedAt"]))} />
+            </div>
           </Panel>
         </div>
       </div>
@@ -813,40 +654,32 @@ export function LiveDetailScreen({ liveId }: { liveId: string }) {
 }
 
 export function OrdersScreen() {
-  const { isReady, patchSession, session } = useSession();
-  const [search, setSearch] = useState("");
-  const [exportStart, setExportStart] = useState("2026-03-01");
-  const [exportEnd, setExportEnd] = useState("2026-03-31");
-  const deferredSearch = useDeferredValue(search);
-  const [state, setState] = useState<RequestState<unknown>>({
-    status: "idle",
+  const { logout, patchSession, session } = useSession();
+  const [query, setQuery] = useState("");
+  const search = useDeferredValue(query);
+  const [selectedOrderId, setSelectedOrderId] = useState("");
+  const [state, setState] = useState<AsyncState<unknown>>({
+    status: "loading",
     data: null,
     error: "",
   });
-  const [selectedOrderId, setSelectedOrderId] = useState("");
-  const [exportMessage, setExportMessage] = useState("");
+  const [exportState, setExportState] = useState("");
+  const [range, setRange] = useState({
+    startDate: "2026-03-01",
+    endDate: "2026-03-31",
+  });
 
   useEffect(() => {
-    if (!isReady || !session.baseUrl || !session.accessToken) {
-      return;
-    }
-
     let cancelled = false;
 
-    async function loadOrders() {
-      setState((current) => ({
-        ...current,
-        status: "loading",
-        error: "",
-      }));
-
+    async function load() {
       try {
-        const result = await proxyRequest(session, {
+        const response = await proxyRequest(session, {
           path: "/orders/user/my-orders",
           query: {
             page: 1,
-            limit: 18,
-            search: deferredSearch || undefined,
+            limit: 20,
+            search: search || undefined,
           },
         });
 
@@ -854,10 +687,11 @@ export function OrdersScreen() {
           return;
         }
 
-        syncSessionFromResponse(result.response, patchSession);
+        handleAuthSync([response.response], patchSession, logout);
+
         setState({
           status: "ready",
-          data: result.data,
+          data: response.data,
           error: "",
         });
       } catch (error) {
@@ -868,262 +702,210 @@ export function OrdersScreen() {
         setState({
           status: "error",
           data: null,
-          error: error instanceof Error ? error.message : "Không thể tải orders.",
+          error: error instanceof Error ? error.message : "Unable to load orders.",
         });
       }
     }
 
-    loadOrders();
+    load();
 
     return () => {
       cancelled = true;
     };
-  }, [deferredSearch, isReady, patchSession, session]);
+  }, [logout, patchSession, search, session]);
 
   const orders = extractCollection(state.data);
   const effectiveSelectedOrderId =
-    selectedOrderId || pickString(orders[0], ["id", "_id"]);
+    selectedOrderId || pickString(orders[0], ["id", "_id", "orderCode"]);
   const selectedOrder =
-    orders.find((item) => pickString(item, ["id", "_id"]) === effectiveSelectedOrderId) ??
-    orders[0] ??
-    null;
+    orders.find(
+      (order) =>
+        pickString(order, ["id", "_id", "orderCode"]) === effectiveSelectedOrderId,
+    ) ?? orders[0] ?? null;
+  const totalRevenue = orders.reduce(
+    (sum, order) => sum + (pickNumber(order, ["totalPrice", "amount"]) ?? 0),
+    0,
+  );
+  const totalDeposit = orders.reduce(
+    (sum, order) => sum + (pickNumber(order, ["deposit"]) ?? 0),
+    0,
+  );
 
-  const revenue = orders.reduce((total, item) => {
-    return total + (pickNumber(item, ["totalPrice", "amount"]) ?? 0);
-  }, 0);
-  const deposit = orders.reduce((total, item) => {
-    return total + (pickNumber(item, ["deposit"]) ?? 0);
-  }, 0);
-
-  async function handleExportExcel() {
-    if (!session.accessToken) {
-      return;
-    }
-
-    const download = await proxyDownload(session, {
+  async function handleExport() {
+    const response = await proxyDownload(session, {
       path: "/orders/export/excel",
-      query: {
-        startDate: exportStart,
-        endDate: exportEnd,
-      },
+      query: range,
     });
 
-    syncSessionFromResponse(download.response, patchSession);
+    handleAuthSync([response.response], patchSession, logout);
 
-    if (!download.ok) {
-      setExportMessage("Export thất bại. Kiểm tra lại khoảng ngày hoặc token.");
-      URL.revokeObjectURL(download.url);
+    if (!response.ok) {
+      setExportState("Export failed");
+      URL.revokeObjectURL(response.url);
       return;
     }
 
     const anchor = document.createElement("a");
-    anchor.href = download.url;
-    anchor.download = download.filename;
+    anchor.href = response.url;
+    anchor.download = response.filename;
     anchor.click();
 
-    setExportMessage(`Đã tạo file ${download.filename}`);
-    window.setTimeout(() => URL.revokeObjectURL(download.url), 60_000);
+    setExportState(response.filename);
+    window.setTimeout(() => URL.revokeObjectURL(response.url), 30000);
   }
 
   return (
-    <div className="space-y-6 pb-24 lg:pb-0">
-      <ScreenHero
-        eyebrow="Orders"
-        title="Quản lý đơn hàng theo live"
-        description="Lấy dữ liệu từ `/orders/user/my-orders` và hỗ trợ export Excel bằng `/orders/export/excel`."
-        actions={
-          <div className="grid gap-3 sm:grid-cols-2">
+    <div className="space-y-8 pb-28 lg:pb-6">
+      <Hero
+        label="Orders"
+        title="Commerce operations"
+        description="Theo dõi doanh thu trên trang hiện tại, rà soát đơn hàng và xuất dữ liệu cho đội vận hành."
+      />
+
+      <div className="grid gap-4 md:grid-cols-3">
+        <StatCard label="Orders" value={orders.length} accent="blue" />
+        <StatCard label="Revenue" value={formatCurrency(totalRevenue)} accent="cyan" />
+        <StatCard label="Deposit" value={formatCurrency(totalDeposit)} accent="slate" />
+      </div>
+
+      <Panel
+        title="Orders"
+        action={
+          <div className="flex flex-col gap-3 md:flex-row">
             <input
-              type="date"
-              value={exportStart}
-              onChange={(event) => setExportStart(event.target.value)}
-              className="h-11 rounded-2xl border border-slate-900/10 bg-white px-4 text-sm outline-none"
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Search order"
+              className={CONTROL_CLASS}
             />
             <input
               type="date"
-              value={exportEnd}
-              onChange={(event) => setExportEnd(event.target.value)}
-              className="h-11 rounded-2xl border border-slate-900/10 bg-white px-4 text-sm outline-none"
+              value={range.startDate}
+              onChange={(event) =>
+                setRange((current) => ({ ...current, startDate: event.target.value }))
+              }
+              className={CONTROL_CLASS}
+            />
+            <input
+              type="date"
+              value={range.endDate}
+              onChange={(event) =>
+                setRange((current) => ({ ...current, endDate: event.target.value }))
+              }
+              className={CONTROL_CLASS}
             />
             <button
               type="button"
-              onClick={handleExportExcel}
-              className="sm:col-span-2 inline-flex justify-center rounded-full bg-[#102b3b] px-4 py-2 text-sm font-semibold text-white"
+              onClick={handleExport}
+              className={PRIMARY_BUTTON_CLASS}
             >
-              Export Excel
+              Export
             </button>
           </div>
         }
-      />
-
-      {!session.accessToken ? <ConnectionEmptyState /> : null}
-
-      <div className="grid gap-4 md:grid-cols-3">
-        <MetricCard label="Orders page" value={orders.length} tone="ocean" />
-        <MetricCard label="Revenue page" value={formatCurrency(revenue)} tone="sunset" />
-        <MetricCard label="Deposits page" value={formatCurrency(deposit)} tone="sand" />
-      </div>
-
-      {exportMessage ? (
-        <div className="rounded-[24px] border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
-          {exportMessage}
-        </div>
-      ) : null}
-
-      <div className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
-        <Panel
-          title="Order list"
-          eyebrow="Operations"
-          description="Danh sách đơn hàng hiện tại. Chọn một đơn để xem chi tiết nhanh bên phải."
-        >
-          <div className="mb-5">
-            <input
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-              placeholder="Tìm theo order code, customer name hoặc phone"
-              className="h-12 w-full rounded-2xl border border-slate-900/10 bg-white px-4 text-sm outline-none transition focus:border-[#ed6f57] focus:ring-4 focus:ring-[#ed6f57]/15"
-            />
+      >
+        {exportState ? (
+          <div className="mb-4 rounded-2xl border border-[var(--border)] bg-[var(--surface-strong)] px-4 py-3 text-sm text-[var(--muted)]">
+            {exportState}
           </div>
+        ) : null}
 
-          {state.status === "loading" ? <LoadingBlock /> : null}
-          {state.status === "error" ? <ErrorBlock message={state.error} /> : null}
-          {state.status === "ready" && orders.length === 0 ? (
-            <EmptyBlock message="Không có order nào cho bộ lọc hiện tại." />
-          ) : null}
+        {state.status === "loading" ? <LoadingState /> : null}
+        {state.status === "error" ? <ErrorState message={state.error} /> : null}
+        {state.status === "ready" && orders.length === 0 ? (
+          <EmptyState message="Không có đơn hàng phù hợp." />
+        ) : null}
 
+        <div className="grid gap-6 xl:grid-cols-[1fr_0.9fr]">
           <div className="space-y-3">
-            {orders.map((order, index) => {
-              const orderId = pickString(order, ["id", "_id"]) || `${index}`;
-              const active = selectedOrderId === orderId;
-              return (
-                <button
-                  key={orderId}
-                  type="button"
-                  onClick={() => setSelectedOrderId(orderId)}
-                  className={`w-full rounded-[24px] border p-4 text-left transition ${
-                    active
-                      ? "border-[#ed6f57]/35 bg-white shadow-[0_18px_40px_rgba(53,34,14,0.08)]"
-                      : "border-slate-900/10 bg-[#fffaf4] hover:border-slate-900/20 hover:bg-white"
-                  }`}
-                >
-                  <div className="flex flex-wrap items-center gap-2">
-                    <MiniBadge tone="ocean">
+            {orders.map((order, index) => (
+              <button
+                key={`${pickString(order, ["id", "_id", "orderCode"]) || index}`}
+                type="button"
+                onClick={() =>
+                  setSelectedOrderId(pickString(order, ["id", "_id", "orderCode"]))
+                }
+                className={`w-full rounded-[24px] border px-4 py-4 text-left transition ${
+                  effectiveSelectedOrderId ===
+                  pickString(order, ["id", "_id", "orderCode"])
+                    ? "border-[color:var(--primary-soft)] bg-[var(--surface)] shadow-[var(--shadow-soft)]"
+                    : "border-[var(--border)] bg-[var(--surface-strong)] hover:-translate-y-0.5"
+                }`}
+              >
+                <div className="flex items-center justify-between gap-4">
+                  <div>
+                    <p className="text-sm font-semibold text-[var(--foreground)]">
                       {pickString(order, ["orderCode", "code"]) || "Order"}
-                    </MiniBadge>
-                    <MiniBadge
-                      tone={
-                        (pickNumber(order, ["deposit"]) ?? 0) > 0
-                          ? "sunset"
-                          : "neutral"
-                      }
-                    >
-                      Deposit {formatCurrency(pickNumber(order, ["deposit"]) ?? 0)}
-                    </MiniBadge>
+                    </p>
+                    <p className="mt-1 text-xs text-[var(--muted)]">
+                      {pickString(order, ["igName", "customerName"]) || "Customer"}
+                    </p>
                   </div>
-                  <h3 className="mt-3 text-sm font-semibold text-slate-950">
-                    {pickString(order, ["igName", "customerName"]) || "Khách hàng"}
-                  </h3>
-                  <div className="mt-3 grid gap-2 md:grid-cols-2">
-                    <InlineMetric
-                      label="Total"
-                      value={formatCurrency(pickNumber(order, ["totalPrice", "amount"]) ?? 0)}
-                    />
-                    <InlineMetric
-                      label="Created"
-                      value={formatDateTime(
-                        pickString(order, ["createdAt", "updatedAt"]),
-                      )}
-                    />
-                  </div>
-                </button>
-              );
-            })}
+                  <Tag tone={(pickNumber(order, ["deposit"]) ?? 0) > 0 ? "blue" : "muted"}>
+                    {formatCurrency(pickNumber(order, ["deposit"]) ?? 0)}
+                  </Tag>
+                </div>
+                <div className="mt-4 grid grid-cols-2 gap-3">
+                  <MiniMetric
+                    label="Total"
+                    value={formatCurrency(pickNumber(order, ["totalPrice", "amount"]) ?? 0)}
+                  />
+                  <MiniMetric
+                    label="Created"
+                    value={formatDateTime(pickString(order, ["createdAt", "updatedAt"]))}
+                  />
+                </div>
+              </button>
+            ))}
           </div>
-        </Panel>
 
-        <Panel
-          title="Selected order"
-          eyebrow="Detail"
-          description="Tóm tắt chi tiết đơn hàng đang chọn. Thao tác chuyên sâu vẫn có thể dùng ở API Studio."
-        >
-          {!selectedOrder ? (
-            <EmptyBlock message="Chọn một đơn hàng để xem chi tiết." />
-          ) : (
-            <div className="space-y-4">
-              <DetailTile
-                label="Order code"
-                value={pickString(selectedOrder, ["orderCode", "code"]) || "Chưa có"}
-              />
-              <DetailTile
-                label="Customer"
-                value={pickString(selectedOrder, ["igName", "customerName"]) || "Chưa có"}
-              />
-              <DetailTile
-                label="Phone"
-                value={pickString(selectedOrder, ["phone"]) || "Chưa có"}
-              />
-              <DetailTile
-                label="Deposit"
-                value={formatCurrency(pickNumber(selectedOrder, ["deposit"]) ?? 0)}
-              />
-              <DetailTile
-                label="Total price"
-                value={formatCurrency(pickNumber(selectedOrder, ["totalPrice", "amount"]) ?? 0)}
-              />
-              <DetailTile
-                label="Created"
-                value={formatDateTime(
-                  pickString(selectedOrder, ["createdAt", "updatedAt"]),
-                )}
-              />
-              <pre className="overflow-auto rounded-[22px] border border-slate-900/10 bg-[#f9f4ec] p-4 text-xs leading-6 text-slate-700">
-                {JSON.stringify(selectedOrder, null, 2)}
-              </pre>
-            </div>
-          )}
-        </Panel>
-      </div>
+          <PanelInset title="Focus order">
+            {!selectedOrder ? (
+              <EmptyState message="Chưa có đơn hàng để hiển thị." compact />
+            ) : (
+              <div className="space-y-3">
+                <MiniMetric label="Order code" value={pickString(selectedOrder, ["orderCode", "code"]) || "Order"} />
+                <MiniMetric label="Customer" value={pickString(selectedOrder, ["igName", "customerName"]) || "Customer"} />
+                <MiniMetric label="Phone" value={pickString(selectedOrder, ["phone"]) || "No phone"} />
+                <MiniMetric label="Deposit" value={formatCurrency(pickNumber(selectedOrder, ["deposit"]) ?? 0)} />
+                <MiniMetric label="Total" value={formatCurrency(pickNumber(selectedOrder, ["totalPrice", "amount"]) ?? 0)} />
+                <MiniMetric label="Created" value={formatDateTime(pickString(selectedOrder, ["createdAt", "updatedAt"]))} />
+              </div>
+            )}
+          </PanelInset>
+        </div>
+      </Panel>
     </div>
   );
 }
 
 export function CustomersScreen() {
-  const { isReady, patchSession, session } = useSession();
-  const [search, setSearch] = useState("");
-  const deferredSearch = useDeferredValue(search);
-  const [state, setState] = useState<RequestState<unknown>>({
-    status: "idle",
+  const { logout, patchSession, session } = useSession();
+  const [query, setQuery] = useState("");
+  const search = useDeferredValue(query);
+  const [selectedCustomerId, setSelectedCustomerId] = useState("");
+  const [state, setState] = useState<AsyncState<unknown>>({
+    status: "loading",
     data: null,
     error: "",
   });
-  const [selectedCustomerId, setSelectedCustomerId] = useState("");
-  const [detailState, setDetailState] = useState<RequestState<unknown>>({
+  const [detailState, setDetailState] = useState<AsyncState<unknown>>({
     status: "idle",
     data: null,
     error: "",
   });
 
   useEffect(() => {
-    if (!isReady || !session.baseUrl || !session.accessToken) {
-      return;
-    }
-
     let cancelled = false;
 
-    async function loadCustomers() {
-      setState((current) => ({
-        ...current,
-        status: "loading",
-        error: "",
-      }));
-
+    async function load() {
       try {
-        const result = await proxyRequest(session, {
+        const response = await proxyRequest(session, {
           path: "/customers/user/my-customers",
           query: {
             page: 1,
-            limit: 18,
-            search: deferredSearch || undefined,
+            limit: 20,
+            search: search || undefined,
           },
         });
 
@@ -1131,10 +913,10 @@ export function CustomersScreen() {
           return;
         }
 
-        syncSessionFromResponse(result.response, patchSession);
+        handleAuthSync([response.response], patchSession, logout);
         setState({
           status: "ready",
-          data: result.data,
+          data: response.data,
           error: "",
         });
       } catch (error) {
@@ -1145,44 +927,32 @@ export function CustomersScreen() {
         setState({
           status: "error",
           data: null,
-          error: error instanceof Error ? error.message : "Không thể tải customers.",
+          error: error instanceof Error ? error.message : "Unable to load customers.",
         });
       }
     }
 
-    loadCustomers();
+    load();
 
     return () => {
       cancelled = true;
     };
-  }, [deferredSearch, isReady, patchSession, session]);
+  }, [logout, patchSession, search, session]);
 
   const customers = extractCollection(state.data);
   const effectiveSelectedCustomerId =
     selectedCustomerId || pickString(customers[0], ["id", "_id"]);
-  const selectedCustomer =
-    customers.find(
-      (item) => pickString(item, ["id", "_id"]) === effectiveSelectedCustomerId,
-    ) ??
-    customers[0] ??
-    null;
 
   useEffect(() => {
-    if (!effectiveSelectedCustomerId || !session.accessToken) {
+    if (!effectiveSelectedCustomerId) {
       return;
     }
 
     let cancelled = false;
 
-    async function loadCustomerDetail() {
-      setDetailState((current) => ({
-        ...current,
-        status: "loading",
-        error: "",
-      }));
-
+    async function loadDetail() {
       try {
-        const result = await proxyRequest(session, {
+        const response = await proxyRequest(session, {
           path: `/customers/${effectiveSelectedCustomerId}`,
           query: { includeHistories: true },
         });
@@ -1191,10 +961,10 @@ export function CustomersScreen() {
           return;
         }
 
-        syncSessionFromResponse(result.response, patchSession);
+        handleAuthSync([response.response], patchSession, logout);
         setDetailState({
           status: "ready",
-          data: result.data,
+          data: response.data,
           error: "",
         });
       } catch (error) {
@@ -1205,410 +975,347 @@ export function CustomersScreen() {
         setDetailState({
           status: "error",
           data: null,
-          error:
-            error instanceof Error ? error.message : "Không thể tải customer detail.",
+          error: error instanceof Error ? error.message : "Unable to load customer detail.",
         });
       }
     }
 
-    loadCustomerDetail();
+    loadDetail();
 
     return () => {
       cancelled = true;
     };
-  }, [effectiveSelectedCustomerId, patchSession, session]);
+  }, [effectiveSelectedCustomerId, logout, patchSession, session]);
 
-  const phoneCount = customers.filter(
-    (item) => Boolean(pickString(item, ["phone"])),
-  ).length;
-  const selectedDetail = asRecord(extractApiData(detailState.data));
-  const selectedTags = extractCollection(selectedDetail.tags);
-  const histories = extractCollection(selectedDetail.histories);
+  const detail = asRecord(extractApiData(detailState.data));
+  const tags = extractCollection(detail.tags);
+  const histories = extractCollection(detail.histories);
 
   return (
-    <div className="space-y-6 pb-24 lg:pb-0">
-      <ScreenHero
-        eyebrow="Customers"
-        title="Quản lý khách hàng và hồ sơ mua hàng"
-        description="Lấy danh sách từ `/customers/user/my-customers` và detail từ `/customers/:customerId?includeHistories=true`."
+    <div className="space-y-8 pb-28 lg:pb-6">
+      <Hero
+        label="Customers"
+        title="Relationship layer"
+        description="Tập trung vào hồ sơ khách hàng, nhịp độ mua hàng và những tín hiệu đáng chú ý để chăm sóc đúng lúc."
       />
 
-      {!session.accessToken ? <ConnectionEmptyState /> : null}
+      <Panel
+        title="Customer base"
+        action={
+          <input
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder="Search customer"
+            className={`${CONTROL_CLASS} w-full md:w-64`}
+          />
+        }
+      >
+        {state.status === "loading" ? <LoadingState /> : null}
+        {state.status === "error" ? <ErrorState message={state.error} /> : null}
+        {state.status === "ready" && customers.length === 0 ? (
+          <EmptyState message="Chưa có khách hàng phù hợp." />
+        ) : null}
 
-      <div className="grid gap-4 md:grid-cols-3">
-        <MetricCard label="Customers page" value={customers.length} tone="forest" />
-        <MetricCard label="Có số điện thoại" value={phoneCount} tone="sand" />
-        <MetricCard
-          label="Có lịch sử"
-          value={formatNumber(histories.length)}
-          tone="ocean"
-        />
-      </div>
-
-      <div className="grid gap-6 xl:grid-cols-[1.05fr_0.95fr]">
-        <Panel
-          title="Customer list"
-          eyebrow="Audience"
-          description="Chọn một customer để xem profile chi tiết, tags và histories."
-        >
-          <div className="mb-5">
-            <input
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-              placeholder="Tìm theo tên Instagram hoặc số điện thoại"
-              className="h-12 w-full rounded-2xl border border-slate-900/10 bg-white px-4 text-sm outline-none transition focus:border-[#ed6f57] focus:ring-4 focus:ring-[#ed6f57]/15"
-            />
-          </div>
-
-          {state.status === "loading" ? <LoadingBlock /> : null}
-          {state.status === "error" ? <ErrorBlock message={state.error} /> : null}
-          {state.status === "ready" && customers.length === 0 ? (
-            <EmptyBlock message="Không có khách hàng nào khớp điều kiện lọc." />
-          ) : null}
-
+        <div className="grid gap-6 xl:grid-cols-[1fr_0.92fr]">
           <div className="space-y-3">
-            {customers.map((customer, index) => {
-              const customerId = pickString(customer, ["id", "_id"]) || `${index}`;
-              const active = selectedCustomerId === customerId;
-
-              return (
-                <button
-                  key={customerId}
-                  type="button"
-                  onClick={() => setSelectedCustomerId(customerId)}
-                  className={`w-full rounded-[24px] border p-4 text-left transition ${
-                    active
-                      ? "border-[#ed6f57]/35 bg-white shadow-[0_18px_40px_rgba(53,34,14,0.08)]"
-                      : "border-slate-900/10 bg-[#fffaf4] hover:border-slate-900/20 hover:bg-white"
-                  }`}
-                >
-                  <div className="flex flex-wrap items-center gap-2">
-                    <MiniBadge tone="forest">
+            {customers.map((customer, index) => (
+              <button
+                key={`${pickString(customer, ["id", "_id"]) || index}`}
+                type="button"
+                onClick={() =>
+                  setSelectedCustomerId(pickString(customer, ["id", "_id"]))
+                }
+                className={`w-full rounded-[24px] border px-4 py-4 text-left transition ${
+                  effectiveSelectedCustomerId === pickString(customer, ["id", "_id"])
+                    ? "border-[color:var(--primary-soft)] bg-[var(--surface)] shadow-[var(--shadow-soft)]"
+                    : "border-[var(--border)] bg-[var(--surface-strong)] hover:-translate-y-0.5"
+                }`}
+              >
+                <div className="flex items-center justify-between gap-4">
+                  <div>
+                    <p className="text-sm font-semibold text-[var(--foreground)]">
                       {pickString(customer, ["igName", "name"]) || "Customer"}
-                    </MiniBadge>
-                    {pickString(customer, ["phone"]) ? (
-                      <MiniBadge tone="ocean">{pickString(customer, ["phone"])}</MiniBadge>
-                    ) : null}
+                    </p>
+                    <p className="mt-1 text-xs text-[var(--muted)]">
+                      {pickString(customer, ["phone"]) || "No phone"}
+                    </p>
                   </div>
-                  <p className="mt-3 text-sm text-slate-700">
-                    {buildAddress(customer) || "Chưa có địa chỉ"}
-                  </p>
-                  <p className="mt-3 text-[11px] uppercase tracking-[0.18em] text-slate-400">
-                    {formatDateTime(
-                      pickString(customer, ["updatedAt", "createdAt"]),
-                    )}
-                  </p>
-                </button>
-              );
-            })}
-          </div>
-        </Panel>
-
-        <Panel
-          title="Customer detail"
-          eyebrow="Profile"
-          description="Panel chi tiết dành cho customer đang chọn."
-        >
-          {!selectedCustomer ? (
-            <EmptyBlock message="Chọn một customer để xem hồ sơ." />
-          ) : detailState.status === "loading" ? (
-            <LoadingBlock />
-          ) : detailState.status === "error" ? (
-            <ErrorBlock message={detailState.error} />
-          ) : (
-            <div className="space-y-4">
-              <DetailTile
-                label="Instagram name"
-                value={
-                  pickString(selectedDetail, ["igName", "name"]) ||
-                  pickString(selectedCustomer, ["igName", "name"]) ||
-                  "Chưa có"
-                }
-              />
-              <DetailTile
-                label="Phone"
-                value={
-                  pickString(selectedDetail, ["phone"]) ||
-                  pickString(selectedCustomer, ["phone"]) ||
-                  "Chưa có"
-                }
-              />
-              <DetailTile
-                label="Birthday"
-                value={formatDateTime(pickString(selectedDetail, ["dayOfBirth"]))}
-              />
-              <DetailTile
-                label="Address"
-                value={buildAddress(selectedDetail) || buildAddress(selectedCustomer) || "Chưa có"}
-              />
-              <DetailTile
-                label="Note"
-                value={pickString(selectedDetail, ["note"]) || "Không có ghi chú"}
-              />
-
-              <div className="rounded-[22px] border border-slate-900/10 bg-[#f9f4ec] p-4">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-                  Tags
+                  <Tag tone="muted">
+                    {formatDateTime(pickString(customer, ["updatedAt", "createdAt"]))}
+                  </Tag>
+                </div>
+                <p className="mt-4 text-sm text-[var(--muted)]">
+                  {compactAddress(customer) || "No address"}
                 </p>
-                <div className="mt-3 flex flex-wrap gap-2">
-                  {selectedTags.length === 0 ? (
-                    <MiniBadge tone="neutral">Chưa có tag</MiniBadge>
-                  ) : (
-                    selectedTags.map((tag, index) => (
-                      <MiniBadge key={`${pickString(tag, ["id", "_id"]) || index}`} tone="sunset">
-                        {pickString(tag, ["label", "name"]) || "Tag"}
-                      </MiniBadge>
-                    ))
-                  )}
+              </button>
+            ))}
+          </div>
+
+          <PanelInset title="Customer profile">
+            {detailState.status === "idle" || detailState.status === "loading" ? (
+              <LoadingState compact />
+            ) : detailState.status === "error" ? (
+              <ErrorState message={detailState.error} compact />
+            ) : (
+              <div className="space-y-3">
+                <MiniMetric label="Instagram" value={pickString(detail, ["igName", "name"]) || "Customer"} />
+                <MiniMetric label="Phone" value={pickString(detail, ["phone"]) || "No phone"} />
+                <MiniMetric label="Birthday" value={formatDateTime(pickString(detail, ["dayOfBirth"]))} />
+                <MiniMetric label="Address" value={compactAddress(detail) || "No address"} />
+                <MiniMetric label="Notes" value={pickString(detail, ["note"]) || "No notes"} />
+                <div className="rounded-[22px] border border-[var(--border)] bg-[var(--surface-strong)] px-4 py-4">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[var(--muted)]">
+                    Tags
+                  </p>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {tags.length === 0 ? (
+                      <Tag tone="muted">No tags</Tag>
+                    ) : (
+                      tags.map((tag, index) => (
+                        <Tag key={`${pickString(tag, ["id", "_id"]) || index}`} tone="blue">
+                          {pickString(tag, ["label", "name"]) || "Tag"}
+                        </Tag>
+                      ))
+                    )}
+                  </div>
+                </div>
+                <div className="rounded-[22px] border border-[var(--border)] bg-[var(--surface-strong)] px-4 py-4">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[var(--muted)]">
+                    Recent history
+                  </p>
+                  <div className="mt-3 space-y-2">
+                    {histories.length === 0 ? (
+                      <EmptyState message="Chưa có lịch sử nào." compact />
+                    ) : (
+                      histories.slice(0, 4).map((history, index) => (
+                        <div
+                          key={`${pickString(history, ["id", "_id"]) || index}`}
+                          className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] px-3 py-3 text-sm text-[var(--foreground-soft)]"
+                        >
+                          {pickString(history, ["title", "action", "type", "note"]) || "Customer activity"}
+                        </div>
+                      ))
+                    )}
+                  </div>
                 </div>
               </div>
-
-              <div className="rounded-[22px] border border-slate-900/10 bg-[#f9f4ec] p-4">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-                  Histories
-                </p>
-                {histories.length === 0 ? (
-                  <p className="mt-3 text-sm text-slate-600">
-                    Chưa có history nào trong payload hiện tại.
-                  </p>
-                ) : (
-                  <div className="mt-3 space-y-2">
-                    {histories.slice(0, 5).map((history, index) => (
-                      <div
-                        key={`${index}-${pickString(history, ["id", "_id"])}`}
-                        className="rounded-2xl border border-slate-900/10 bg-white px-3 py-3 text-sm text-slate-700"
-                      >
-                        {pickString(history, ["title", "action", "type", "note"]) ||
-                          JSON.stringify(history)}
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-        </Panel>
-      </div>
+            )}
+          </PanelInset>
+        </div>
+      </Panel>
     </div>
   );
 }
 
-function ScreenHero({
-  eyebrow,
+function Hero({
+  label,
   title,
   description,
-  actions,
 }: {
-  eyebrow: string;
+  label: string;
   title: string;
   description: string;
-  actions?: React.ReactNode;
 }) {
   return (
-    <section className="overflow-hidden rounded-[36px] border border-slate-900/10 bg-[linear-gradient(135deg,_rgba(16,43,59,0.98)_0%,_rgba(27,62,82,0.95)_48%,_rgba(237,111,87,0.96)_100%)] p-6 text-white shadow-[0_30px_100px_rgba(16,43,59,0.18)] md:p-8">
-      <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-white/65">
-        {eyebrow}
+    <section className="overflow-hidden rounded-[36px] border border-[var(--border)] bg-[linear-gradient(140deg,_rgba(10,132,255,0.14)_0%,_rgba(90,200,250,0.08)_36%,_var(--surface-strong)_100%)] px-6 py-7 shadow-[var(--shadow-soft)] backdrop-blur-2xl md:px-8 md:py-8 lg:px-9 lg:py-9">
+      <p className="text-[11px] font-semibold uppercase tracking-[0.26em] text-[var(--muted)]">
+        {label}
       </p>
-      <div className="mt-4 flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
-        <div className="max-w-3xl">
-          <h1 className="text-4xl font-semibold tracking-[-0.05em] md:text-5xl">
-            {title}
-          </h1>
-          <p className="mt-4 text-sm leading-7 text-white/78 md:text-base">
-            {description}
-          </p>
-        </div>
-        {actions ? <div className="shrink-0">{actions}</div> : null}
-      </div>
+      <h1 className="mt-4 max-w-4xl text-4xl font-semibold tracking-[-0.05em] text-[var(--foreground)] md:text-5xl">
+        {title}
+      </h1>
+      <p className="mt-4 max-w-3xl text-sm leading-8 text-[var(--foreground-soft)] md:text-base">
+        {description}
+      </p>
     </section>
   );
 }
 
 function Panel({
   title,
-  eyebrow,
-  description,
   children,
+  action,
 }: {
   title: string;
-  eyebrow: string;
-  description: string;
   children: React.ReactNode;
+  action?: React.ReactNode;
 }) {
   return (
-    <section className="rounded-[32px] border border-slate-900/10 bg-white/80 p-5 shadow-[0_20px_80px_rgba(110,81,41,0.08)] backdrop-blur-xl md:p-6">
-      <div className="mb-5">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-500">
-          {eyebrow}
-        </p>
-        <h2 className="mt-2 text-2xl font-semibold tracking-[-0.03em] text-slate-950">
+    <section className="rounded-[32px] border border-[var(--border)] bg-[var(--surface)] px-5 py-5 shadow-[var(--shadow-soft)] backdrop-blur-2xl md:px-6 md:py-6 lg:px-7 lg:py-7">
+      <div className="mb-5 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+        <h2 className="text-2xl font-semibold tracking-[-0.04em] text-[var(--foreground)]">
           {title}
         </h2>
-        <p className="mt-3 text-sm leading-7 text-slate-600">{description}</p>
+        {action}
       </div>
       {children}
     </section>
   );
 }
 
-function MetricCard({
+function PanelInset({
+  title,
+  children,
+}: {
+  title: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="rounded-[28px] border border-[var(--border)] bg-[linear-gradient(180deg,_var(--surface-strong)_0%,_var(--surface)_100%)] px-4 py-4 shadow-[var(--shadow-soft)] md:px-5 md:py-5">
+      <h3 className="text-lg font-semibold text-[var(--foreground)]">{title}</h3>
+      <div className="mt-4">{children}</div>
+    </div>
+  );
+}
+
+function StatCard({
   label,
   value,
-  tone,
+  accent,
 }: {
   label: string;
   value: Primitive;
-  tone: "sunset" | "ocean" | "forest" | "sand";
+  accent: "blue" | "cyan" | "indigo" | "slate";
 }) {
-  const styles = {
-    sunset: "from-[#ed6f57]/18 to-[#fffaf4]",
-    ocean: "from-[#102b3b]/16 to-[#f6f0e8]",
-    forest: "from-emerald-500/16 to-[#f6f0e8]",
-    sand: "from-amber-400/18 to-[#fffaf4]",
-  }[tone];
+  const accentClass = {
+    blue: "from-[rgba(10,132,255,0.18)] to-transparent",
+    cyan: "from-[rgba(90,200,250,0.18)] to-transparent",
+    indigo: "from-[rgba(88,86,214,0.18)] to-transparent",
+    slate: "from-[rgba(148,163,184,0.16)] to-transparent",
+  }[accent];
 
   return (
-    <article
-      className={`rounded-[28px] border border-slate-900/10 bg-gradient-to-br ${styles} p-5 shadow-[0_20px_80px_rgba(110,81,41,0.06)]`}
-    >
-      <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-        {label}
-      </p>
-      <p className="mt-4 text-4xl font-semibold tracking-[-0.05em] text-slate-950">
-        {typeof value === "number" ? formatNumber(value) : String(value)}
-      </p>
+    <article className="rounded-[28px] border border-[var(--border)] bg-[linear-gradient(180deg,_var(--surface-strong)_0%,_var(--surface)_100%)] px-5 py-5 shadow-[var(--shadow-soft)]">
+      <div className={`rounded-[24px] bg-gradient-to-br ${accentClass} px-1 py-1`}>
+        <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[var(--muted)]">
+          {label}
+        </p>
+        <p className="mt-4 text-4xl font-semibold tracking-[-0.05em] text-[var(--foreground)]">
+          {typeof value === "number" ? formatNumber(value) : String(value)}
+        </p>
+      </div>
     </article>
   );
 }
 
-function DetailTile({ label, value }: { label: string; value: Primitive }) {
+function MiniMetric({ label, value }: { label: string; value: Primitive }) {
   return (
-    <div className="rounded-[22px] border border-slate-900/10 bg-[#fffaf4] px-4 py-4">
-      <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+    <div className="rounded-[22px] border border-[var(--border)] bg-[var(--surface-muted)] px-4 py-4">
+      <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[var(--muted)]">
         {label}
       </p>
-      <p className="mt-2 break-words text-sm leading-7 text-slate-800">
+      <p className="mt-2 text-sm font-semibold leading-7 text-[var(--foreground)]">
         {String(value)}
       </p>
     </div>
   );
 }
 
-function InlineMetric({ label, value }: { label: string; value: Primitive }) {
-  return (
-    <div className="rounded-[20px] bg-slate-100 px-3 py-3">
-      <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-        {label}
-      </p>
-      <p className="mt-2 truncate text-sm font-semibold text-slate-900">
-        {String(value)}
-      </p>
-    </div>
-  );
-}
-
-function MiniBadge({
+function Tag({
   children,
   tone,
 }: {
   children: React.ReactNode;
-  tone: "sunset" | "ocean" | "forest" | "sand" | "neutral" | "danger";
+  tone: "blue" | "muted" | "danger";
 }) {
-  const styles = {
-    sunset: "bg-[#ffe0d9] text-[#ac3f29]",
-    ocean: "bg-[#dceaf2] text-[#1f4b66]",
-    forest: "bg-emerald-100 text-emerald-800",
-    sand: "bg-amber-100 text-amber-800",
-    neutral: "bg-slate-100 text-slate-700",
-    danger: "bg-rose-100 text-rose-800",
+  const tones = {
+    blue: "bg-[rgba(10,132,255,0.14)] text-[var(--primary)]",
+    muted: "bg-[var(--surface-muted)] text-[var(--muted)]",
+    danger: "bg-[rgba(255,69,58,0.14)] text-[rgb(255,69,58)]",
   }[tone];
 
   return (
-    <span
-      className={`inline-flex rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] ${styles}`}
-    >
+    <span className={`inline-flex rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] ${tones}`}>
       {children}
     </span>
   );
 }
 
-function QuickLink({ href, label }: { href: string; label: string }) {
+function LinkPill({ href, label }: { href: string; label: string }) {
   return (
     <Link
       href={href}
-      className="inline-flex rounded-full border border-white/15 bg-white/10 px-4 py-2 text-sm font-semibold text-white transition hover:border-white/30 hover:bg-white/14"
+      className={SECONDARY_BUTTON_CLASS}
     >
       {label}
     </Link>
   );
 }
 
-function ConnectionEmptyState() {
+function LoadingState({ compact = false }: { compact?: boolean }) {
   return (
-    <div className="rounded-[28px] border border-dashed border-slate-900/15 bg-white/75 px-5 py-4 text-sm leading-7 text-slate-600">
-      Màn hình này cần `accessToken`. Hãy mở `Backend settings` ở góc trên bên phải
-      để nhập backend origin và JWT trước khi tải dữ liệu.
+    <div className={`rounded-[24px] border border-[var(--border)] bg-[var(--surface-muted)] text-[var(--muted)] ${compact ? "px-4 py-4 text-sm" : "mb-4 px-4 py-5 text-sm"}`}>
+      Loading…
     </div>
   );
 }
 
-function LoadingBlock() {
+function ErrorState({
+  message,
+  compact = false,
+}: {
+  message: string;
+  compact?: boolean;
+}) {
   return (
-    <div className="rounded-[24px] border border-slate-900/10 bg-[#f9f4ec] px-4 py-5 text-sm text-slate-600">
-      Đang tải dữ liệu...
-    </div>
-  );
-}
-
-function ErrorBlock({ message }: { message: string }) {
-  return (
-    <div className="rounded-[24px] border border-rose-200 bg-rose-50 px-4 py-5 text-sm text-rose-800">
+    <div className={`rounded-[24px] border border-[rgba(255,69,58,0.24)] bg-[rgba(255,69,58,0.08)] text-[rgb(255,69,58)] ${compact ? "px-4 py-4 text-sm" : "mb-4 px-4 py-5 text-sm"}`}>
       {message}
     </div>
   );
 }
 
-function EmptyBlock({ message }: { message: string }) {
+function EmptyState({
+  message,
+  compact = false,
+}: {
+  message: string;
+  compact?: boolean;
+}) {
   return (
-    <div className="rounded-[24px] border border-dashed border-slate-900/10 bg-[#f9f4ec] px-4 py-5 text-sm text-slate-600">
+    <div className={`rounded-[24px] border border-dashed border-[var(--border)] bg-[var(--surface-muted)] text-[var(--muted)] ${compact ? "px-4 py-4 text-sm" : "px-4 py-5 text-sm"}`}>
       {message}
     </div>
   );
 }
 
-function summarizeMetric(value: unknown) {
+function CompanionMetric({
+  label,
+  value,
+}: {
+  label: string;
+  value: Primitive;
+}) {
+  return (
+    <div className="rounded-[20px] border border-white/10 bg-white/5 px-4 py-3">
+      <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-white/52">
+        {label}
+      </p>
+      <p className="mt-2 text-sm font-semibold text-white">{String(value)}</p>
+    </div>
+  );
+}
+
+function compactMetric(value: unknown) {
   const record = asRecord(value);
-
-  return (
+  const primary =
     pickNumber(record, [
       "total",
       "count",
+      "value",
       "totalOrders",
       "totalComments",
       "totalLives",
       "totalCustomers",
-      "value",
-    ]) ?? findFirstNumber(record) ?? 0
-  );
+    ]) ?? 0;
+
+  return {
+    primary,
+  };
 }
 
-function syncSessionFromResponse(
-  response: Response | Headers,
-  patchSession: (patch: Record<string, string>) => void,
-) {
-  const headers = response instanceof Response ? response.headers : response;
-  const refreshedAccessToken = headers.get("x-refreshed-access-token");
-
-  if (refreshedAccessToken) {
-    patchSession({
-      accessToken: refreshedAccessToken,
-    });
-  }
-}
-
-function safelyParseJson(value: string) {
+function safelyParseEvent(value: string) {
   try {
-    return JSON.parse(value) as unknown;
+    return JSON.parse(value) as Record<string, unknown>;
   } catch {
     return {};
   }
@@ -1630,7 +1337,7 @@ function dedupeComments(comments: Record<string, unknown>[]) {
   });
 }
 
-function buildAddress(value: unknown) {
+function compactAddress(value: unknown) {
   const record = asRecord(value);
   return [
     pickString(record, ["street"]),
@@ -1639,4 +1346,76 @@ function buildAddress(value: unknown) {
   ]
     .filter(Boolean)
     .join(", ");
+}
+
+function resolveInstagramHandle(
+  live: Record<string, unknown>,
+  shop: Record<string, unknown>,
+  user: Record<string, unknown>,
+) {
+  const handle = [
+    pickString(live, ["igUsername", "instagramUsername", "username"]),
+    pickString(shop, ["igUsername", "instagramUsername", "username"]),
+    pickString(user, ["igUsername", "instagramUsername", "username"]),
+  ].find(Boolean);
+
+  return normalizeInstagramHandle(handle ?? "");
+}
+
+function buildInstagramUrl(handle: string) {
+  if (!handle) {
+    return "https://www.instagram.com/";
+  }
+
+  return `https://www.instagram.com/${handle}/`;
+}
+
+function normalizeInstagramHandle(value: string) {
+  return value.trim().replace(/^@+/, "").replace(/^https?:\/\/(www\.)?instagram\.com\//, "").replace(/\/.*$/, "");
+}
+
+function compactDate(value: string) {
+  if (!value) {
+    return "No data";
+  }
+
+  try {
+    return new Intl.DateTimeFormat("en-US", {
+      month: "short",
+      day: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+    }).format(new Date(value));
+  } catch {
+    return value;
+  }
+}
+
+function formatStreamState(value: "connecting" | "live" | "stopped" | "error") {
+  return {
+    connecting: "Connecting",
+    live: "Live",
+    stopped: "Stopped",
+    error: "Error",
+  }[value];
+}
+
+function handleAuthSync(
+  responses: Response[],
+  patchSession: (patch: Partial<SessionSettings>) => void,
+  logout: () => Promise<void>,
+) {
+  const refreshedAccessToken = responses
+    .map((response) => response.headers.get("x-refreshed-access-token"))
+    .find(Boolean);
+
+  if (refreshedAccessToken) {
+    patchSession({
+      accessToken: refreshedAccessToken,
+    });
+  }
+
+  if (responses.some((response) => response.status === 401)) {
+    void logout();
+  }
 }

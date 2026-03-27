@@ -6,7 +6,7 @@ import { absoluteUrl } from "@/lib/site";
 export const metadata: Metadata = {
   title: "Dashboard",
   description:
-    "Dashboard vận hành LiveTracker với metrics tổng quan, subscription và notification mới nhất.",
+    "Không gian điều hành trung tâm cho LiveTracker với dashboard thương mại, livestream realtime, đơn hàng và khách hàng.",
   alternates: {
     canonical: absoluteUrl("/"),
   },

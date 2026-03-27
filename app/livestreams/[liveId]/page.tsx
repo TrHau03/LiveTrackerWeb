@@ -17,7 +17,7 @@ export async function generateMetadata({
   return {
     title: `Livestream ${liveId}`,
     description:
-      "Màn hình comment listener realtime cho livestream, dùng SSE comment stream và Instagram iframe preview.",
+      "Không gian realtime cho một livestream, tập trung vào comment feed, trạng thái live và preview Instagram.",
     alternates: {
       canonical: absoluteUrl(`/livestreams/${encodeURIComponent(liveId)}`),
     },
@@ -29,4 +29,3 @@ export default async function LivestreamDetailPage({ params }: PageProps) {
 
   return <LiveDetailScreen liveId={liveId} />;
 }
-

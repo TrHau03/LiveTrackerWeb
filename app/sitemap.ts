@@ -24,11 +24,5 @@ export default function sitemap(): MetadataRoute.Sitemap {
       changeFrequency: "daily",
       priority: 0.85,
     },
-    {
-      url: absoluteUrl("/api-studio"),
-      changeFrequency: "weekly",
-      priority: 0.6,
-    },
   ];
 }
-

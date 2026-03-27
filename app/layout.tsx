@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 
 import { AppShell } from "@/components/app-shell";
 import { SessionProvider } from "@/components/session-provider";
+import { ThemeProvider } from "@/components/theme-provider";
 import { absoluteUrl, siteConfig } from "@/lib/site";
 
 import "./globals.css";
@@ -15,6 +16,8 @@ export const metadata: Metadata = {
   description: siteConfig.description,
   keywords: siteConfig.keywords,
   applicationName: siteConfig.name,
+  category: "business",
+  creator: siteConfig.name,
   alternates: {
     canonical: absoluteUrl("/"),
   },
@@ -41,9 +44,11 @@ export default function RootLayout({
   return (
     <html lang="vi" className="h-full antialiased">
       <body className="min-h-full">
-        <SessionProvider>
-          <AppShell>{children}</AppShell>
-        </SessionProvider>
+        <ThemeProvider>
+          <SessionProvider>
+            <AppShell>{children}</AppShell>
+          </SessionProvider>
+        </ThemeProvider>
       </body>
     </html>
   );

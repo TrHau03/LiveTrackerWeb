@@ -6,7 +6,7 @@ import { absoluteUrl } from "@/lib/site";
 export const metadata: Metadata = {
   title: "Livestreams",
   description:
-    "Danh sách livestream đang nghe webhook, mở sang màn hình comment listener realtime và Instagram preview.",
+    "Theo dõi các livestream đang chạy, mở vào room comment realtime và quan sát phiên live theo phong cách SaaS gọn gàng.",
   alternates: {
     canonical: absoluteUrl("/livestreams"),
   },
@@ -15,4 +15,3 @@ export const metadata: Metadata = {
 export default function LivestreamsPage() {
   return <LivestreamsScreen />;
 }
-

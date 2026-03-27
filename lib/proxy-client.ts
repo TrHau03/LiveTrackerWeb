@@ -1,7 +1,8 @@
 "use client";
 
-import type { ApiScope } from "@/lib/api-types";
 import type { SessionSettings } from "@/lib/workspace-session";
+
+type ApiScope = "api" | "root";
 
 export type JsonRecord = Record<string, string | number | boolean>;
 
@@ -53,9 +54,7 @@ export async function proxyRequest<T>(
   } = options;
 
   const targetUrl = buildProxyUrl(scope, path, query);
-  const headers = new Headers({
-    "x-backend-base-url": session.baseUrl,
-  });
+  const headers = new Headers();
 
   if (session.accessToken) {
     headers.set("x-access-token", session.accessToken);
@@ -63,10 +62,6 @@ export async function proxyRequest<T>(
 
   if (session.refreshToken) {
     headers.set("x-refresh-token", session.refreshToken);
-  }
-
-  if (session.adminToken) {
-    headers.set("x-admin-token", session.adminToken);
   }
 
   Object.entries(extraHeaders ?? {}).forEach(([key, value]) => {
@@ -117,9 +112,7 @@ export async function proxyDownload(
     options.path,
     options.query,
   );
-  const headers = new Headers({
-    "x-backend-base-url": session.baseUrl,
-  });
+  const headers = new Headers();
 
   if (session.accessToken) {
     headers.set("x-access-token", session.accessToken);
@@ -162,7 +155,6 @@ export async function streamProxyRequest(
   );
 
   const headers = new Headers({
-    "x-backend-base-url": session.baseUrl,
     accept: "text/event-stream",
   });
 
@@ -404,4 +396,3 @@ function extractFilename(contentDisposition: string) {
 
   return match?.[1] ? decodeURIComponent(match[1]) : "download.bin";
 }
-

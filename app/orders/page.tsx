@@ -6,7 +6,7 @@ import { absoluteUrl } from "@/lib/site";
 export const metadata: Metadata = {
   title: "Orders",
   description:
-    "Màn hình quản lý đơn hàng LiveTracker, tổng hợp doanh thu trang hiện tại và export Excel.",
+    "Bảng điều hành đơn hàng cho đội vận hành, tổng hợp doanh thu và xuất dữ liệu nhanh cho LiveTracker.",
   alternates: {
     canonical: absoluteUrl("/orders"),
   },
@@ -15,4 +15,3 @@ export const metadata: Metadata = {
 export default function OrdersPage() {
   return <OrdersScreen />;
 }
-
