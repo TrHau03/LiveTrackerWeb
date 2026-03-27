@@ -323,10 +323,8 @@ function buildProxyUrl(
   query?: Record<string, string | number | boolean | undefined | null>,
 ) {
   const normalizedPath = path === "/" ? "" : path;
-  const url = new URL(
-    `/api/proxy/${scope}${normalizedPath}`,
-    window.location.origin,
-  );
+  const baseUrl = process.env.NEXT_PUBLIC_API_URL || "https://admin.livetracker.vn/api/v1";
+  const url = new URL(`${baseUrl}${normalizedPath}`);
 
   Object.entries(query ?? {}).forEach(([key, value]) => {
     if (value === undefined || value === null || value === "") {

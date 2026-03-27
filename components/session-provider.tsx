@@ -113,7 +113,8 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
         setLoginError("");
 
         try {
-          const loginResponse = await fetch("/api/proxy/api/auth/login", {
+          const baseUrl = process.env.NEXT_PUBLIC_API_URL || "https://admin.livetracker.vn/api/v1";
+          const loginResponse = await fetch(`${baseUrl}/auth/login`, {
             method: "POST",
             headers: {
               "content-type": "application/json",
@@ -179,7 +180,8 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
         }
 
         try {
-          await fetch("/api/proxy/api/auth/logout", {
+          const baseUrl = process.env.NEXT_PUBLIC_API_URL || "https://admin.livetracker.vn/api/v1";
+          await fetch(`${baseUrl}/auth/logout`, {
             method: "POST",
             headers: {
               "content-type": "application/json",
@@ -252,7 +254,8 @@ async function fetchUserProfile(
   accessToken?: string;
   user: AuthUser | null;
 }> {
-  const response = await fetch("/api/proxy/api/users/me", {
+  const baseUrl = process.env.NEXT_PUBLIC_API_URL || "https://admin.livetracker.vn/api/v1";
+  const response = await fetch(`${baseUrl}/users/me`, {
     method: "GET",
     headers: {
       "x-access-token": auth.accessToken,
