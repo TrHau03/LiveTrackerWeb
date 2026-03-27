@@ -185,6 +185,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
             method: "POST",
             headers: {
               "content-type": "application/json",
+              ...(session.accessToken ? { "Authorization": `Bearer ${session.accessToken}` } : {}),
             },
             body: JSON.stringify({ refreshToken }),
             cache: "no-store",
@@ -258,6 +259,7 @@ async function fetchUserProfile(
   const response = await fetch(`${baseUrl}/users/me`, {
     method: "GET",
     headers: {
+      "Authorization": `Bearer ${auth.accessToken}`,
       "x-access-token": auth.accessToken,
       "x-refresh-token": auth.refreshToken,
     },

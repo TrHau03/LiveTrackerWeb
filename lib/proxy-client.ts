@@ -57,6 +57,7 @@ export async function proxyRequest<T>(
   const headers = new Headers();
 
   if (session.accessToken) {
+    headers.set("Authorization", `Bearer ${session.accessToken}`);
     headers.set("x-access-token", session.accessToken);
   }
 
@@ -115,6 +116,7 @@ export async function proxyDownload(
   const headers = new Headers();
 
   if (session.accessToken) {
+    headers.set("Authorization", `Bearer ${session.accessToken}`);
     headers.set("x-access-token", session.accessToken);
   }
 
@@ -159,6 +161,7 @@ export async function streamProxyRequest(
   });
 
   if (session.accessToken) {
+    headers.set("Authorization", `Bearer ${session.accessToken}`);
     headers.set("x-access-token", session.accessToken);
   }
 
