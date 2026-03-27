@@ -2,9 +2,10 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   /* config options here */
-  output: 'export',
-  // Nếu bạn có dùng thẻ <Image /> của Next.js, bạn cần bỏ comment dòng bên dưới
-  // images: { unoptimized: true }
+  // Removed: output: 'export' to support dynamic routes like /order/[id]
+  images: {
+    unoptimized: true,
+  },
 };
 
 export default nextConfig;
