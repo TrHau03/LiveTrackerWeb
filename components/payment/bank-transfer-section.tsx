@@ -41,13 +41,20 @@ export function BankTransferSection({
                 </div>
 
                 {/* Bank */}
-                <div className="bg-white rounded-lg p-4">
-                    <p className="text-xs font-semibold text-gray-600 uppercase">
-                        Mã ngân hàng
-                    </p>
-                    <p className="mt-1 text-base text-gray-900 font-medium">
-                        {bankInfo.bankCode}
-                    </p>
+                <div className="bg-white rounded-lg p-4 flex items-center justify-between">
+                    <div className="flex-1">
+                        <p className="text-xs font-semibold text-gray-600 uppercase">
+                            Tên ngân hàng
+                        </p>
+                        <p className="mt-1 text-base text-gray-900 font-medium">
+                            {bankInfo.bankName}
+                        </p>
+                    </div>
+                    <CopyButton
+                        text={bankInfo.bankName}
+                        target="bankName"
+                        className="ml-2"
+                    />
                 </div>
 
                 {/* Account Number */}

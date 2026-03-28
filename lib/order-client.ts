@@ -11,6 +11,7 @@ export type OrderItem = {
 
 export type BankInfo = {
     bankCode: string;
+    bankName: string;
     bankAccount: string;
     bankAccountName: string;
 };
