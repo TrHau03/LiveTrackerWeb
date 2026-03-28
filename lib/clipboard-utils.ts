@@ -6,12 +6,14 @@ export type CopyTarget =
     | "accountNumber"
     | "amount"
     | "transferDescription"
+    | "bankName"
     | "generic";
 
 const COPY_LABELS: Record<CopyTarget, string> = {
     accountNumber: "Số tài khoản",
     amount: "Số tiền",
     transferDescription: "Nội dung chuyển khoản",
+    bankName: "Tên ngân hàng",
     generic: "Văn bản",
 };
 
