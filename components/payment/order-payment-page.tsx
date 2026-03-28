@@ -78,7 +78,7 @@ export function OrderPaymentPage({
                 <SuccessModal
                     isOpen={showSuccessModal}
                     onClose={handleCloseModal}
-                    orderId={orderData.orderId}
+                    orderId={orderData.orderCode}
                 />
             </div>
         </>
