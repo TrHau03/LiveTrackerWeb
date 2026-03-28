@@ -38,7 +38,7 @@ export function OrderPaymentPage({
                         Thanh toán đơn hàng
                     </h1>
                     <p className="text-center text-sm text-gray-600 mt-1">
-                        {orderData.orderId}
+                        {orderData.orderCode}
                     </p>
                 </div>
 
@@ -46,18 +46,18 @@ export function OrderPaymentPage({
                 <div className="flex flex-col">
                     {/* QR Code Section - Priority 1 */}
                     <QRCodeDisplay
-                        qrCodeUrl={orderData.qrCodeUrl}
-                        orderId={orderData.orderId}
+                        qrUrl={orderData.qrUrl}
+                        orderCode={orderData.orderCode}
                     />
 
                     {/* Bank Transfer Section - Priority 2 */}
                     <BankTransferSection
-                        bankInfo={orderData.bankTransfer}
-                        totalAmount={orderData.totalAmount}
+                        bankInfo={orderData.bankInfo}
+                        totalPrice={orderData.totalPrice}
                     />
 
                     {/* Payment Instruction - Priority 3 */}
-                    <PaymentInstruction orderId={orderData.orderId} />
+                    <PaymentInstruction orderCode={orderData.orderCode} />
 
                     {/* Confirm Button - Priority 4 */}
                     <div className="px-4 py-4 bg-white border-t border-gray-200">
@@ -68,8 +68,8 @@ export function OrderPaymentPage({
                     <div className="bg-gray-50">
                         <OrderInfoSection
                             items={orderData.items}
-                            totalAmount={orderData.totalAmount}
-                            orderId={orderData.orderId}
+                            totalPrice={orderData.totalPrice}
+                            orderCode={orderData.orderCode}
                         />
                     </div>
                 </div>

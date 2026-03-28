@@ -6,17 +6,17 @@ import { OrderPaymentPageContainer } from "@/components/payment/order-payment-pa
 
 function OrderPaymentContent() {
     const searchParams = useSearchParams();
-    const orderId = searchParams.get("id");
+    const orderCode = searchParams.get("id");
 
-    if (!orderId) {
+    if (!orderCode) {
         return (
             <div className="flex items-center justify-center p-8 text-sm text-[var(--muted)]">
-                Không tìm thấy ID đơn hàng hợp lệ.
+                Không tìm thấy mã đơn hàng hợp lệ.
             </div>
         );
     }
 
-    return <OrderPaymentPageContainer orderId={orderId} />;
+    return <OrderPaymentPageContainer orderId={orderCode} />;
 }
 
 export default function OrderPage() {

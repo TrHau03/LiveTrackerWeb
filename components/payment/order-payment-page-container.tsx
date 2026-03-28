@@ -19,6 +19,7 @@ export function OrderPaymentPageContainer({
     useEffect(() => {
         const fetchOrder = async () => {
             try {
+                // orderId is actually the orderCode from URL param
                 const response = await getPublicOrderDetails(orderId);
                 if (response.success && response.data) {
                     setOrderData(response.data);

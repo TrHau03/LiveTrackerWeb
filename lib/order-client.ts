@@ -4,24 +4,25 @@ import type { SessionSettings } from "@/lib/workspace-session";
 import { proxyRequest } from "@/lib/proxy-client";
 
 export type OrderItem = {
-    productName: string;
+    text: string;
     quantity: number;
     price: number;
 };
 
-export type BankTransferInfo = {
-    recipientName: string;
-    bankName: string;
-    accountNumber: string;
-    transferDescription: string;
+export type BankInfo = {
+    bankCode: string;
+    bankAccount: string;
+    bankAccountName: string;
 };
 
 export type OrderPaymentData = {
-    orderId: string;
+    orderCode: string;
     items: OrderItem[];
-    totalAmount: number;
-    qrCodeUrl: string;
-    bankTransfer: BankTransferInfo;
+    totalPrice: number;
+    deposit: number;
+    qrUrl: string | null;
+    bankInfo: BankInfo | null;
+    createdAt: string;
 };
 
 export type GetOrderResponse = {

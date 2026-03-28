@@ -17,7 +17,7 @@
   - `getOrderDetails(orderId)` - Fetch order from Backend API
   - `formatCurrency(amount)` - VND currency formatter
   - `logPaymentAction(orderId, action)` - Optional action logging
-  - TypeScript types: `OrderItem`, `BankTransferInfo`, `OrderPaymentData`
+  - TypeScript types: `OrderItem`, `BankInfo`, `OrderPaymentData`
 
 - ✅ `lib/clipboard-utils.ts` - Clipboard helpers
   - `copyToClipboard(text, target)` - Copy with toast notification

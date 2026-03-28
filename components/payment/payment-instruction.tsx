@@ -1,11 +1,11 @@
 "use client";
 
 interface PaymentInstructionProps {
-    orderId: string;
+    orderCode: string;
 }
 
 export function PaymentInstruction({
-    orderId,
+    orderCode,
 }: PaymentInstructionProps) {
     return (
         <div className="border-t border-gray-200 bg-yellow-50 px-4 py-6">
@@ -19,7 +19,7 @@ export function PaymentInstruction({
                         Vui lòng <strong>chụp lại màn hình giao dịch</strong> từ ứng dụng ngân hàng để chứng minh khoản thanh toán.
                     </p>
                     <p className="mt-2 text-xs text-gray-600">
-                        Mã đơn hàng: <span className="font-mono font-bold">{orderId}</span>
+                        Mã đơn hàng: <span className="font-mono font-bold">{orderCode}</span>
                     </p>
                 </div>
             </div>
