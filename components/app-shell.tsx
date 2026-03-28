@@ -13,6 +13,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const { authStatus, isAuthenticated, logout, session } = useSession();
   const { theme, toggleTheme } = useTheme();
 
+  // Public routes - không cần authentication
+  const publicRoutes = ["/order", "/instagram-auth-callback", "/ul"];
+  const isPublicRoute = publicRoutes.some((route) => pathname.startsWith(route));
+
   if (authStatus === "booting") {
     return (
       <div className="flex min-h-screen items-center justify-center px-6">
@@ -24,8 +28,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     );
   }
 
-  if (!isAuthenticated) {
+  // Skip auth check cho public routes
+  if (!isPublicRoute && !isAuthenticated) {
     return <AuthScreen />;
+  }
+
+  // Nếu là public route, render children trực tiếp (không có sidebar)
+  if (isPublicRoute) {
+    return <div className="min-h-screen">{children}</div>;
   }
 
   const activeItem =
@@ -79,18 +89,16 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   className="group relative block overflow-hidden rounded-[22px]"
                 >
                   <span
-                    className={`absolute inset-0 rounded-[22px] bg-[linear-gradient(135deg,_var(--primary)_0%,_var(--primary-strong)_100%)] transition-all duration-300 ${
-                      active
+                    className={`absolute inset-0 rounded-[22px] bg-[linear-gradient(135deg,_var(--primary)_0%,_var(--primary-strong)_100%)] transition-all duration-300 ${active
                         ? "scale-100 opacity-100"
                         : "scale-[0.92] opacity-0 group-hover:scale-100 group-hover:opacity-100"
-                    }`}
+                      }`}
                   />
                   <span
-                    className={`relative flex items-center gap-3 rounded-[22px] border px-4 py-3.5 transition-all duration-300 ${
-                      active
+                    className={`relative flex items-center gap-3 rounded-[22px] border px-4 py-3.5 transition-all duration-300 ${active
                         ? "border-transparent text-white shadow-[0_18px_40px_rgba(10,132,255,0.22)]"
                         : "border-transparent bg-transparent text-[var(--muted)] group-hover:-translate-y-0.5 group-hover:text-white"
-                    }`}
+                      }`}
                   >
                     <NavIcon href={item.href} active={active} />
                     <span className="text-sm font-semibold">{item.label}</span>
@@ -193,18 +201,16 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   className="group relative overflow-hidden rounded-[22px]"
                 >
                   <span
-                    className={`absolute inset-0 rounded-[22px] bg-[linear-gradient(135deg,_var(--primary)_0%,_var(--primary-strong)_100%)] transition-all duration-300 ${
-                      active
+                    className={`absolute inset-0 rounded-[22px] bg-[linear-gradient(135deg,_var(--primary)_0%,_var(--primary-strong)_100%)] transition-all duration-300 ${active
                         ? "scale-100 opacity-100"
                         : "scale-[0.9] opacity-0 group-hover:scale-100 group-hover:opacity-100"
-                    }`}
+                      }`}
                   />
                   <span
-                    className={`relative flex flex-col items-center gap-1.5 rounded-[22px] px-2 py-2.5 transition-all duration-300 ${
-                      active
+                    className={`relative flex flex-col items-center gap-1.5 rounded-[22px] px-2 py-2.5 transition-all duration-300 ${active
                         ? "-translate-y-0.5 text-white"
                         : "text-[var(--muted)] group-hover:-translate-y-0.5 group-hover:text-white"
-                    }`}
+                      }`}
                   >
                     <NavIcon href={item.href} active={active} />
                     <span className="text-[11px] font-semibold">{item.shortLabel}</span>
@@ -220,9 +226,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 }
 
 function NavIcon({ href, active }: { href: string; active: boolean }) {
-  const className = `h-5 w-5 transition-transform duration-300 ${
-    active ? "scale-110" : "group-hover:scale-110"
-  }`;
+  const className = `h-5 w-5 transition-transform duration-300 ${active ? "scale-110" : "group-hover:scale-110"
+    }`;
 
   if (href === "/") {
     return (
