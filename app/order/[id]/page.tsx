@@ -7,6 +7,9 @@ type Props = {
     };
 };
 
+// Không prerender dynamic routes vì order IDs được fetch runtime
+export const dynamicParams = false;
+
 export function generateMetadata({ params }: Props): Metadata {
     return {
         title: `Thanh toán đơn hàng ${params.id}`,
@@ -17,7 +20,7 @@ export function generateMetadata({ params }: Props): Metadata {
 /**
  * Trả về danh sách order IDs cần prerender
  * Vì không thể lấy tất cả order IDs ở build time, trả về rỗng
- * Các order khác sẽ được load client-side
+ * Các route khác sẽ return 404
  */
 export function generateStaticParams() {
     return [];
