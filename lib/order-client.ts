@@ -14,6 +14,7 @@ export type BankInfo = {
     bankName: string;
     bankAccount: string;
     bankAccountName: string;
+    bankLogo?: string;
 };
 
 export type OrderPaymentData = {

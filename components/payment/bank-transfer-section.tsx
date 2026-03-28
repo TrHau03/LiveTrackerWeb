@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { CopyButton } from "./copy-button";
 import { formatCurrency } from "@/lib/order-client";
 import type { BankInfo } from "@/lib/order-client";
@@ -41,20 +42,31 @@ export function BankTransferSection({
                 </div>
 
                 {/* Bank */}
-                <div className="bg-white rounded-lg p-4 flex items-center justify-between">
-                    <div className="flex-1">
-                        <p className="text-xs font-semibold text-gray-600 uppercase">
-                            Tên ngân hàng
-                        </p>
-                        <p className="mt-1 text-base text-gray-900 font-medium">
-                            {bankInfo.bankName}
-                        </p>
+                <div className="bg-white rounded-lg p-4">
+                    <p className="text-xs font-semibold text-gray-600 uppercase">
+                        Tên ngân hàng
+                    </p>
+                    <div className="mt-3 flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                            {bankInfo.bankLogo && (
+                                <Image
+                                    src={bankInfo.bankLogo}
+                                    alt={bankInfo.bankName}
+                                    width={40}
+                                    height={40}
+                                    className="rounded object-contain"
+                                />
+                            )}
+                            <p className="text-base text-gray-900 font-medium">
+                                {bankInfo.bankName}
+                            </p>
+                        </div>
+                        <CopyButton
+                            text={bankInfo.bankName}
+                            target="bankName"
+                            className="ml-2"
+                        />
                     </div>
-                    <CopyButton
-                        text={bankInfo.bankName}
-                        target="bankName"
-                        className="ml-2"
-                    />
                 </div>
 
                 {/* Account Number */}
