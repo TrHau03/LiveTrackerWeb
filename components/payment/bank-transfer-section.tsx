@@ -83,23 +83,6 @@ export function BankTransferSection({
                         className="ml-2"
                     />
                 </div>
-
-                {/* Transfer Description */}
-                <div className="bg-white rounded-lg p-4 flex items-center justify-between">
-                    <div className="flex-1">
-                        <p className="text-xs font-semibold text-gray-600 uppercase">
-                            Nội dung chuyển khoản
-                        </p>
-                        <p className="mt-1 text-base text-gray-900 font-mono font-bold">
-                            {bankInfo.transferDescription}
-                        </p>
-                    </div>
-                    <CopyButton
-                        text={bankInfo.transferDescription}
-                        target="transferDescription"
-                        className="ml-2"
-                    />
-                </div>
             </div>
         </div>
     );
