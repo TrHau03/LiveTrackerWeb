@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { getOrderDetails } from "@/lib/order-client";
+import { getPublicOrderDetails } from "@/lib/order-client";
 import { OrderPaymentPage } from "./order-payment-page";
 import type { OrderPaymentData } from "@/lib/order-client";
 
@@ -19,7 +19,7 @@ export function OrderPaymentPageContainer({
     useEffect(() => {
         const fetchOrder = async () => {
             try {
-                const response = await getOrderDetails(orderId);
+                const response = await getPublicOrderDetails(orderId);
                 if (response.success && response.data) {
                     setOrderData(response.data);
                 } else {

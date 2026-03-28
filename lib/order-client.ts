@@ -32,7 +32,50 @@ export type GetOrderResponse = {
 };
 
 /**
- * Fetch order details by ID from Backend API
+ * Fetch public order details by order code (no authentication required)
+ * GET /api/v1/public/orders/{orderCode}
+ */
+export async function getPublicOrderDetails(
+    orderCode: string,
+): Promise<GetOrderResponse> {
+    try {
+        const backendUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
+        const url = `${backendUrl}/api/v1/public/orders/${orderCode}`;
+
+        const response = await fetch(url, {
+            method: "GET",
+            headers: {
+                "Content-Type": "application/json",
+            },
+        });
+
+        if (!response.ok) {
+            return {
+                success: false,
+                message: `Failed to fetch order: ${response.status}`,
+                statusCode: response.status,
+            };
+        }
+
+        const responseData = await response.json();
+        const orderData = responseData.data || responseData;
+
+        return {
+            success: true,
+            message: "Order fetched successfully",
+            data: orderData as OrderPaymentData,
+        };
+    } catch (error) {
+        console.error("Error fetching public order:", error);
+        return {
+            success: false,
+            message: error instanceof Error ? error.message : "Unknown error",
+        };
+    }
+}
+
+/**
+ * Fetch order details by ID from Backend API (requires authentication)
  * GET /api/v1/orders/:id
  */
 export async function getOrderDetails(
