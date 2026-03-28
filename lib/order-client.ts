@@ -40,8 +40,10 @@ export async function getPublicOrderDetails(
     orderCode: string,
 ): Promise<GetOrderResponse> {
     try {
-        const backendUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
-        const url = `${backendUrl}/api/v1/public/orders/${orderCode}`;
+        const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
+        // If apiBase already includes /api/v1, don't add it again
+        const basePath = apiBase.endsWith("/api/v1") ? apiBase : `${apiBase}/api/v1`;
+        const url = `${basePath}/public/orders/${orderCode}`;
 
         const response = await fetch(url, {
             method: "GET",
