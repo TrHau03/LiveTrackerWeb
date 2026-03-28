@@ -14,6 +14,15 @@ export function generateMetadata({ params }: Props): Metadata {
     };
 }
 
+/**
+ * Trả về danh sách order IDs cần prerender
+ * Vì không thể lấy tất cả order IDs ở build time, trả về rỗng
+ * Các order khác sẽ được load client-side
+ */
+export function generateStaticParams() {
+    return [];
+}
+
 export default function OrderPage({ params }: Props) {
     return <OrderPaymentPageContainer orderId={params.id} />;
 }

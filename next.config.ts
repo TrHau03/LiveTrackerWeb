@@ -2,9 +2,9 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   /* config options here */
-  // Use standalone mode for better server deployment compatibility
-  // Supports dynamic routes like /order/[id] with minimal bundle size
-  output: 'standalone',
+  // Static export for Cloudflare Pages
+  // Output directory: out/
+  output: 'export',
   images: {
     unoptimized: true,
   },
