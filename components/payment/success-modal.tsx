@@ -30,7 +30,7 @@ export function SuccessModal({
     }
 
     return (
-        <div className="fixed inset-0 z-50 flex items-end bg-black/50 backdrop-blur-sm sm:items-center">
+        <div className="fixed inset-0 z-50 flex items-end bg-black/50 backdrop-blur-sm sm:items-center sm:justify-center">
             <div className="w-full animate-in slide-in-from-bottom-5 rounded-t-2xl bg-white sm:max-w-md sm:rounded-2xl sm:slide-in-from-bottom-0">
                 <div className="flex items-center justify-between border-b border-gray-200 px-6 py-4">
                     <h2 className="text-lg font-bold text-gray-900">

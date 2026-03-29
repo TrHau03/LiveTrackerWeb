@@ -7,6 +7,7 @@ import { OrderPaymentPageContainer } from "@/components/payment/order-payment-pa
 function OrderPaymentContent() {
     const searchParams = useSearchParams();
     const orderCode = searchParams.get("id");
+    const token = searchParams.get("token");
 
     if (!orderCode) {
         return (
@@ -16,7 +17,7 @@ function OrderPaymentContent() {
         );
     }
 
-    return <OrderPaymentPageContainer orderId={orderCode} />;
+    return <OrderPaymentPageContainer orderId={orderCode} token={token || undefined} />;
 }
 
 export default function OrderPage() {

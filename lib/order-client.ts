@@ -25,6 +25,11 @@ export type OrderPaymentData = {
     qrUrl: string | null;
     bankInfo: BankInfo | null;
     createdAt: string;
+    shopAvatar?: string;
+    shopName?: string;
+    transferContent?: string;
+    igName?: string;
+    quantity?: number;
 };
 
 export type GetOrderResponse = {
@@ -36,16 +41,22 @@ export type GetOrderResponse = {
 
 /**
  * Fetch public order details by order code (no authentication required)
- * GET /api/v1/public/orders/{orderCode}
+ * GET /api/v1/public/orders/{orderCode}?token={token}
  */
 export async function getPublicOrderDetails(
     orderCode: string,
+    token?: string,
 ): Promise<GetOrderResponse> {
     try {
         const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
         // If apiBase already includes /api/v1, don't add it again
         const basePath = apiBase.endsWith("/api/v1") ? apiBase : `${apiBase}/api/v1`;
-        const url = `${basePath}/public/orders/${orderCode}`;
+
+        // Build URL with token parameter if provided
+        let url = `${basePath}/public/orders/${orderCode}`;
+        if (token) {
+            url += `?token=${encodeURIComponent(token)}`;
+        }
 
         const response = await fetch(url, {
             method: "GET",
@@ -53,6 +64,15 @@ export async function getPublicOrderDetails(
                 "Content-Type": "application/json",
             },
         });
+
+        // Handle token validation errors (400 or 403)
+        if (response.status === 400 || response.status === 403) {
+            return {
+                success: false,
+                message: "Token truy cập không hợp lệ hoặc bị thiếu",
+                statusCode: response.status,
+            };
+        }
 
         if (!response.ok) {
             return {

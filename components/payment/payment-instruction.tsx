@@ -8,18 +8,18 @@ export function PaymentInstruction({
     orderCode,
 }: PaymentInstructionProps) {
     return (
-        <div className="border-t border-gray-200 bg-yellow-50 px-4 py-6">
-            <div className="flex items-start gap-3">
-                <span className="flex-shrink-0 text-2xl">📌</span>
-                <div>
-                    <p className="text-sm font-semibold text-gray-900">
+        <div className="bg-amber-50 px-4 py-5 md:px-6 md:py-5 border-y border-amber-200">
+            <div className="flex gap-3">
+                <div className="flex-shrink-0 text-xl mt-0.5">📌</div>
+                <div className="flex-1">
+                    <p className="text-sm font-bold text-gray-900 mb-2">
                         Sau khi chuyển khoản thành công
                     </p>
-                    <p className="mt-2 text-sm text-gray-700 leading-relaxed">
-                        Vui lòng <strong>chụp lại màn hình giao dịch</strong> từ ứng dụng ngân hàng để chứng minh khoản thanh toán.
+                    <p className="text-xs text-gray-700 leading-relaxed">
+                        Vui lòng <span className="font-semibold">chụp lại màn hình giao dịch</span> từ ứng dụng ngân hàng để chứng minh khoản thanh toán của bạn.
                     </p>
-                    <p className="mt-2 text-xs text-gray-600">
-                        Mã đơn hàng: <span className="font-mono font-bold">{orderCode}</span>
+                    <p className="text-xs text-gray-600 mt-3">
+                        Mã đơn hàng: <span className="font-mono font-bold text-gray-900">{orderCode}</span>
                     </p>
                 </div>
             </div>

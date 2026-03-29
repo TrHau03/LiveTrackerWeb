@@ -18,6 +18,9 @@ export const metadata: Metadata = {
   applicationName: siteConfig.name,
   category: "business",
   creator: siteConfig.name,
+  icons: {
+    icon: "/favicon.png",
+  },
   alternates: {
     canonical: absoluteUrl("/"),
   },
@@ -42,8 +45,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="vi" className="h-full antialiased">
-      <body className="min-h-full">
+    <html lang="vi" className="h-full antialiased" suppressHydrationWarning>
+      <body className="min-h-full" suppressHydrationWarning>
         <ThemeProvider>
           <SessionProvider>
             <AppShell>{children}</AppShell>
