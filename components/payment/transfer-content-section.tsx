@@ -28,7 +28,7 @@ export function TransferContentSection({
                 </p>
                 <CopyButton
                     text={displayContent}
-                    target="transferContent"
+                    target="transferDescription"
                     className="flex-shrink-0"
                 />
             </div>
