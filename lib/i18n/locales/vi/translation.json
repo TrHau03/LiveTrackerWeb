@@ -1,0 +1,21 @@
+{
+  "sidebar": {
+    "dashboard": "BẢN TIN",
+    "dashboard_short": "Bản tin",
+    "livestreams": "Phiên Live",
+    "livestreams_short": "Live",
+    "orders": "Đơn hàng",
+    "orders_short": "Đơn",
+    "customers": "Khách hàng",
+    "customers_short": "Khách",
+    "settings": "Cài đặt"
+  },
+  "dashboard": {
+    "welcome": "Chào mừng trở lại, {{name}}.",
+    "business_overview": "Tổng quan kinh doanh",
+    "estimated_revenue": "Doanh thu dự kiến",
+    "total_orders": "Tổng đơn hàng",
+    "livestreams_broadcasted": "Livestream đã phát",
+    "new_customers": "Khách hàng mới"
+  }
+}

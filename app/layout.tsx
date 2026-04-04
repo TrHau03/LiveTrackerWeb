@@ -3,6 +3,8 @@ import type { Metadata } from "next";
 import { AppShell } from "@/components/app-shell";
 import { SessionProvider } from "@/components/session-provider";
 import { ThemeProvider } from "@/components/theme-provider";
+import { ReactQueryProvider } from "@/providers/react-query-provider";
+import "@/lib/i18n/i18n";
 import { absoluteUrl, siteConfig } from "@/lib/site";
 
 import "./globals.css";
@@ -48,9 +50,11 @@ export default function RootLayout({
     <html lang="vi" className="h-full antialiased" suppressHydrationWarning>
       <body className="min-h-full" suppressHydrationWarning>
         <ThemeProvider>
-          <SessionProvider>
-            <AppShell>{children}</AppShell>
-          </SessionProvider>
+          <ReactQueryProvider>
+            <SessionProvider>
+              <AppShell>{children}</AppShell>
+            </SessionProvider>
+          </ReactQueryProvider>
         </ThemeProvider>
       </body>
     </html>

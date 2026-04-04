@@ -1,0 +1,21 @@
+{
+  "sidebar": {
+    "dashboard": "DASHBOARD",
+    "dashboard_short": "Dash",
+    "livestreams": "Livestreams",
+    "livestreams_short": "Live",
+    "orders": "Orders",
+    "orders_short": "Orders",
+    "customers": "Customers",
+    "customers_short": "Cust",
+    "settings": "Settings"
+  },
+  "dashboard": {
+    "welcome": "Welcome back, {{name}}.",
+    "business_overview": "Business Overview",
+    "estimated_revenue": "Estimated Revenue",
+    "total_orders": "Total Orders",
+    "livestreams_broadcasted": "Lives Broadcasted",
+    "new_customers": "New Customers"
+  }
+}

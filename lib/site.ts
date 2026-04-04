@@ -18,23 +18,28 @@ export const siteConfig = {
 export const appNavigation = [
   {
     href: "/",
-    label: "Dashboard",
-    shortLabel: "Home",
+    label: "BẢN TIN",
+    shortLabel: "Bản tin",
   },
   {
     href: "/livestreams",
-    label: "Livestreams",
+    label: "Phiên Live",
     shortLabel: "Live",
   },
   {
     href: "/orders",
-    label: "Orders",
-    shortLabel: "Orders",
+    label: "Đơn hàng",
+    shortLabel: "Đơn",
   },
   {
     href: "/customers",
-    label: "Customers",
-    shortLabel: "Customers",
+    label: "Khách hàng",
+    shortLabel: "Khách",
+  },
+  {
+    href: "/settings",
+    label: "Cài đặt",
+    shortLabel: "CĐ",
   },
 ] as const;
 

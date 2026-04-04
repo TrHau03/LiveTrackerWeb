@@ -1,9 +1,11 @@
 "use client";
 
+import React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 import { AuthScreen } from "@/components/auth-screen";
+import { Header } from "@/components/header";
 import { useSession } from "@/components/session-provider";
 import { useTheme } from "@/components/theme-provider";
 import { appNavigation } from "@/lib/site";
@@ -12,17 +14,24 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { authStatus, isAuthenticated, logout, session } = useSession();
   const { theme, toggleTheme } = useTheme();
+  const [isCollapsed, setIsCollapsed] = React.useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = React.useState(false);
+
+  // Close mobile menu when route changes
+  React.useEffect(() => {
+    setIsMobileMenuOpen(false);
+  }, [pathname]);
 
   // Public routes - không cần authentication
   const publicRoutes = ["/order", "/instagram-auth-callback", "/ul"];
-  const isPublicRoute = publicRoutes.some((route) => pathname.startsWith(route));
+  const isPublicRoute = publicRoutes.some((route) => pathname === route || pathname.startsWith(`${route}/`));
 
   if (authStatus === "booting") {
     return (
       <div className="flex min-h-screen items-center justify-center px-6">
         <div className="flex items-center gap-3 rounded-full border border-[var(--border)] bg-[var(--surface)] px-5 py-3 text-sm font-medium text-[var(--muted)] shadow-[var(--shadow-soft)] backdrop-blur-2xl">
           <span className="h-2.5 w-2.5 animate-pulse rounded-full bg-[var(--primary)]" />
-          Preparing workspace
+          Đang chuẩn bị không gian làm việc
         </div>
       </div>
     );
@@ -51,31 +60,50 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="min-h-screen">
-      <div className="mx-auto flex min-h-screen max-w-[1680px] gap-4 px-3 py-3 sm:px-4 sm:py-4 lg:gap-6 lg:px-5 lg:py-5">
-        <aside className="hidden w-[292px] shrink-0 flex-col rounded-[32px] border border-[var(--border)] bg-[var(--surface)] p-4 shadow-[var(--shadow-soft)] backdrop-blur-2xl lg:flex">
-          <Link
-            href="/"
-            className="rounded-[28px] border border-[var(--border)] bg-[var(--surface-strong)] px-5 py-5 shadow-[var(--shadow-soft)] transition duration-300 hover:-translate-y-0.5"
-          >
-            <div className="flex items-center gap-3">
-              <span className="inline-flex h-12 w-12 items-center justify-center rounded-[18px] bg-[linear-gradient(135deg,_var(--primary)_0%,_var(--primary-strong)_100%)] text-lg font-semibold text-white shadow-[0_18px_44px_rgba(10,132,255,0.26)]">
-                L
-              </span>
-              <div>
-                <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[var(--muted)]">
-                  LiveTracker
-                </p>
-                <h1 className="mt-1 text-xl font-semibold tracking-[-0.04em] text-[var(--foreground)]">
-                  Commerce OS
-                </h1>
-              </div>
-            </div>
-            <p className="mt-5 text-sm leading-7 text-[var(--foreground-soft)]">
-              SaaS workspace cho vận hành livestream, đơn hàng và khách hàng.
-            </p>
-          </Link>
+      <div className={`mx-auto flex gap-0 bg-[var(--background)] ${pathname === "/livestreams" ? "h-screen overflow-hidden" : "min-h-screen"}`}>
+        {/* Backdrop for mobile */}
+        {isMobileMenuOpen && (
+          <div
+            className="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm lg:hidden"
+            onClick={() => setIsMobileMenuOpen(false)}
+          />
+        )}
 
-          <nav className="mt-8 space-y-2">
+        <aside
+          className={`fixed inset-y-0 left-0 z-50 flex h-screen shrink-0 flex-col border-r border-[var(--border)] bg-[var(--surface)] transition-all duration-300 lg:sticky lg:flex ${isMobileMenuOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
+            } ${isCollapsed ? "w-[var(--sidebar-width-icon)] px-4 py-6" : "w-[var(--sidebar-width)] p-6"
+            }`}
+        >
+          <div className={`mb-10 flex items-center ${isCollapsed ? "justify-center" : "justify-between px-2"}`}>
+            <Link
+              href="/"
+              className="flex items-center gap-3 transition duration-300"
+            >
+              <img
+                src={isCollapsed ? "/logoicon.png" : (theme === "dark" ? "/logo.png" : "/logo-2.png")}
+                alt="LiveTracker Logo"
+                className={`${isCollapsed ? "h-11 w-11" : "h-9 w-auto"} object-contain`}
+              />
+            </Link>
+            {!isCollapsed && (
+              <button
+                onClick={() => setIsCollapsed(true)}
+                className="hidden lg:flex h-8 w-8 items-center justify-center rounded-lg text-[var(--muted)] hover:bg-[var(--surface-muted)] hover:text-[var(--foreground)]"
+              >
+                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 19l-7-7 7-7m8 14l-7-7 7-7" /></svg>
+              </button>
+            )}
+            {isCollapsed && (
+              <button
+                onClick={() => setIsCollapsed(false)}
+                className="absolute -right-3 top-20 flex h-6 w-6 items-center justify-center rounded-full border border-[var(--border)] bg-[var(--surface)] text-[var(--muted)] hover:text-[var(--foreground)] shadow-sm"
+              >
+                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" /></svg>
+              </button>
+            )}
+          </div>
+
+          <nav className="flex-1 space-y-2 overflow-y-auto pr-2 custom-scrollbar">
             {appNavigation.map((item) => {
               const active =
                 item.href === "/"
@@ -86,108 +114,83 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 <Link
                   key={item.href}
                   href={item.href}
-                  className="group relative block overflow-hidden rounded-[22px]"
+                  title={isCollapsed ? item.label : ""}
+                  className={`group flex items-center rounded-xl p-3 text-sm font-semibold transition-all duration-200 ${isCollapsed ? "justify-center" : "gap-4 px-4"
+                    } ${active
+                      ? "bg-[var(--primary-soft)] text-[var(--primary)]"
+                      : "text-[var(--muted)] hover:text-[var(--foreground)] hover:bg-[var(--surface-muted)]"
+                    }`}
                 >
-                  <span
-                    className={`absolute inset-0 rounded-[22px] bg-[linear-gradient(135deg,_var(--primary)_0%,_var(--primary-strong)_100%)] transition-all duration-300 ${active
-                        ? "scale-100 opacity-100"
-                        : "scale-[0.92] opacity-0 group-hover:scale-100 group-hover:opacity-100"
-                      }`}
-                  />
-                  <span
-                    className={`relative flex items-center gap-3 rounded-[22px] border px-4 py-3.5 transition-all duration-300 ${active
-                        ? "border-transparent text-white shadow-[0_18px_40px_rgba(10,132,255,0.22)]"
-                        : "border-transparent bg-transparent text-[var(--muted)] group-hover:-translate-y-0.5 group-hover:text-white"
-                      }`}
-                  >
-                    <NavIcon href={item.href} active={active} />
-                    <span className="text-sm font-semibold">{item.label}</span>
-                  </span>
+                  <NavIcon href={item.href} active={active} />
+                  {!isCollapsed && <span>{item.label}</span>}
                 </Link>
               );
             })}
           </nav>
 
-          <div className="mt-8 rounded-[28px] border border-[var(--border)] bg-[linear-gradient(180deg,_var(--surface-strong)_0%,_var(--surface)_100%)] px-5 py-5 shadow-[var(--shadow-soft)]">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[var(--muted)]">
-              Workspace
-            </p>
-            <div className="mt-4 flex items-center gap-3">
-              <span className="flex h-11 w-11 items-center justify-center rounded-[18px] bg-[linear-gradient(135deg,_var(--primary)_0%,_var(--primary-strong)_100%)] text-sm font-semibold text-white">
-                {getInitials(session.user?.fullName)}
-              </span>
-              <div className="min-w-0">
-                <p className="truncate text-sm font-semibold text-[var(--foreground)]">
-                  {session.user?.fullName || "LiveTracker user"}
-                </p>
-                <p className="truncate text-xs text-[var(--muted)]">
-                  {session.user?.email || "Signed in"}
-                </p>
+          <div className="mt-auto space-y-6">
+            {/* Upgrade Card */}
+            {!isCollapsed && (
+              <div className="relative overflow-hidden rounded-2xl bg-[var(--primary)] p-5 text-white shadow-lg shadow-[var(--primary-soft)]">
+                <div className="relative z-10">
+                  <div className="mb-4 flex h-10 w-10 items-center justify-center rounded-xl bg-white/20 backdrop-blur-md">
+                    <svg className="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
+                  </div>
+                  <button className="w-full rounded-xl bg-white py-2.5 text-xs font-bold text-[var(--primary)] transition hover:bg-opacity-90">
+                    Upgrade Now
+                  </button>
+                </div>
+                <div className="absolute -right-4 -top-4 h-24 w-24 rounded-full bg-white/10" />
               </div>
-            </div>
-          </div>
+            )}
 
-          <div className="mt-auto flex items-center gap-3 rounded-[28px] border border-[var(--border)] bg-[var(--surface-strong)] p-3 shadow-[var(--shadow-soft)]">
-            <button
-              type="button"
-              onClick={toggleTheme}
-              className="inline-flex h-12 w-12 items-center justify-center rounded-[18px] border border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)] transition hover:-translate-y-0.5 hover:border-[color:var(--primary-soft)]"
-              aria-label="Toggle theme"
-            >
-              {theme === "dark" ? <SunIcon /> : <MoonIcon />}
-            </button>
-            <button
-              type="button"
-              onClick={() => void logout()}
-              className="inline-flex h-12 flex-1 items-center justify-center rounded-[18px] bg-[linear-gradient(135deg,_var(--primary)_0%,_var(--primary-strong)_100%)] px-4 text-sm font-semibold text-white shadow-[0_18px_40px_rgba(10,132,255,0.2)] transition hover:-translate-y-0.5"
-            >
-              Sign out
-            </button>
+            {/* Profile Section */}
+            <div className={`flex items-center border-t border-[var(--border)] pt-6 ${isCollapsed ? "justify-center" : "justify-between"}`}>
+              <div className="flex items-center gap-3">
+                <div className="h-10 w-10 shrink-0 overflow-hidden rounded-full bg-[var(--primary-soft)]">
+                  <button className="flex h-full w-full items-center justify-center text-xs font-bold text-[var(--primary)] uppercase">
+                    {getInitials(session.user?.fullName)}
+                  </button>
+                </div>
+                {!isCollapsed && (
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-bold text-[var(--foreground)]">{session.user?.fullName || "Easin Arafat"}</p>
+                    <p className="truncate text-xs text-[var(--muted)]">Free Account</p>
+                  </div>
+                )}
+              </div>
+              {!isCollapsed && (
+                <button onClick={() => void logout()} className="text-[var(--muted)] hover:text-red-500 transition-colors">
+                  <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
+                </button>
+              )}
+            </div>
           </div>
         </aside>
 
-        <div className="flex min-h-screen min-w-0 flex-1 flex-col gap-4">
-          <header className="sticky top-3 z-30 rounded-[28px] border border-[var(--border)] bg-[var(--surface)] shadow-[var(--shadow-soft)] backdrop-blur-2xl">
-            <div className="flex items-center justify-between gap-4 px-5 py-4 sm:px-6">
-              <div className="min-w-0">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[var(--muted)]">
-                  SaaS Workspace
-                </p>
-                <h2 className="mt-1 truncate text-[28px] font-semibold tracking-[-0.04em] text-[var(--foreground)]">
-                  {activeLabel}
-                </h2>
-              </div>
+        <div className={`flex min-w-0 flex-1 flex-col ${pathname === "/livestreams" ? "h-screen overflow-hidden" : "min-h-screen"}`}>
+          <Header />
 
-              <div className="flex items-center gap-3">
-                <button
-                  type="button"
-                  onClick={toggleTheme}
-                  className="inline-flex h-11 w-11 items-center justify-center rounded-[18px] border border-[var(--border)] bg-[var(--surface-strong)] text-[var(--foreground)] transition hover:-translate-y-0.5 lg:hidden"
-                  aria-label="Toggle theme"
-                >
-                  {theme === "dark" ? <SunIcon /> : <MoonIcon />}
-                </button>
-                <div className="hidden rounded-[18px] border border-[var(--border)] bg-[var(--surface-strong)] px-4 py-2.5 text-right shadow-[var(--shadow-soft)] sm:block">
-                  <p className="text-xs font-semibold text-[var(--foreground)]">
-                    {session.user?.fullName || "LiveTracker user"}
-                  </p>
-                  <p className="mt-1 text-[11px] text-[var(--muted)]">
-                    {session.user?.role || "operator"}
-                  </p>
-                </div>
+          <main className={`min-w-0 flex-1 px-4 sm:px-8 ${pathname === "/livestreams" ? "pb-0 flex flex-col overflow-hidden" : "pb-24 lg:pb-8"}`}>
+            <div className={`w-full ${pathname === "/livestreams" ? "flex-1 overflow-hidden" : ""}`}>{children}</div>
+          </main>
+
+          <footer className="mt-auto hidden border-t border-[var(--border)] bg-[var(--surface)] px-6 py-4 lg:block shrink-0">
+            <div className="mx-auto flex max-w-[1200px] items-center justify-between text-xs text-[var(--muted)]">
+              <p>© {new Date().getFullYear()} LiveTracker. All rights reserved.</p>
+              <div className="flex gap-4">
+                <a href="#" className="hover:text-[var(--foreground)]">Hỗ trợ</a>
+                <a href="#" className="hover:text-[var(--foreground)]">Bảo mật</a>
+                <a href="#" className="hover:text-[var(--foreground)]">Điều khoản</a>
               </div>
             </div>
-          </header>
-
-          <main className="min-w-0 flex-1 pb-24 lg:pb-3">
-            <div className="mx-auto w-full max-w-[1260px] px-1">{children}</div>
-          </main>
+          </footer>
         </div>
       </div>
 
-      <nav className="fixed inset-x-0 bottom-4 z-40 lg:hidden">
-        <div className="mx-auto w-[calc(100%-1.5rem)] max-w-md rounded-[30px] border border-[var(--border)] bg-[var(--surface)] p-2 shadow-[var(--shadow-strong)] backdrop-blur-2xl">
-          <div className="grid grid-cols-4 gap-1.5">
+      <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-[var(--border)] bg-[var(--surface)]/90 backdrop-blur-md lg:hidden">
+        <div className="mx-auto w-full px-2 py-2">
+          <div className="flex items-center justify-around gap-1">
             {appNavigation.map((item) => {
               const active =
                 item.href === "/"
@@ -198,23 +201,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 <Link
                   key={item.href}
                   href={item.href}
-                  className="group relative overflow-hidden rounded-[22px]"
+                  className={`flex flex-1 flex-col items-center gap-1 rounded-md px-1 py-2 transition-colors ${active ? "text-[color:var(--primary)]" : "text-[var(--muted)] hover:text-[var(--foreground)]"
+                    }`}
                 >
-                  <span
-                    className={`absolute inset-0 rounded-[22px] bg-[linear-gradient(135deg,_var(--primary)_0%,_var(--primary-strong)_100%)] transition-all duration-300 ${active
-                        ? "scale-100 opacity-100"
-                        : "scale-[0.9] opacity-0 group-hover:scale-100 group-hover:opacity-100"
-                      }`}
-                  />
-                  <span
-                    className={`relative flex flex-col items-center gap-1.5 rounded-[22px] px-2 py-2.5 transition-all duration-300 ${active
-                        ? "-translate-y-0.5 text-white"
-                        : "text-[var(--muted)] group-hover:-translate-y-0.5 group-hover:text-white"
-                      }`}
-                  >
-                    <NavIcon href={item.href} active={active} />
-                    <span className="text-[11px] font-semibold">{item.shortLabel}</span>
-                  </span>
+                  <NavIcon href={item.href} active={active} />
+                  <span className="text-[10px] font-medium">{item.shortLabel}</span>
                 </Link>
               );
             })}
@@ -231,87 +222,49 @@ function NavIcon({ href, active }: { href: string; active: boolean }) {
 
   if (href === "/") {
     return (
-      <svg viewBox="0 0 24 24" fill="none" className={className}>
-        <path
-          d="M4 10.5L12 4l8 6.5V20a1 1 0 0 1-1 1h-4.5v-6h-5v6H5a1 1 0 0 1-1-1v-9.5Z"
-          stroke="currentColor"
-          strokeWidth="1.8"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
+      <svg viewBox="0 0 24 24" fill={active ? "currentColor" : "none"} stroke="currentColor" strokeWidth="1.8" className={className}>
+        <path d="M3 13.125C3 12.5037 3.50368 12 4.125 12H9.375C9.99632 12 10.5 12.5037 10.5 13.125V19.875C10.5 20.4963 9.99632 21 9.375 21H4.125C3.50368 21 3 20.4963 3 19.875V13.125Z" />
+        <path d="M13.5 13.125C13.5 12.5037 14.0037 12 14.625 12H19.875C20.4963 12 21 12.5037 21 13.125V19.875C21 20.4963 20.4963 21 19.875 21H14.625C14.0037 21 13.5 20.4963 13.5 19.875V13.125Z" />
+        <path d="M3 4.125C3 3.50368 3.50368 3 4.125 3H9.375C9.99632 3 10.5 3.50368 10.5 4.125V8.375C10.5 8.99632 9.99632 9.5 9.375 9.5H4.125C3.50368 9.5 3 8.99632 3 8.375V4.125Z" />
+        <path d="M13.5 4.125C13.5 3.50368 14.0037 3 14.625 3H19.875C20.4963 3 21 3.50368 21 4.125V8.375C21 8.99632 20.4963 9.5 19.875 9.5H14.625C14.0037 9.5 13.5 8.99632 13.5 8.375V4.125Z" />
       </svg>
     );
   }
 
   if (href === "/livestreams") {
     return (
-      <svg viewBox="0 0 24 24" fill="none" className={className}>
-        <rect
-          x="4"
-          y="6"
-          width="16"
-          height="12"
-          rx="4"
-          stroke="currentColor"
-          strokeWidth="1.8"
-        />
-        <circle cx="12" cy="12" r="2.5" fill="currentColor" />
+      <svg viewBox="0 0 24 24" fill={active ? "currentColor" : "none"} stroke="currentColor" strokeWidth="1.8" className={className}>
+        <path d="M2.25 18V9A2.25 2.25 0 014.5 6.75h15a2.25 2.25 0 012.25 2.25v9a2.25 2.25 0 01-2.25 2.25h-15A2.25 2.25 0 012.25 18z" />
+        <path d="M15.75 3.75h.008v.008H15.75V3.75z" />
       </svg>
     );
   }
 
   if (href === "/orders") {
     return (
-      <svg viewBox="0 0 24 24" fill="none" className={className}>
-        <path
-          d="M5 7h14M7 11h10M8 15h8M6 4h12a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Z"
-          stroke="currentColor"
-          strokeWidth="1.8"
-          strokeLinecap="round"
-        />
+      <svg viewBox="0 0 24 24" fill={active ? "currentColor" : "none"} stroke="currentColor" strokeWidth="1.8" className={className}>
+        <path d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
       </svg>
     );
   }
 
+  if (href === "/settings") {
+    return (
+      <svg viewBox="0 0 24 24" fill={active ? "currentColor" : "none"} stroke="currentColor" strokeWidth="1.8" className={className}>
+        <path d="M4.5 12a7.5 7.5 0 1115 0 7.5 7.5 0 01-15 0z" />
+        <path d="M12 9v3m0 0v3m0-3h3m-3 0H9" />
+      </svg>
+    )
+  }
+
   return (
-    <svg viewBox="0 0 24 24" fill="none" className={className}>
-      <path
-        d="M6 18.5a4.5 4.5 0 1 1 0-9 4.5 4.5 0 0 1 0 9Zm12 0a4.5 4.5 0 1 1 0-9 4.5 4.5 0 0 1 0 9ZM6 9.5V8a3 3 0 0 1 3-3h6a3 3 0 0 1 3 3v1.5"
-        stroke="currentColor"
-        strokeWidth="1.8"
-        strokeLinecap="round"
-      />
+    <svg viewBox="0 0 24 24" fill={active ? "currentColor" : "none"} stroke="currentColor" strokeWidth="1.8" className={className}>
+      <path d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" />
     </svg>
   );
 }
 
-function MoonIcon() {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" className="h-5 w-5">
-      <path
-        d="M20 14.5A7.5 7.5 0 0 1 9.5 4 8.5 8.5 0 1 0 20 14.5Z"
-        stroke="currentColor"
-        strokeWidth="1.8"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
-}
 
-function SunIcon() {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" className="h-5 w-5">
-      <circle cx="12" cy="12" r="4" stroke="currentColor" strokeWidth="1.8" />
-      <path
-        d="M12 2.5v2.2M12 19.3v2.2M21.5 12h-2.2M4.7 12H2.5M18.7 5.3l-1.6 1.6M6.9 17.1l-1.6 1.6M18.7 18.7l-1.6-1.6M6.9 6.9 5.3 5.3"
-        stroke="currentColor"
-        strokeWidth="1.8"
-        strokeLinecap="round"
-      />
-    </svg>
-  );
-}
 
 function getInitials(name?: string) {
   if (!name) {

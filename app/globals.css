@@ -1,21 +1,24 @@
 @import "tailwindcss";
 
 :root {
-  --background: #f4f7fb;
-  --background-secondary: #eaf0f8;
-  --foreground: #111827;
-  --foreground-soft: #475467;
-  --muted: #6b7280;
-  --border: rgba(15, 23, 42, 0.08);
-  --surface: rgba(255, 255, 255, 0.8);
-  --surface-strong: rgba(255, 255, 255, 0.96);
+  --background: #fafafb;
+  --background-secondary: #f1f4f9;
+  --foreground: #1a1f36;
+  --foreground-soft: #4f566b;
+  --muted: #a3acb9;
+  --border: #edf2f7;
+  --surface: #ffffff;
+  --surface-strong: #ffffff;
   --surface-elevated: #ffffff;
-  --surface-muted: rgba(248, 250, 252, 0.84);
-  --primary: #0a84ff;
-  --primary-strong: #2563eb;
-  --primary-soft: rgba(10, 132, 255, 0.18);
-  --shadow-soft: 0 18px 50px rgba(15, 23, 42, 0.08);
-  --shadow-strong: 0 32px 90px rgba(15, 23, 42, 0.12);
+  --surface-muted: #f7fafc;
+  --primary: #5d5fef;
+  --primary-strong: #4e50d1;
+  --primary-soft: rgba(93, 95, 239, 0.1);
+  --shadow-soft: 0 10px 30px rgba(0, 0, 0, 0.04);
+  --shadow-strong: 0 20px 50px rgba(0, 0, 0, 0.08);
+  --radius-lg: 16px;
+  --sidebar-width: 280px;
+  --sidebar-width-icon: 88px;
   color-scheme: light;
 }
 
@@ -30,6 +33,7 @@
   --surface-strong: rgba(13, 21, 35, 0.96);
   --surface-elevated: #111827;
   --surface-muted: rgba(19, 27, 43, 0.88);
+  --sidebar-width-icon: 88px;
   --primary: #4da3ff;
   --primary-strong: #0a84ff;
   --primary-soft: rgba(77, 163, 255, 0.2);
@@ -59,15 +63,9 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: "Avenir Next", "Segoe UI", sans-serif;
-  background-image:
-    radial-gradient(circle at top, rgba(10, 132, 255, 0.12), transparent 28%),
-    radial-gradient(circle at bottom right, rgba(90, 200, 250, 0.08), transparent 32%),
-    radial-gradient(circle at left center, rgba(37, 99, 235, 0.06), transparent 22%),
-    linear-gradient(180deg, var(--background) 0%, var(--background-secondary) 100%);
   transition:
     background-color 220ms ease,
-    color 220ms ease,
-    background-image 220ms ease;
+    color 220ms ease;
 }
 
 ::selection {
