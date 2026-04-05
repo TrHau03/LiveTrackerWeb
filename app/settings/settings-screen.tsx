@@ -6,7 +6,10 @@ import { useSession } from "@/components/session-provider";
 
 export function SettingsScreen() {
   const { session } = useSession();
-  const { theme, language, autoReconnectSSE, paperSize, setTheme, setLanguage, setAutoReconnectSSE, setPaperSize } = useSettingsStore();
+  const { 
+    theme, language, autoReconnectSSE, paperSize, commentDisplayOrder, 
+    setTheme, setLanguage, setAutoReconnectSSE, setPaperSize, setCommentDisplayOrder 
+  } = useSettingsStore();
 
   const [printerConfig, setPrinterConfig] = useState({
     enabled: true,

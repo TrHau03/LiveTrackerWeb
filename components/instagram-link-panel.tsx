@@ -6,7 +6,7 @@ import { INSTAGRAM_OAUTH_BACKEND_ORIGIN } from "@/lib/instagram-oauth";
 import { formatDateTime } from "@/lib/proxy-client";
 
 const PRIMARY_BUTTON_CLASS =
-  "inline-flex h-12 items-center justify-center rounded-[18px] bg-[linear-gradient(135deg,_var(--primary)_0%,_var(--primary-strong)_100%)] px-4 text-sm font-semibold text-white shadow-[0_18px_40px_rgba(10,132,255,0.22)] transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-60";
+  "inline-flex h-12 items-center justify-center rounded-[18px] bg-[linear-gradient(135deg,_var(--primary)_0%,_var(--primary-strong)_100%)] px-4 text-sm font-semibold text-white shadow-[0_18px_40px_rgba(20,71,230,0.22)] transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-60";
 const SECONDARY_BUTTON_CLASS =
   "inline-flex h-12 items-center justify-center rounded-[18px] border border-[var(--border)] bg-[var(--surface-strong)] px-4 text-sm font-medium text-[var(--foreground)] transition hover:-translate-y-0.5 hover:border-[color:var(--primary-soft)] disabled:cursor-not-allowed disabled:opacity-60";
 
@@ -36,7 +36,7 @@ export function InstagramLinkPanel() {
         ? "Connected"
         : "Not connected";
   const statusTone = isConnected
-    ? "bg-[rgba(10,132,255,0.14)] text-[var(--primary)]"
+    ? "bg-[var(--primary-soft)] text-[var(--primary)]"
     : "bg-[var(--surface-muted)] text-[var(--muted)]";
 
   async function handleRefresh() {
@@ -74,7 +74,7 @@ export function InstagramLinkPanel() {
       ) : null}
 
       <div className="mt-6 grid gap-4 xl:grid-cols-[1.08fr_0.92fr]">
-        <div className="rounded-[28px] border border-[var(--border)] bg-[linear-gradient(140deg,_rgba(10,132,255,0.12)_0%,_var(--surface-strong)_65%)] p-5">
+        <div className="rounded-[28px] border border-[var(--border)] bg-[linear-gradient(140deg,_rgba(20,71,230,0.12)_0%,_var(--surface-strong)_65%)] p-5">
           <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[var(--muted)]">
             Current connection
           </p>

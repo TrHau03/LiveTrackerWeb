@@ -1,0 +1,88 @@
+{
+  "success": true,
+  "message": "Get comments successfully",
+  "data": {
+    "comments": [
+      {
+        "_id": "69cead058ae76926b54584f3",
+        "igUserId": "27350059757910828",
+        "igUsername": "nhunnhun6897",
+        "text": "@350",
+        "createdAt": "2026-04-02T17:53:08.000Z",
+        "status": "NORMAL",
+        "price": 350000,
+        "quantity": 1,
+        "backupOf": {},
+        "customerTag": {},
+        "customerClosedCount": 1,
+        "isNewCustomer": false
+      },
+      {
+        "_id": "69ceacf1a93bc278bf7590cb",
+        "igUserId": "2158181311764390",
+        "igUsername": "_indi_ee",
+        "text": "Có nhóm thanh lý đồ của bà k, bữa mua nhầm 2 áo giống nhau",
+        "createdAt": "2026-04-02T17:52:48.000Z",
+        "status": null,
+        "price": 0,
+        "quantity": 1,
+        "backupOf": {},
+        "customerTag": {},
+        "customerClosedCount": 0,
+        "isNewCustomer": false
+      },
+      {
+        "_id": "69ceace78ae76926b54584d8",
+        "igUserId": "27350059757910828",
+        "igUsername": "nhunnhun6897",
+        "text": "e chốt cái áo adidas cuối ạ",
+        "createdAt": "2026-04-02T17:52:37.000Z",
+        "status": null,
+        "price": 0,
+        "quantity": 1,
+        "backupOf": {},
+        "customerTag": {},
+        "customerClosedCount": 1,
+        "isNewCustomer": false
+      },
+      {
+        "_id": "69ceacc88ae76926b54584be",
+        "igUserId": "827628539636987",
+        "igUsername": "trnh.phphanh",
+        "text": "có tank ngực 32 hog c",
+        "createdAt": "2026-04-02T17:52:07.000Z",
+        "status": null,
+        "price": 32000,
+        "quantity": 1,
+        "backupOf": {},
+        "customerTag": {},
+        "customerClosedCount": 1,
+        "isNewCustomer": false
+      },
+      {
+        "_id": "69ceaca1a93bc278bf759009",
+        "igUserId": "827628539636987",
+        "igUsername": "trnh.phphanh",
+        "text": "có tank ngực 32 hog c",
+        "createdAt": "2026-04-02T17:51:28.000Z",
+        "status": null,
+        "price": 32000,
+        "quantity": 1,
+        "backupOf": {},
+        "customerTag": {},
+        "customerClosedCount": 1,
+        "isNewCustomer": false
+      }
+    ],
+    "liveStats": {
+      "totalOrder": 97,
+      "totalComment": 1823,
+      "totalClosedComment": 280
+    },
+    "pagination": {
+      "limit": 5,
+      "hasMore": true,
+      "nextCursor": "69ceaca1a93bc278bf759009"
+    }
+  }
+}

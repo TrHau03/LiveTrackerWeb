@@ -24,6 +24,7 @@ import {
   streamProxyRequest,
 } from "@/lib/proxy-client";
 import type { SessionSettings } from "@/lib/workspace-session";
+import { Virtuoso, VirtuosoHandle } from "react-virtuoso";
 
 // ─── New Service & Hook imports ──────────────────────────────────────────────
 import { useDashboard } from "@/hooks/use-dashboard";
@@ -77,7 +78,7 @@ export function DashboardScreen() {
           value={178}
           icon={<HeartIcon />}
           iconBg="bg-[#eef2ff]"
-          iconColor="text-[#5d5fef]"
+          iconColor="text-[#1447E6]"
         />
         <StatCard
           label="Stock Products"
@@ -120,7 +121,7 @@ export function DashboardScreen() {
               ]} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
                 <defs>
                   <linearGradient id="lineGradient" x1="0" y1="0" x2="1" y2="0">
-                    <stop offset="0%" stopColor="#5d5fef" />
+                    <stop offset="0%" stopColor="#1447E6" />
                     <stop offset="100%" stopColor="#f472b6" />
                   </linearGradient>
                 </defs>
@@ -139,7 +140,7 @@ export function DashboardScreen() {
                     return null;
                   }}
                 />
-                <Area type="monotone" dataKey="value" stroke="url(#lineGradient)" strokeWidth={3} fill="transparent" dot={{ r: 4, fill: '#fff', stroke: '#5d5fef', strokeWidth: 2 }} activeDot={{ r: 6, fill: '#5d5fef' }} />
+                <Area type="monotone" dataKey="value" stroke="url(#lineGradient)" strokeWidth={3} fill="transparent" dot={{ r: 4, fill: '#fff', stroke: '#1447E6', strokeWidth: 2 }} activeDot={{ r: 6, fill: '#1447E6' }} />
               </AreaChart>
             </ResponsiveContainer>
           </div>
@@ -151,7 +152,7 @@ export function DashboardScreen() {
               {/* Simplified Donut Chart via SVG */}
               <svg viewBox="0 0 100 100" className="h-full w-full -rotate-90">
                 <circle cx="50" cy="50" r="40" fill="transparent" stroke="#f1f4f9" strokeWidth="12" />
-                <circle cx="50" cy="50" r="40" fill="transparent" stroke="#5d5fef" strokeWidth="12" strokeDasharray="251.2" strokeDashoffset="50" />
+                <circle cx="50" cy="50" r="40" fill="transparent" stroke="#1447E6" strokeWidth="12" strokeDasharray="251.2" strokeDashoffset="50" />
                 <circle cx="50" cy="50" r="40" fill="transparent" stroke="#ff8a00" strokeWidth="12" strokeDasharray="251.2" strokeDashoffset="180" />
                 <circle cx="50" cy="50" r="40" fill="transparent" stroke="#ffc107" strokeWidth="12" strokeDasharray="251.2" strokeDashoffset="220" />
               </svg>
@@ -161,7 +162,7 @@ export function DashboardScreen() {
               </div>
             </div>
             <div className="mt-6 flex flex-wrap justify-center gap-4 text-[10px] font-semibold">
-              <div className="flex items-center gap-2 text-[var(--foreground)]"><span className="h-2 w-2 rounded-full bg-[#5d5fef]"></span> Sale</div>
+              <div className="flex items-center gap-2 text-[var(--foreground)]"><span className="h-2 w-2 rounded-full bg-[#1447E6]"></span> Sale</div>
               <div className="flex items-center gap-2 text-[var(--foreground)]"><span className="h-2 w-2 rounded-full bg-[#ffc107]"></span> Distribute</div>
               <div className="flex items-center gap-2 text-[var(--foreground)]"><span className="h-2 w-2 rounded-full bg-[#ff8a00]"></span> Return</div>
             </div>
@@ -238,17 +239,20 @@ export function DashboardScreen() {
 }
 
 export function LivestreamsScreen() {
-  const [activeLiveId, setActiveLiveId] = useState<string | null>(null);
+  const activeLiveId = useSettingsStore(state => state.activeLiveId);
+  const setActiveLiveId = useSettingsStore(state => state.setActiveLiveId);
   const [mobileView, setMobileView] = useState<"list" | "detail">("list");
+  const setCommentDisplayOrder = useSettingsStore(state => state.setCommentDisplayOrder);
 
   // Reset mobile view when selecting a live
   const handleSelectLive = (id: string) => {
     setActiveLiveId(id);
     setMobileView("detail");
+    setCommentDisplayOrder("newest_at_top");
   };
 
   return (
-    <div className="flex flex-col flex-1 h-full overflow-hidden">
+    <div className="flex flex-col flex-1 h-full overflow-hidden pb-4">
       <div className="flex flex-1 min-h-0 gap-4 overflow-hidden">
         {/* Left Column: List (Hidden on mobile detail) */}
         <div className={`flex flex-col rounded-xl border border-[var(--border)] bg-[var(--surface)] shadow-[var(--shadow-soft)] transition-all duration-300 ${mobileView === "list" ? "w-full lg:w-[25%]" : "hidden lg:flex lg:w-[25%]"
@@ -260,7 +264,7 @@ export function LivestreamsScreen() {
         <div className={`flex-1 flex min-h-0 gap-4 overflow-hidden transition-all duration-300 ${mobileView === "detail" ? "w-full flex-col lg:flex-row" : "hidden lg:flex"
           }`}>
           {/* Middle Column: Comments */}
-          <div className="flex flex-col flex-[1.5] rounded-xl border border-[var(--border)] bg-[var(--surface)] shadow-[var(--shadow-soft)] overflow-hidden">
+          <div className="flex flex-col flex-[1.5] min-h-0 rounded-xl border border-[var(--border)] bg-[var(--surface)] shadow-[var(--shadow-soft)] overflow-hidden">
             {activeLiveId ? (
               <div className="flex flex-col h-full">
                 <div className="lg:hidden p-3 border-b border-[var(--border)] bg-[var(--surface-muted)]/30">
@@ -286,7 +290,7 @@ export function LivestreamsScreen() {
           </div>
 
           {/* Right Column: Orders */}
-          <div className="flex flex-col flex-1 rounded-xl border border-[var(--border)] bg-[var(--surface)] shadow-[var(--shadow-soft)] relative overflow-hidden h-[400px] lg:h-full">
+          <div className="flex flex-col flex-1 min-h-0 rounded-xl border border-[var(--border)] bg-[var(--surface)] shadow-[var(--shadow-soft)] relative overflow-hidden h-[400px] lg:h-full">
             {activeLiveId ? (
               <LiveOrderColumn key={activeLiveId} liveId={activeLiveId} />
             ) : (
@@ -328,6 +332,13 @@ function LiveListColumn({ activeLiveId, onSelectLive }: { activeLiveId: string |
     owner: pickString(asRecord(live.user), ["fullName", "name"]) || session.user?.fullName || "Owner",
     igLiveId: pickString(live, ["igLiveId"]) || "instagram-live",
   }));
+
+  // Auto-select the first (most recent) live on first load if none selected
+  useEffect(() => {
+    if (livestreams.length > 0 && !activeLiveId && !query) {
+      onSelectLive(livestreams[0].id);
+    }
+  }, [livestreams, activeLiveId, onSelectLive, query]);
 
   return (
     <div className="flex h-full flex-col">
@@ -392,15 +403,69 @@ function LiveListColumn({ activeLiveId, onSelectLive }: { activeLiveId: string |
 }
 
 function LiveCommentColumn({ liveId }: { liveId: string }) {
-  const { comments, streamState, stopStream } = useCommentsStream(liveId);
-  const [autoScroll, setAutoScroll] = useState(true);
-  const scrollRef = useRef<HTMLDivElement>(null);
+  const { comments, streamState, hasMore, isLoadingMore, fetchMoreComments } = useCommentsStream(liveId);
+  const commentDisplayOrder = useSettingsStore(state => state.commentDisplayOrder);
+  const setCommentDisplayOrder = useSettingsStore(state => state.setCommentDisplayOrder);
+  const virtuosoRef = useRef<VirtuosoHandle>(null);
+  const [atBottom, setAtBottom] = useState(true);
+  const [atTop, setAtTop] = useState(true);
 
+  const displayComments = commentDisplayOrder === "newest_at_top" 
+    ? [...comments].reverse() 
+    : comments;
+
+  const isNewestAtBottom = commentDisplayOrder === "newest_at_bottom";
+
+  // Reset states when switching lives
   useEffect(() => {
-    if (autoScroll && scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-    }
-  }, [comments, autoScroll]);
+    setAtBottom(true);
+    setAtTop(true);
+  }, [liveId]);
+
+  const ItemContent = (index: number, comment: any) => {
+    const igUsername = pickString(comment, ["igUsername", "username"]) || "Instagram user";
+    return (
+      <div className="relative flex gap-3 rounded-xl border border-[var(--border)] bg-[var(--surface)] p-2.5 shadow-[var(--shadow-soft)] mx-3 my-1.5 transition hover:border-[var(--primary)] hover:shadow-md">
+        {/* Left: Avatar */}
+        <div className="flex-shrink-0 pt-0.5">
+          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[color:var(--primary-soft)] text-xs font-bold text-[var(--primary)]">
+            {igUsername.charAt(0).toUpperCase()}
+          </div>
+        </div>
+
+        {/* Right: Content container */}
+        <div className="flex-1 min-w-0 flex flex-col gap-1.5">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-sm font-semibold text-[var(--foreground)] hover:underline cursor-pointer transition-colors hover:text-[var(--primary)] truncate">
+              {igUsername}
+            </span>
+            <span className="text-[10px] font-medium text-[var(--muted)] whitespace-nowrap">
+              {formatTimeOnly(pickString(comment, ["createdAt", "updatedAt"]))}
+            </span>
+          </div>
+
+          <p className="text-sm leading-relaxed text-[var(--foreground-soft)] whitespace-pre-wrap break-words">
+            {pickString(comment, ["text", "content", "message"]) || "No text"}
+          </p>
+
+          <div className="flex items-center gap-2 pt-1">
+            <button className="flex items-center gap-1.5 rounded-md bg-[var(--primary)] px-2.5 py-1 text-xs font-bold text-white shadow-sm hover:bg-[var(--primary-strong)] transition active:scale-95 shrink-0">
+              <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" /></svg>
+              Chốt đơn
+            </button>
+            <button className="flex items-center gap-1.5 rounded-md border border-[var(--border)] bg-[var(--surface)] px-2.5 py-1 text-[10px] font-medium text-[var(--muted)] shadow-sm hover:bg-[var(--surface-muted)] hover:border-[var(--primary)] hover:text-[var(--foreground)] transition active:scale-95 shrink-0">
+              <svg className="h-3 v-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4v.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+              Đã báo lỗi
+            </button>
+            <button className="flex items-center gap-1.5 rounded-md border border-[var(--border)] bg-[var(--surface)] px-2.5 py-1 text-[10px] font-medium text-[var(--muted)] shadow-sm hover:bg-[var(--surface-muted)] hover:border-[var(--primary)] hover:text-[var(--foreground)] transition active:scale-95 shrink-0">
+              <svg className="h-3 v-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+              Dự bị
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
 
   return (
     <div className="flex h-full flex-col relative w-full overflow-hidden">
@@ -410,86 +475,82 @@ function LiveCommentColumn({ liveId }: { liveId: string }) {
           {streamState === "live" && <span className="flex h-2 w-2 rounded-full bg-red-500 animate-[pulse_2s_ease-in-out_infinite]"></span>}
         </h3>
         <div className="flex items-center gap-4">
-          <label className="flex items-center gap-2 cursor-pointer group">
-            <div className={`relative flex h-5 w-9 shrink-0 cursor-pointer items-center justify-center rounded-full transition-colors duration-200 ease-in-out ${autoScroll ? 'bg-[var(--primary)]' : 'bg-[var(--surface-muted)]'}`}>
-              <input
-                type="checkbox"
-                checked={autoScroll}
-                onChange={(e) => setAutoScroll(e.target.checked)}
-                className="peer sr-only"
-              />
-              <span className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${autoScroll ? 'translate-x-2' : '-translate-x-2'}`}></span>
-            </div>
-            <span className="text-xs font-medium text-[var(--foreground-soft)] group-hover:text-[var(--foreground)]">Cuộn tự động</span>
-          </label>
+          <button 
+            onClick={() => setCommentDisplayOrder(isNewestAtBottom ? "newest_at_top" : "newest_at_bottom")}
+            className="flex items-center gap-2 rounded-lg border border-[var(--border)] bg-[var(--surface)] px-2.5 py-1.5 text-xs font-medium text-[var(--foreground-soft)] hover:bg-[var(--surface-muted)] hover:text-[var(--foreground)] hover:border-[var(--primary)] transition-all"
+            title="Đổi chiều hiển thị bình luận"
+          >
+            <svg className={`h-4 w-4 transition-transform duration-300 ${isNewestAtBottom ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 4h13M3 8h9m-9 4h6m4 0l4-4m0 0l4 4m-4-4v12" />
+            </svg>
+            {!isNewestAtBottom ? "Mới nhất ở trên" : "Mới nhất ở dưới"}
+          </button>
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-4 space-y-4" ref={scrollRef}>
-        {comments.length === 0 ? (
+      <div className="flex-1 min-h-0 relative bg-[var(--surface-muted)]/10">
+        {displayComments.length === 0 ? (
           <div className="flex h-full items-center justify-center text-sm text-[var(--muted)]">
             Đang chờ bình luận mới...
           </div>
         ) : (
-          comments.map((comment, index) => {
-            const igUsername = pickString(comment, ["igUsername", "username"]) || "Instagram user";
-            return (
-              <div
-                key={`${pickString(comment, ["id", "_id"]) || index}`}
-                className="relative rounded-xl border border-[var(--border)] bg-[var(--surface)] p-3.5 shadow-[var(--shadow-soft)] transition hover:border-[var(--primary)] hover:shadow-md"
-              >
-                {/* Header: Username and Time */}
-                <div className="flex items-start justify-between gap-3 mb-3">
-                  <div className="flex items-center gap-2.5">
-                    <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[color:var(--primary-soft)] text-xs font-bold text-[var(--primary)]">
-                      {igUsername.charAt(0).toUpperCase()}
-                    </div>
-                    <span className="text-sm font-semibold text-[var(--foreground)] hover:underline cursor-pointer transition-colors hover:text-[var(--primary)]">
-                      {igUsername}
-                    </span>
-                  </div>
-                  <span className="text-[10px] font-medium text-[var(--muted)] whitespace-nowrap">
-                    {formatTimeOnly(pickString(comment, ["createdAt", "updatedAt"]))}
-                  </span>
+          <Virtuoso
+            ref={virtuosoRef}
+            data={displayComments}
+            className="h-full custom-scrollbar"
+            atBottomStateChange={setAtBottom}
+            atTopStateChange={setAtTop}
+            itemContent={ItemContent}
+            startReached={isNewestAtBottom && !isLoadingMore && hasMore ? fetchMoreComments : undefined}
+            endReached={!isNewestAtBottom && !isLoadingMore && hasMore ? fetchMoreComments : undefined}
+            initialTopMostItemIndex={isNewestAtBottom ? displayComments.length - 1 : 0}
+            followOutput={isNewestAtBottom ? (isAtBottom => isAtBottom ? 'smooth' : false) : false}
+            components={{
+              Header: () => isNewestAtBottom ? (
+                <div className="py-3 text-center mb-2">
+                  {!hasMore ? (
+                    <span className="text-[10px] text-[var(--muted)] font-medium italic mx-4 block py-1 bg-[var(--surface-muted)]/50 rounded">--- Đã tải hết lịch sử ---</span>
+                  ) : isLoadingMore ? (
+                    <span className="text-[10px] font-bold text-[var(--primary)] animate-pulse">Đang tải...</span>
+                  ) : (
+                    <span className="text-[10px] text-[var(--muted)] opacity-60">↑ Cuộn để tải thêm</span>
+                  )}
                 </div>
-
-                {/* Comment Text */}
-                <p className="text-sm leading-6 text-[var(--foreground-soft)] whitespace-pre-wrap mb-3">
-                  {pickString(comment, ["text", "content", "message"]) || "No text"}
-                </p>
-
-                {/* Action Buttons */}
-                <div className="flex items-center gap-2 pt-2 border-t border-[var(--border)]">
-                  <button className="flex items-center gap-1.5 rounded-lg border border-[var(--border)] bg-[var(--surface)] px-3 py-1.5 text-xs font-medium text-[var(--foreground)] shadow-sm hover:bg-[var(--surface-muted)] hover:border-[var(--primary)] transition active:scale-95">
-                    <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" /></svg>
-                    Chốt đơn
-                  </button>
-                  <button className="flex items-center gap-1.5 rounded-lg border border-[var(--border)] bg-[var(--surface)] px-3 py-1.5 text-xs font-medium text-[var(--foreground)] shadow-sm hover:bg-[var(--surface-muted)] hover:border-[var(--primary)] transition active:scale-95">
-                    <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4v.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                    Đã báo lỗi
-                  </button>
-                  <button className="flex items-center gap-1.5 rounded-lg border border-[var(--border)] bg-[var(--surface)] px-3 py-1.5 text-xs font-medium text-[var(--foreground)] shadow-sm hover:bg-[var(--surface-muted)] hover:border-[var(--primary)] transition active:scale-95">
-                    <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                    Dự bị
-                  </button>
+              ) : null,
+              Footer: () => !isNewestAtBottom ? (
+                <div className="py-3 text-center mt-2">
+                  {!hasMore ? (
+                    <span className="text-[10px] text-[var(--muted)] font-medium italic mx-4 block py-1 bg-[var(--surface-muted)]/50 rounded">--- Đã tải hết lịch sử ---</span>
+                  ) : isLoadingMore ? (
+                    <span className="text-[10px] font-bold text-[var(--primary)] animate-pulse">Đang tải...</span>
+                  ) : (
+                    <span className="text-[10px] text-[var(--muted)] opacity-60">↓ Cuộn để tải thêm</span>
+                  )}
                 </div>
-              </div>
-            );
-          })
+              ) : <div className="h-4" /> /* padding block */
+            }}
+          />
+        )}
+
+        {(!isNewestAtBottom ? !atTop : !atBottom) && displayComments.length > 0 && (
+          <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-20">
+            <button
+              onClick={() => {
+                const behavior = 'smooth';
+                if (isNewestAtBottom) {
+                  virtuosoRef.current?.scrollToIndex({ index: 'LAST', behavior });
+                } else {
+                  virtuosoRef.current?.scrollToIndex({ index: 0, behavior });
+                }
+              }}
+              className="flex items-center gap-2 rounded-full border border-[var(--border)] bg-[var(--surface)] px-5 py-2.5 text-xs font-bold text-[var(--foreground)] shadow-[0_4px_12px_rgba(0,0,0,0.1)] hover:shadow-lg hover:-translate-y-0.5 transition-all active:translate-y-0"
+            >
+              <svg className={`h-4 w-4 text-[var(--primary)] ${isNewestAtBottom ? 'animate-bounce' : 'rotate-180 animate-bounce'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19 14l-7 7m0 0l-7-7m7 7V3" /></svg>
+              Theo dõi Luồng mới
+            </button>
+          </div>
         )}
       </div>
-
-      {!autoScroll && (
-        <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-20">
-          <button
-            onClick={() => setAutoScroll(true)}
-            className="flex items-center gap-2 rounded-full border border-[var(--border)] bg-[var(--surface)] px-5 py-2 text-xs font-bold text-[var(--foreground)] shadow-lg hover:bg-[var(--surface-muted)] transition-transform hover:-translate-y-0.5 active:translate-y-0"
-          >
-            <svg className="h-4 w-4 text-[var(--primary)] animate-bounce" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19 14l-7 7m0 0l-7-7m7 7V3" /></svg>
-            Tiếp tục cuộn xuống
-          </button>
-        </div>
-      )}
     </div>
   );
 }
@@ -549,9 +610,7 @@ function LiveOrderColumn({ liveId }: { liveId: string }) {
               >
                 <div className="mb-2 flex items-start justify-between">
                   <div className="flex items-center gap-2.5">
-                    <span className={`text-sm font-semibold truncate ${isActive ? 'text-[var(--primary)]' : 'text-[var(--foreground)]'}`}>
-                      {pickString(order, ["igName", "customerName"]) || "Khách hàng"}
-                    </span>
+                      {pickString(asRecord(order.customerId), ["igName"]) || pickString(order, ["igName", "customerName"]) || "Khách hàng"}
                   </div>
                   <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${isActive ? 'text-[var(--primary-strong)]' : 'text-[var(--primary)]'}`}>
                     {formatCurrency(pickNumber(order, ["totalPrice", "amount"]) ?? 0)}
@@ -596,7 +655,7 @@ function LiveOrderColumn({ liveId }: { liveId: string }) {
               <div className="space-y-3">
                 <h5 className="text-[10px] font-bold uppercase tracking-[0.1em] text-[var(--muted)]">Thông tin người mua</h5>
                 <div className="rounded-xl border border-[var(--border)] bg-[var(--surface-subdued)] p-3.5 space-y-2.5">
-                  <p className="font-semibold text-[var(--foreground)] text-sm">{pickString(selectedOrder, ["igName", "customerName"]) || "Instagram User"}</p>
+                  <p className="font-semibold text-[var(--foreground)] text-sm">{pickString(asRecord(selectedOrder.customerId), ["igName"]) || pickString(selectedOrder, ["igName", "customerName"]) || "Người mua"}</p>
                   <p className="text-xs text-[var(--foreground-soft)] flex items-center gap-1.5 font-medium">
                     <svg className="h-3.5 w-3.5 text-[var(--muted)]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" /></svg>
                     {pickString(selectedOrder, ["phone"]) || "Chưa gửi SĐT"}
@@ -1057,7 +1116,7 @@ export function OrdersScreen() {
                       <td className="px-4 py-2 text-[var(--foreground)] font-medium">{pickString(order, ["phone"]) || "—"}</td>
                       <td className="px-4 py-2 font-bold text-right text-[var(--foreground)] text-base">{formatCurrency(pickNumber(order, ["totalPrice", "amount"]) ?? 0)}</td>
                       <td className="px-4 py-2 text-center">
-                        <span className="inline-flex rounded-full bg-blue-50 px-2.5 py-1.5 text-[11px] font-bold uppercase tracking-wider text-[var(--primary)]">Chờ xử lý</span>
+                        <span className="inline-flex rounded-full bg-[color:var(--primary-soft)] px-2.5 py-1.5 text-[11px] font-bold uppercase tracking-wider text-[var(--primary)]">Chờ xử lý</span>
                       </td>
                     </tr>
                   );
@@ -1115,7 +1174,7 @@ export function OrdersScreen() {
                 </div>
 
                 <div className="p-6 border-t border-[var(--border)] bg-[var(--surface-subdued)] shrink-0 flex flex-col gap-4">
-                  <button className="w-full rounded-xl bg-[#0a84ff] hover:bg-[#0070e0] px-4 py-4 text-base font-bold text-white shadow-lg transition-colors flex items-center justify-center gap-2">
+                  <button className="w-full rounded-xl bg-[#1447E6] hover:bg-[#0E3BBF] px-4 py-4 text-base font-bold text-white shadow-lg transition-colors flex items-center justify-center gap-2">
                     <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7" /></svg>
                     XÁC NHẬN ĐƠN HÀNG
                   </button>
@@ -1296,7 +1355,7 @@ export function CustomersScreen() {
                       <span className="text-sm text-[var(--muted)]">No tags</span>
                     ) : (
                       tags.map((tag, index) => (
-                        <span key={`${pickString(tag, ["id", "_id"]) || index}`} className="inline-flex rounded-md bg-blue-50 px-2 py-1 text-xs font-medium text-[var(--primary)]">
+                        <span key={`${pickString(tag, ["id", "_id"]) || index}`} className="inline-flex rounded-md bg-[color:var(--primary-soft)] px-2 py-1 text-xs font-medium text-[var(--primary)]">
                           {pickString(tag, ["label", "name"]) || "Tag"}
                         </span>
                       ))
@@ -1461,7 +1520,7 @@ function Tag({
   tone: "blue" | "muted" | "danger";
 }) {
   const tones = {
-    blue: "bg-[rgba(10,132,255,0.14)] text-[var(--primary)]",
+    blue: "bg-[var(--primary-soft)] text-[var(--primary)]",
     muted: "bg-[var(--surface-muted)] text-[var(--muted)]",
     danger: "bg-[rgba(255,69,58,0.14)] text-[rgb(255,69,58)]",
   }[tone];

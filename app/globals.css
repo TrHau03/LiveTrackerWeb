@@ -11,9 +11,9 @@
   --surface-strong: #ffffff;
   --surface-elevated: #ffffff;
   --surface-muted: #f7fafc;
-  --primary: #5d5fef;
-  --primary-strong: #4e50d1;
-  --primary-soft: rgba(93, 95, 239, 0.1);
+  --primary: #1447E6;
+  --primary-strong: #0E3BBF;
+  --primary-soft: rgba(20, 71, 230, 0.1);
   --shadow-soft: 0 10px 30px rgba(0, 0, 0, 0.04);
   --shadow-strong: 0 20px 50px rgba(0, 0, 0, 0.08);
   --radius-lg: 16px;
@@ -34,9 +34,9 @@
   --surface-elevated: #111827;
   --surface-muted: rgba(19, 27, 43, 0.88);
   --sidebar-width-icon: 88px;
-  --primary: #4da3ff;
-  --primary-strong: #0a84ff;
-  --primary-soft: rgba(77, 163, 255, 0.2);
+  --primary: #4D7CFF;
+  --primary-strong: #1447E6;
+  --primary-soft: rgba(77, 124, 255, 0.2);
   --shadow-soft: 0 26px 70px rgba(2, 6, 23, 0.42);
   --shadow-strong: 0 42px 120px rgba(2, 6, 23, 0.52);
   color-scheme: dark;
@@ -69,7 +69,7 @@ body {
 }
 
 ::selection {
-  background: rgba(10, 132, 255, 0.24);
+  background: rgba(20, 71, 230, 0.24);
 }
 
 a,

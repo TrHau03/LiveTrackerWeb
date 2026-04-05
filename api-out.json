@@ -1,0 +1,39 @@
+{
+  "success": true,
+  "message": "Lấy danh sách live stream theo userId thành công",
+  "data": {
+    "items": [
+      {
+        "_id": "69ce7c5a9b92ebc898f4875d",
+        "igLiveId": "18313527424283525",
+        "shopId": "17841433139936544",
+        "userId": {
+          "_id": "69bd3654a501775d949c4164",
+          "shops": [
+            {
+              "id": "17841433139936544",
+              "name": "G'ior.lin",
+              "avatar": "https://scontent.cdninstagram.com/v/t51.2885-19/268149293_261639075880370_5013636426580911218_n.jpg?stp=dst-jpg_s206x206_tt6&_nc_cat=104&ccb=7-5&_nc_sid=bf7eb4&efg=eyJ2ZW5jb2RlX3RhZyI6InByb2ZpbGVfcGljLnd3dy41MTUuQzMifQ%3D%3D&_nc_ohc=aJSVRERqYgMQ7kNvwG-IwGN&_nc_oc=AdoCaWzVIBZLPz98u0QUx2t5XTfGAls3dcj6txyP9mkqDP-0z06ZLLHsFJO3uCkNR6g&_nc_zt=24&_nc_ht=scontent.cdninstagram.com&edm=AP4hL3IEAAAA&_nc_tpa=Q5bMBQGiyqyKapvCa0-bj5uaDbzZqoypMxHcbxvppFh9TtixxZNPplRuube-GxP33rAhd7rr0SlknWL9Uw&oh=00_Af3yOfEjHUOQFGT1gEvQtHzfrauIUeyQpgDZ0YOQwYX6kQ&oe=69D3075C",
+              "address": "",
+              "phone": "",
+              "bankAccount": "0359713151",
+              "bankAccountName": "BUI THI TO NHU",
+              "bankCode": "546034"
+            }
+          ]
+        },
+        "isLive": false,
+        "totalComment": 1823,
+        "totalOrder": 97,
+        "createdAt": "2026-04-02T14:25:30.367Z",
+        "updatedAt": "2026-04-03T02:57:39.478Z"
+      }
+    ],
+    "pagination": {
+      "page": 1,
+      "limit": 1,
+      "total": 11,
+      "totalPages": 11
+    }
+  }
+}

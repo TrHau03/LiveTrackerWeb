@@ -8,6 +8,7 @@ import { AuthScreen } from "@/components/auth-screen";
 import { Header } from "@/components/header";
 import { useSession } from "@/components/session-provider";
 import { useTheme } from "@/components/theme-provider";
+import { LivestreamsScreen } from "@/components/workspace-screens";
 import { appNavigation } from "@/lib/site";
 
 export function AppShell({ children }: { children: React.ReactNode }) {
@@ -20,6 +21,37 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   // Close mobile menu when route changes
   React.useEffect(() => {
     setIsMobileMenuOpen(false);
+  }, [pathname]);
+
+  // Logic định hướng domain (Domain-based routing)
+  React.useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const hostname = window.location.hostname;
+    // Bỏ qua nếu là môi trường phát triển (localhost / 127.0.0.1)
+    const isLocal = hostname === "localhost" || hostname === "127.0.0.1" || hostname.includes("192.168.");
+    if (isLocal) return;
+
+    const urlParams = new URLSearchParams(window.location.search);
+    const orderId = urlParams.get("id");
+
+    // 1. Xử lý logic pay.livetracker.vn
+    if (hostname === "pay.livetracker.vn") {
+      // Chỉ cho phép đường dẫn /order và PHẢI có tham số id
+      const isValidPaymentPath = pathname.startsWith("/order") && orderId;
+
+      if (!isValidPaymentPath) {
+        // Nếu sai: trả về livetracker.vn (không có path hay dấu / đằng sau)
+        window.location.replace("https://livetracker.vn");
+        return;
+      }
+    }
+
+    // 2. Xử lý logic app.livetracker.vn
+    if (hostname === "app.livetracker.vn") {
+      // Mặc định AppShell đã xử lý việc hiển thị AuthScreen nếu không phải public route.
+      // Nếu bạn muốn ép buộc về trang chủ khi ở domain này, có thể bổ sung tại đây.
+    }
   }, [pathname]);
 
   // Public routes - không cần authentication
@@ -172,19 +204,24 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <Header />
 
           <main className={`min-w-0 flex-1 px-4 sm:px-8 ${pathname === "/livestreams" ? "pb-0 flex flex-col overflow-hidden" : "pb-24 lg:pb-8"}`}>
-            <div className={`w-full ${pathname === "/livestreams" ? "flex-1 overflow-hidden" : ""}`}>{children}</div>
+            <div className={`w-full h-full ${pathname === "/livestreams" ? "flex flex-col flex-1 overflow-hidden" : "hidden"}`}>
+              <LivestreamsScreen />
+            </div>
+            <div className={`w-full ${pathname !== "/livestreams" ? "block" : "hidden"}`}>{children}</div>
           </main>
 
-          <footer className="mt-auto hidden border-t border-[var(--border)] bg-[var(--surface)] px-6 py-4 lg:block shrink-0">
-            <div className="mx-auto flex max-w-[1200px] items-center justify-between text-xs text-[var(--muted)]">
-              <p>© {new Date().getFullYear()} LiveTracker. All rights reserved.</p>
-              <div className="flex gap-4">
-                <a href="#" className="hover:text-[var(--foreground)]">Hỗ trợ</a>
-                <a href="#" className="hover:text-[var(--foreground)]">Bảo mật</a>
-                <a href="#" className="hover:text-[var(--foreground)]">Điều khoản</a>
+          {pathname !== "/livestreams" && (
+            <footer className="mt-auto hidden border-t border-[var(--border)] bg-[var(--surface)] px-6 py-4 lg:block shrink-0">
+              <div className="mx-auto flex max-w-[1200px] items-center justify-between text-xs text-[var(--muted)]">
+                <p>© {new Date().getFullYear()} LiveTracker. All rights reserved.</p>
+                <div className="flex gap-4">
+                  <a href="#" className="hover:text-[var(--foreground)]">Hỗ trợ</a>
+                  <a href="#" className="hover:text-[var(--foreground)]">Bảo mật</a>
+                  <a href="#" className="hover:text-[var(--foreground)]">Điều khoản</a>
+                </div>
               </div>
-            </div>
-          </footer>
+            </footer>
+          )}
         </div>
       </div>
 

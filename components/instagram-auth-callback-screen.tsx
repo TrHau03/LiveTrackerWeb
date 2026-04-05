@@ -169,7 +169,7 @@ export function InstagramAuthCallbackScreen() {
 
   return (
     <div className="space-y-8 pb-28 lg:pb-6">
-      <section className="overflow-hidden rounded-[36px] border border-[var(--border)] bg-[linear-gradient(140deg,_rgba(10,132,255,0.14)_0%,_rgba(90,200,250,0.08)_36%,_var(--surface-strong)_100%)] px-6 py-7 shadow-[var(--shadow-soft)] backdrop-blur-2xl md:px-8 md:py-8 lg:px-9 lg:py-9">
+      <section className="overflow-hidden rounded-[36px] border border-[var(--border)] bg-[linear-gradient(140deg,_var(--primary-soft)_0%,_rgba(90,200,250,0.08)_36%,_var(--surface-strong)_100%)] px-6 py-7 shadow-[var(--shadow-soft)] backdrop-blur-2xl md:px-8 md:py-8 lg:px-9 lg:py-9">
         <p className="text-[11px] font-semibold uppercase tracking-[0.26em] text-[var(--muted)]">
           Instagram Callback
         </p>
@@ -236,7 +236,7 @@ function StepCard({
 }) {
   return (
     <article className="rounded-[24px] border border-[var(--border)] bg-[var(--surface-muted)] px-4 py-4">
-      <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-[rgba(10,132,255,0.14)] text-sm font-semibold text-[var(--primary)]">
+      <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-[var(--primary-soft)] text-sm font-semibold text-[var(--primary)]">
         {label}
       </span>
       <h2 className="mt-4 text-lg font-semibold text-[var(--foreground)]">

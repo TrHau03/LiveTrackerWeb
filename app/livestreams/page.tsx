@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 
-import { LivestreamsScreen } from "@/components/workspace-screens";
 import { absoluteUrl } from "@/lib/site";
 
 export const metadata: Metadata = {
@@ -13,5 +12,5 @@ export const metadata: Metadata = {
 };
 
 export default function LivestreamsPage() {
-  return <LivestreamsScreen />;
+  return null;
 }
