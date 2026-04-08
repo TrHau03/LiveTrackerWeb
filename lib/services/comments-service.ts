@@ -46,3 +46,36 @@ export async function deleteComment(
     method: "DELETE",
   });
 }
+
+export async function linkBackup(
+  session: SessionSettings,
+  commentId: string,
+) {
+  return proxyRequest(session, {
+    path: `/comments/${commentId}/backup/link`,
+    method: "POST",
+  });
+}
+
+export async function unlinkBackup(
+  session: SessionSettings,
+  commentId: string,
+) {
+  return proxyRequest(session, {
+    path: `/comments/${commentId}/backup`,
+    method: "DELETE",
+  });
+}
+
+export async function updateCustomerTag(
+  session: SessionSettings,
+  commentId: string,
+  customerTag: string,
+) {
+  return proxyRequest(session, {
+    path: `/comments/${commentId}/customer-tag`,
+    method: "PATCH",
+    body: { customerTag },
+  });
+}
+

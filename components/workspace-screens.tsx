@@ -31,10 +31,16 @@ import { useDashboard } from "@/hooks/use-dashboard";
 import { useLives } from "@/hooks/use-lives";
 import { useOrders, useLiveOrders, useExportOrders } from "@/hooks/use-orders";
 import { useCommentsStream } from "@/hooks/use-comments";
+import type { LiveStats } from "@/hooks/use-comments";
 import { useCustomers, useCustomerDetail } from "@/hooks/use-customers";
+import { useTags } from "@/hooks/use-tags";
 import { PrintTemplate } from "@/components/printer/print-template";
 import { useSettingsStore } from "@/stores/settings-store";
 import { applyAuthResponses } from "@/hooks/use-auth-sync";
+import { createOrder, deleteOrder as deleteOrderApi, removeCommentFromOrder } from "@/lib/services/orders-service";
+import { updateComment, linkBackup, unlinkBackup, updateCustomerTag } from "@/lib/services/comments-service";
+import { detectLive } from "@/lib/services/lives-service";
+import { useQueryClient } from "@tanstack/react-query";
 
 type AsyncState<T> = {
   status: "idle" | "loading" | "ready" | "error";
@@ -243,12 +249,13 @@ export function LivestreamsScreen() {
   const setActiveLiveId = useSettingsStore(state => state.setActiveLiveId);
   const [mobileView, setMobileView] = useState<"list" | "detail">("list");
   const setCommentDisplayOrder = useSettingsStore(state => state.setCommentDisplayOrder);
+  const [liveStats, setLiveStats] = useState<LiveStats>({ totalOrder: 0, totalComment: 0, totalItems: 0 });
 
   // Reset mobile view when selecting a live
   const handleSelectLive = (id: string) => {
     setActiveLiveId(id);
     setMobileView("detail");
-    setCommentDisplayOrder("newest_at_top");
+    setLiveStats({ totalOrder: 0, totalComment: 0, totalItems: 0 });
   };
 
   return (
@@ -257,7 +264,7 @@ export function LivestreamsScreen() {
         {/* Left Column: List (Hidden on mobile detail) */}
         <div className={`flex flex-col rounded-xl border border-[var(--border)] bg-[var(--surface)] shadow-[var(--shadow-soft)] transition-all duration-300 ${mobileView === "list" ? "w-full lg:w-[25%]" : "hidden lg:flex lg:w-[25%]"
           }`}>
-          <LiveListColumn activeLiveId={activeLiveId} onSelectLive={handleSelectLive} />
+          <LiveListColumn activeLiveId={activeLiveId} onSelectLive={handleSelectLive} liveStats={liveStats} />
         </div>
 
         {/* Detail Views (Combined on mobile, separate on desktop) */}
@@ -276,7 +283,7 @@ export function LivestreamsScreen() {
                     Quay lại danh sách
                   </button>
                 </div>
-                <LiveCommentColumn liveId={activeLiveId} />
+                <LiveCommentColumn liveId={activeLiveId} onLiveStatsUpdate={setLiveStats} />
               </div>
             ) : (
               <div className="flex flex-1 flex-col items-center justify-center rounded-xl bg-[var(--surface-muted)]/20 p-8 text-center">
@@ -292,7 +299,7 @@ export function LivestreamsScreen() {
           {/* Right Column: Orders */}
           <div className="flex flex-col flex-1 min-h-0 rounded-xl border border-[var(--border)] bg-[var(--surface)] shadow-[var(--shadow-soft)] relative overflow-hidden h-[400px] lg:h-full">
             {activeLiveId ? (
-              <LiveOrderColumn key={activeLiveId} liveId={activeLiveId} />
+              <LiveOrderColumn key={activeLiveId} liveId={activeLiveId} liveStats={liveStats} />
             ) : (
               <div className="flex flex-1 flex-col items-center justify-center rounded-xl bg-[var(--surface-muted)]/20 p-8 text-center">
                 <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-[var(--surface-muted)] shadow-inner text-[var(--muted)]">
@@ -309,10 +316,12 @@ export function LivestreamsScreen() {
   );
 }
 
-function LiveListColumn({ activeLiveId, onSelectLive }: { activeLiveId: string | null; onSelectLive: (id: string) => void }) {
+function LiveListColumn({ activeLiveId, onSelectLive, liveStats }: { activeLiveId: string | null; onSelectLive: (id: string) => void; liveStats: LiveStats }) {
   const { session } = useSession();
   const [query, setQuery] = useState("");
   const search = useDeferredValue(query);
+  const [detecting, setDetecting] = useState(false);
+  const queryClient = useQueryClient();
 
   const { data, status, error: queryError } = useLives(search);
 
@@ -331,6 +340,7 @@ function LiveListColumn({ activeLiveId, onSelectLive }: { activeLiveId: string |
     updatedAt: pickString(live, ["lastWebhookAt", "updatedAt", "createdAt"]),
     owner: pickString(asRecord(live.user), ["fullName", "name"]) || session.user?.fullName || "Owner",
     igLiveId: pickString(live, ["igLiveId"]) || "instagram-live",
+    shopId: pickString(live, ["shopId"]) || pickString(asRecord(live.shop), ["id", "_id"]),
   }));
 
   // Auto-select the first (most recent) live on first load if none selected
@@ -340,10 +350,32 @@ function LiveListColumn({ activeLiveId, onSelectLive }: { activeLiveId: string |
     }
   }, [livestreams, activeLiveId, onSelectLive, query]);
 
+  const handleDetectLive = async () => {
+    const firstShopId = livestreams[0]?.shopId;
+    if (!firstShopId || detecting) return;
+    setDetecting(true);
+    try {
+      const res = await detectLive(session, firstShopId);
+      applyAuthResponses([res.response], () => {}, async () => {});
+      queryClient.invalidateQueries({ queryKey: ["livestreams"] });
+    } catch { /* ignore */ }
+    setDetecting(false);
+  };
+
   return (
     <div className="flex h-full flex-col">
       <div className="border-b border-[var(--border)] px-4 py-3 shrink-0">
-        <h2 className="mb-3 text-sm font-semibold text-[var(--foreground)]">Phiên Live của bạn</h2>
+        <div className="mb-3 flex items-center justify-between">
+          <h2 className="text-sm font-semibold text-[var(--foreground)]">Phiên Live của bạn</h2>
+          <button
+            onClick={handleDetectLive}
+            disabled={detecting}
+            className="flex h-7 w-7 items-center justify-center rounded-lg border border-[var(--border)] bg-[var(--surface)] text-[var(--muted)] hover:bg-[var(--surface-muted)] hover:text-[var(--foreground)] hover:border-[var(--primary)] transition-all disabled:opacity-50"
+            title="Nhận diện Live stream"
+          >
+            <svg className={`h-3.5 w-3.5 ${detecting ? 'animate-spin' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+          </button>
+        </div>
         <div className="relative">
           <svg className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--muted)]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
           <input
@@ -365,6 +397,9 @@ function LiveListColumn({ activeLiveId, onSelectLive }: { activeLiveId: string |
         <div className="space-y-1">
           {livestreams.map((live) => {
             const isActive = activeLiveId === live.id;
+            // Use SSE stats for the active live, API data for others
+            const displayComments = isActive && liveStats.totalComment > 0 ? liveStats.totalComment : live.comments;
+            const displayOrders = isActive && liveStats.totalOrder > 0 ? liveStats.totalOrder : live.orders;
             return (
               <button
                 key={live.id}
@@ -386,11 +421,11 @@ function LiveListColumn({ activeLiveId, onSelectLive }: { activeLiveId: string |
                 <div className="flex items-center gap-4 text-xs">
                   <span className="flex items-center gap-1.5">
                     <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" /></svg>
-                    <strong className={isActive ? "text-[var(--primary)]" : "text-[var(--foreground)]"}>{formatNumber(live.comments)}</strong>
+                    <strong className={isActive ? "text-[var(--primary)]" : "text-[var(--foreground)]"}>{formatNumber(displayComments)}</strong>
                   </span>
                   <span className="flex items-center gap-1.5">
                     <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" /></svg>
-                    <strong className={isActive ? "text-[var(--primary)]" : "text-[var(--foreground)]"}>{formatNumber(live.orders)}</strong>
+                    <strong className={isActive ? "text-[var(--primary)]" : "text-[var(--foreground)]"}>{formatNumber(displayOrders)}</strong>
                   </span>
                 </div>
               </button>
@@ -402,30 +437,179 @@ function LiveListColumn({ activeLiveId, onSelectLive }: { activeLiveId: string |
   );
 }
 
-function LiveCommentColumn({ liveId }: { liveId: string }) {
-  const { comments, streamState, hasMore, isLoadingMore, fetchMoreComments } = useCommentsStream(liveId);
-  const commentDisplayOrder = useSettingsStore(state => state.commentDisplayOrder);
-  const setCommentDisplayOrder = useSettingsStore(state => state.setCommentDisplayOrder);
-  const virtuosoRef = useRef<VirtuosoHandle>(null);
-  const [atBottom, setAtBottom] = useState(true);
-  const [atTop, setAtTop] = useState(true);
+function CustomerTagDropdown({ commentId, currentTag, session, queryClient }: { commentId: string; currentTag: string; session: any; queryClient: any }) {
+  const [open, setOpen] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const { data: tagsData } = useTags();
+  const tags = extractCollection(tagsData);
+  const dropdownRef = useRef<HTMLDivElement>(null);
 
-  const displayComments = commentDisplayOrder === "newest_at_top" 
-    ? [...comments].reverse() 
-    : comments;
-
-  const isNewestAtBottom = commentDisplayOrder === "newest_at_bottom";
-
-  // Reset states when switching lives
+  // Close on outside click
   useEffect(() => {
-    setAtBottom(true);
-    setAtTop(true);
-  }, [liveId]);
+    if (!open) return;
+    const handler = (e: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [open]);
+
+  const handleSelect = async (tagLabel: string) => {
+    if (loading) return;
+    setLoading(true);
+    try {
+      const res = await updateCustomerTag(session, commentId, tagLabel);
+      applyAuthResponses([res.response], () => {}, async () => {});
+    } catch { /* ignore */ }
+    setLoading(false);
+    setOpen(false);
+  };
+
+  return (
+    <div className="relative" ref={dropdownRef}>
+      <button
+        onClick={(e) => { e.stopPropagation(); setOpen(!open); }}
+        className={`flex h-5 w-5 items-center justify-center rounded transition-colors ${currentTag ? 'text-purple-500 hover:text-purple-700' : 'text-[var(--muted)] hover:text-[var(--foreground)]'}`}
+        title="Gán nhãn khách hàng"
+      >
+        <svg className="h-3 w-3" fill={currentTag ? "currentColor" : "none"} viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" /></svg>
+      </button>
+      {open && (
+        <div className="absolute right-0 top-full mt-1 z-50 min-w-[120px] rounded-lg border border-[var(--border)] bg-[var(--surface)] shadow-lg py-1 animate-in fade-in slide-in-from-top-1 duration-150">
+          {tags.length === 0 && (
+            <div className="px-3 py-2 text-[10px] text-[var(--muted)]">Chưa có tag</div>
+          )}
+          {tags.map((tag, idx) => {
+            const label = pickString(tag, ["label", "name"]);
+            const color = pickString(tag, ["color"]) || "#8b5cf6";
+            return (
+              <button
+                key={pickString(tag, ["id", "_id"]) || idx}
+                onClick={(e) => { e.stopPropagation(); handleSelect(label); }}
+                disabled={loading}
+                className={`w-full text-left px-3 py-1.5 text-[11px] font-semibold hover:bg-[var(--surface-muted)] transition-colors flex items-center gap-2 disabled:opacity-50 ${currentTag === label ? 'text-[var(--primary)]' : 'text-[var(--foreground)]'}`}
+              >
+                <span className="h-2 w-2 rounded-full shrink-0" style={{ backgroundColor: color }} />
+                {label}
+              </button>
+            );
+          })}
+          {currentTag && (
+            <button
+              onClick={(e) => { e.stopPropagation(); handleSelect(""); }}
+              disabled={loading}
+              className="w-full text-left px-3 py-1.5 text-[11px] font-semibold text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors flex items-center gap-2 border-t border-[var(--border)] mt-1 pt-1.5 disabled:opacity-50"
+            >
+              <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
+              Bỏ tag
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function LiveCommentColumn({ liveId, onLiveStatsUpdate }: { liveId: string; onLiveStatsUpdate?: (stats: LiveStats) => void }) {
+  const { session } = useSession();
+  const queryClient = useQueryClient();
+  const { comments, streamState, hasMore, isLoadingMore, fetchMoreComments, liveStats } = useCommentsStream(liveId);
+  const [actionLoading, setActionLoading] = useState<Record<string, string>>({});
+
+  // Push liveStats up to parent whenever they change
+  useEffect(() => {
+    if (onLiveStatsUpdate && (liveStats.totalComment > 0 || liveStats.totalOrder > 0)) {
+      onLiveStatsUpdate(liveStats);
+    }
+  }, [liveStats, onLiveStatsUpdate]);
+  // ── Action handlers ──
+  const handleCreateOrder = async (comment: Record<string, unknown>, actionType: "NORMAL" | "BACKUP" | "CONFIRMED_ERROR") => {
+    const commentId = pickString(comment, ["id", "_id"]);
+    if (!commentId || actionLoading[commentId]) return;
+    setActionLoading((prev) => ({ ...prev, [commentId]: actionType }));
+    try {
+      const res = await createOrder(session, {
+        commentId,
+        igId: pickString(comment, ["igUserId", "igId"]),
+        igName: pickString(comment, ["igUsername", "username"]),
+        liveId,
+        actionType,
+      });
+      applyAuthResponses([res.response], () => {}, async () => {});
+      if (res.ok) queryClient.invalidateQueries({ queryKey: ["live_orders"] });
+    } catch { /* ignore */ }
+    setActionLoading((prev) => { const n = { ...prev }; delete n[commentId]; return n; });
+  };
+
+  const handleLinkBackup = async (comment: Record<string, unknown>) => {
+    const commentId = pickString(comment, ["id", "_id"]);
+    if (!commentId || actionLoading[commentId]) return;
+    setActionLoading((prev) => ({ ...prev, [commentId]: "BACKUP" }));
+    try {
+      const res = await linkBackup(session, commentId);
+      applyAuthResponses([res.response], () => {}, async () => {});
+      if (res.ok) queryClient.invalidateQueries({ queryKey: ["live_orders"] });
+    } catch { /* ignore */ }
+    setActionLoading((prev) => { const n = { ...prev }; delete n[commentId]; return n; });
+  };
+
+  const handleUnlinkBackup = async (comment: Record<string, unknown>) => {
+    const commentId = pickString(comment, ["id", "_id"]);
+    if (!commentId || actionLoading[commentId]) return;
+    setActionLoading((prev) => ({ ...prev, [commentId]: "UNLINK_BACKUP" }));
+    try {
+      const res = await unlinkBackup(session, commentId);
+      applyAuthResponses([res.response], () => {}, async () => {});
+      if (res.ok) queryClient.invalidateQueries({ queryKey: ["live_orders"] });
+    } catch { /* ignore */ }
+    setActionLoading((prev) => { const n = { ...prev }; delete n[commentId]; return n; });
+  };
+
+  const handleCancelOrder = async (comment: Record<string, unknown>) => {
+    const commentId = pickString(comment, ["id", "_id"]);
+    const orderId = pickString(comment, ["orderId"]);
+    if (!commentId || !orderId || actionLoading[commentId]) return;
+    setActionLoading((prev) => ({ ...prev, [commentId]: "CANCEL" }));
+    try {
+      const res = await deleteOrderApi(session, orderId);
+      applyAuthResponses([res.response], () => {}, async () => {});
+      if (res.ok) queryClient.invalidateQueries({ queryKey: ["live_orders"] });
+    } catch { /* ignore */ }
+    setActionLoading((prev) => { const n = { ...prev }; delete n[commentId]; return n; });
+  };
+
+  const handleAddQuantity = async (comment: Record<string, unknown>) => {
+    const commentId = pickString(comment, ["id", "_id"]);
+    if (!commentId || actionLoading[commentId]) return;
+    setActionLoading((prev) => ({ ...prev, [commentId]: "ADD_QTY" }));
+    try {
+      const currentQty = pickNumber(comment, ["quantity"]) ?? 1;
+      const res = await updateComment(session, commentId, {
+        quantity: currentQty + 1,
+        liveId,
+        customerId: pickString(comment, ["customerId"]),
+      });
+      applyAuthResponses([res.response], () => {}, async () => {});
+    } catch { /* ignore */ }
+    setActionLoading((prev) => { const n = { ...prev }; delete n[commentId]; return n; });
+  };
 
   const ItemContent = (index: number, comment: any) => {
     const igUsername = pickString(comment, ["igUsername", "username"]) || "Instagram user";
+    const commentId = pickString(comment, ["id", "_id"]);
+    const status = pickString(comment, ["status", "type"]).toUpperCase();
+    const customerTag = pickString(comment, ["customerTag"]);
+    const closedCount = pickNumber(comment, ["customerClosedCount"]);
+    const isNew = pickBoolean(comment, ["isNewCustomer"]);
+    const loading = actionLoading[commentId];
+
     return (
-      <div className="relative flex gap-3 rounded-xl border border-[var(--border)] bg-[var(--surface)] p-2.5 shadow-[var(--shadow-soft)] mx-3 my-1.5 transition hover:border-[var(--primary)] hover:shadow-md">
+      <div className={`relative flex gap-3 rounded-xl border p-2.5 shadow-[var(--shadow-soft)] mx-3 my-1.5 transition hover:shadow-md ${
+        status === "NORMAL" ? "border-green-200 bg-green-50/30 dark:border-green-800/40 dark:bg-green-900/10" :
+        status === "BACKUP" ? "border-amber-200 bg-amber-50/30 dark:border-amber-800/40 dark:bg-amber-900/10" :
+        status === "CONFIRMED_ERROR" ? "border-red-200 bg-red-50/30 dark:border-red-800/40 dark:bg-red-900/10 opacity-60" :
+        "border-[var(--border)] bg-[var(--surface)] hover:border-[var(--primary)]"
+      }`}>
         {/* Left: Avatar */}
         <div className="flex-shrink-0 pt-0.5">
           <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[color:var(--primary-soft)] text-xs font-bold text-[var(--primary)]">
@@ -436,44 +620,177 @@ function LiveCommentColumn({ liveId }: { liveId: string }) {
         {/* Right: Content container */}
         <div className="flex-1 min-w-0 flex flex-col gap-1.5">
           <div className="flex items-center justify-between gap-2">
-            <span className="text-sm font-semibold text-[var(--foreground)] hover:underline cursor-pointer transition-colors hover:text-[var(--primary)] truncate">
-              {igUsername}
-            </span>
-            <span className="text-[10px] font-medium text-[var(--muted)] whitespace-nowrap">
-              {formatTimeOnly(pickString(comment, ["createdAt", "updatedAt"]))}
-            </span>
+            <div className="flex items-center gap-1.5 min-w-0">
+              <span className="text-sm font-semibold text-[var(--foreground)] hover:underline cursor-pointer transition-colors hover:text-[var(--primary)] truncate">
+                {igUsername}
+              </span>
+              {customerTag && (
+                <span className="inline-flex items-center rounded px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300 shrink-0">
+                  {customerTag}
+                </span>
+              )}
+              {isNew && (
+                <span className="inline-flex items-center rounded px-1.5 py-0.5 text-[9px] font-bold bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 shrink-0">
+                  🆕 Mới
+                </span>
+              )}
+            </div>
+            <div className="flex items-center gap-1.5 shrink-0">
+              <CustomerTagDropdown commentId={commentId} currentTag={customerTag} session={session} queryClient={queryClient} />
+              <span className="text-[10px] font-medium text-[var(--muted)] whitespace-nowrap">
+                {formatTimeOnly(pickString(comment, ["createdAt", "updatedAt"]))}
+              </span>
+            </div>
           </div>
 
           <p className="text-sm leading-relaxed text-[var(--foreground-soft)] whitespace-pre-wrap break-words">
             {pickString(comment, ["text", "content", "message"]) || "No text"}
           </p>
 
-          <div className="flex items-center gap-2 pt-1">
-            <button className="flex items-center gap-1.5 rounded-md bg-[var(--primary)] px-2.5 py-1 text-xs font-bold text-white shadow-sm hover:bg-[var(--primary-strong)] transition active:scale-95 shrink-0">
-              <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" /></svg>
-              Chốt đơn
-            </button>
-            <button className="flex items-center gap-1.5 rounded-md border border-[var(--border)] bg-[var(--surface)] px-2.5 py-1 text-[10px] font-medium text-[var(--muted)] shadow-sm hover:bg-[var(--surface-muted)] hover:border-[var(--primary)] hover:text-[var(--foreground)] transition active:scale-95 shrink-0">
-              <svg className="h-3 v-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4v.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-              Đã báo lỗi
-            </button>
-            <button className="flex items-center gap-1.5 rounded-md border border-[var(--border)] bg-[var(--surface)] px-2.5 py-1 text-[10px] font-medium text-[var(--muted)] shadow-sm hover:bg-[var(--surface-muted)] hover:border-[var(--primary)] hover:text-[var(--foreground)] transition active:scale-95 shrink-0">
-              <svg className="h-3 v-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-              Dự bị
-            </button>
+          {/* Customer closed count badge */}
+          {closedCount !== null && closedCount > 0 && (
+            <div className="flex items-center gap-1">
+              <span className="inline-flex items-center gap-1 rounded-full bg-[var(--surface-muted)] px-2 py-0.5 text-[10px] font-semibold text-[var(--foreground-soft)]">
+                <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" /></svg>
+                Đã chốt: {closedCount} SP
+              </span>
+            </div>
+          )}
+
+          {/* Action buttons based on status */}
+          <div className="flex items-center gap-2 pt-1 flex-wrap">
+            {(!status || status === "" || status === "PENDING") && (
+              <>
+                <button
+                  disabled={!!loading}
+                  onClick={() => handleCreateOrder(comment, "NORMAL")}
+                  className="flex items-center gap-1.5 rounded-md bg-[var(--primary)] px-2.5 py-1 text-xs font-bold text-white shadow-sm hover:bg-[var(--primary-strong)] transition active:scale-95 shrink-0 disabled:opacity-50"
+                >
+                  {loading === "NORMAL" ? <span className="h-3.5 w-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" /></svg>}
+                  Chốt đơn
+                </button>
+                <button
+                  disabled={!!loading}
+                  onClick={() => handleCreateOrder(comment, "CONFIRMED_ERROR")}
+                  className="flex items-center gap-1.5 rounded-md border border-[var(--border)] bg-[var(--surface)] px-2.5 py-1 text-[10px] font-medium text-[var(--muted)] shadow-sm hover:bg-[var(--surface-muted)] hover:border-[var(--primary)] hover:text-[var(--foreground)] transition active:scale-95 shrink-0 disabled:opacity-50"
+                >
+                  {loading === "CONFIRMED_ERROR" ? <span className="h-3 w-3 border-2 border-gray-300 border-t-gray-600 rounded-full animate-spin" /> : <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4v.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>}
+                  Đã báo lỗi
+                </button>
+                <button
+                  disabled={!!loading}
+                  onClick={() => handleLinkBackup(comment)}
+                  className="flex items-center gap-1.5 rounded-md border border-[var(--border)] bg-[var(--surface)] px-2.5 py-1 text-[10px] font-medium text-[var(--muted)] shadow-sm hover:bg-[var(--surface-muted)] hover:border-[var(--primary)] hover:text-[var(--foreground)] transition active:scale-95 shrink-0 disabled:opacity-50"
+                >
+                  {loading === "BACKUP" ? <span className="h-3 w-3 border-2 border-gray-300 border-t-gray-600 rounded-full animate-spin" /> : <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>}
+                  Dự bị
+                </button>
+              </>
+            )}
+
+            {(status === "NORMAL" || status === "CONFIRMED_ERROR") && (
+              <>
+                <button
+                  disabled={!!loading}
+                  onClick={() => handleCancelOrder(comment)}
+                  className="flex items-center gap-1.5 rounded-md bg-red-500 px-2.5 py-1 text-xs font-bold text-white shadow-sm hover:bg-red-600 transition active:scale-95 shrink-0 disabled:opacity-50"
+                >
+                  {loading === "CANCEL" ? <span className="h-3.5 w-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>}
+                  Huỷ chốt
+                </button>
+                <button
+                  disabled={!!loading}
+                  onClick={() => handleAddQuantity(comment)}
+                  className="flex items-center gap-1.5 rounded-md border border-green-300 bg-green-50 px-2.5 py-1 text-[10px] font-bold text-green-700 shadow-sm hover:bg-green-100 transition active:scale-95 shrink-0 disabled:opacity-50 dark:border-green-700 dark:bg-green-900/20 dark:text-green-300"
+                >
+                  {loading === "ADD_QTY" ? <span className="h-3 w-3 border-2 border-green-300 border-t-green-600 rounded-full animate-spin" /> : <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" /></svg>}
+                  In thêm
+                </button>
+              </>
+            )}
+
+            {status === "BACKUP" && (
+              <button
+                disabled={!!loading}
+                onClick={() => handleUnlinkBackup(comment)}
+                className="flex items-center gap-1.5 rounded-md bg-amber-500 px-2.5 py-1 text-xs font-bold text-white shadow-sm hover:bg-amber-600 transition active:scale-95 shrink-0 disabled:opacity-50"
+              >
+                {loading === "UNLINK_BACKUP" ? <span className="h-3.5 w-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>}
+                Huỷ dự bị
+              </button>
+            )}
+
+            {status === "CONFIRMED_ERROR" && (
+              <span className="flex items-center gap-1.5 rounded-md bg-red-100 px-2.5 py-1 text-[10px] font-bold text-red-600 dark:bg-red-900/30 dark:text-red-400 shrink-0">
+                <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4v.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                Đã xác nhận lỗi
+              </span>
+            )}
           </div>
         </div>
       </div>
     );
   };
 
+  const commentDisplayOrder = useSettingsStore(state => state.commentDisplayOrder);
+  const setCommentDisplayOrder = useSettingsStore(state => state.setCommentDisplayOrder);
+  const virtuosoRef = useRef<VirtuosoHandle>(null);
+  const [atBottom, setAtBottom] = useState(true);
+  const [atTop, setAtTop] = useState(true);
+  const [firstItemIndex, setFirstItemIndex] = useState(10000);
+  const prevDisplayCommentsRef = useRef<any[]>([]);
+
+  const displayComments = commentDisplayOrder === "newest_at_top"
+    ? [...comments].reverse()
+    : comments;
+
+  const isNewestAtBottom = commentDisplayOrder === "newest_at_bottom";
+
+  // Reset states when switching lives or display order
+  useEffect(() => {
+    setAtBottom(true);
+    setAtTop(true);
+    setFirstItemIndex(10000);
+    prevDisplayCommentsRef.current = [];
+  }, [liveId, commentDisplayOrder]);
+
+  // Adjust firstItemIndex when items are prepended to prevent scroll jumping
+  useEffect(() => {
+    const prev = prevDisplayCommentsRef.current;
+    if (prev.length > 0 && displayComments.length > prev.length) {
+      const getIdentity = (c: any) => pickString(c, ["id", "_id"]) || (pickString(c, ["createdAt"]) + pickString(c, ["text"]));
+      const prevFirstId = getIdentity(prev[0]);
+      
+      const newIndex = displayComments.findIndex(c => getIdentity(c) === prevFirstId);
+      
+      if (newIndex > 0) {
+        setFirstItemIndex(idx => idx - newIndex);
+      }
+    }
+    prevDisplayCommentsRef.current = displayComments;
+  }, [displayComments]);
+
+  // SSE connection status badge
+  const connectionBadge = streamState === "live"
+    ? <span className="flex items-center gap-1.5 text-[10px] font-semibold text-green-600"><span className="h-1.5 w-1.5 rounded-full bg-green-500 animate-[pulse_2s_ease-in-out_infinite]" />Đã kết nối</span>
+    : streamState === "connecting"
+    ? <span className="flex items-center gap-1.5 text-[10px] font-semibold text-amber-500"><span className="h-1.5 w-1.5 rounded-full bg-amber-400 animate-pulse" />Đang kết nối</span>
+    : streamState === "error"
+    ? <span className="flex items-center gap-1.5 text-[10px] font-semibold text-red-500"><span className="h-1.5 w-1.5 rounded-full bg-red-500" />Mất kết nối</span>
+    : <span className="flex items-center gap-1.5 text-[10px] font-semibold text-[var(--muted)]"><span className="h-1.5 w-1.5 rounded-full bg-gray-400" />Đã dừng</span>;
+
   return (
     <div className="flex h-full flex-col relative w-full overflow-hidden">
       <div className="flex items-center justify-between border-b border-[var(--border)] px-4 py-3 shrink-0">
-        <h3 className="text-sm font-semibold text-[var(--foreground)] flex items-center gap-2">
-          Luồng bình luận
-          {streamState === "live" && <span className="flex h-2 w-2 rounded-full bg-red-500 animate-[pulse_2s_ease-in-out_infinite]"></span>}
-        </h3>
+        <div className="flex items-center gap-3">
+          <h3 className="text-sm font-semibold text-[var(--foreground)]">Luồng bình luận</h3>
+          {connectionBadge}
+          {typeof liveStats.totalComment === 'number' && (
+            <span className="text-[10px] font-bold text-[var(--muted)] bg-[var(--surface-muted)] rounded-full px-2 py-0.5" title="Tổng lượt bình luận">
+              {formatNumber(liveStats.totalComment)} cmts
+            </span>
+          )}
+        </div>
         <div className="flex items-center gap-4">
           <button 
             onClick={() => setCommentDisplayOrder(isNewestAtBottom ? "newest_at_top" : "newest_at_bottom")}
@@ -495,12 +812,14 @@ function LiveCommentColumn({ liveId }: { liveId: string }) {
           </div>
         ) : (
           <Virtuoso
+            key={`${liveId}-${commentDisplayOrder}`}
             ref={virtuosoRef}
             data={displayComments}
             className="h-full custom-scrollbar"
             atBottomStateChange={setAtBottom}
             atTopStateChange={setAtTop}
             itemContent={ItemContent}
+            firstItemIndex={firstItemIndex}
             startReached={isNewestAtBottom && !isLoadingMore && hasMore ? fetchMoreComments : undefined}
             endReached={!isNewestAtBottom && !isLoadingMore && hasMore ? fetchMoreComments : undefined}
             initialTopMostItemIndex={isNewestAtBottom ? displayComments.length - 1 : 0}
@@ -513,7 +832,7 @@ function LiveCommentColumn({ liveId }: { liveId: string }) {
                   ) : isLoadingMore ? (
                     <span className="text-[10px] font-bold text-[var(--primary)] animate-pulse">Đang tải...</span>
                   ) : (
-                    <span className="text-[10px] text-[var(--muted)] opacity-60">↑ Cuộn để tải thêm</span>
+                    <button onClick={fetchMoreComments} className="text-[10px] text-[var(--muted)] opacity-60 hover:text-[var(--primary)] hover:opacity-100 transition-colors cursor-pointer inline-block py-1 px-4">↑ Bấm hoặc cuộn để tải thêm</button>
                   )}
                 </div>
               ) : null,
@@ -524,7 +843,7 @@ function LiveCommentColumn({ liveId }: { liveId: string }) {
                   ) : isLoadingMore ? (
                     <span className="text-[10px] font-bold text-[var(--primary)] animate-pulse">Đang tải...</span>
                   ) : (
-                    <span className="text-[10px] text-[var(--muted)] opacity-60">↓ Cuộn để tải thêm</span>
+                    <button onClick={fetchMoreComments} className="text-[10px] text-[var(--muted)] opacity-60 hover:text-[var(--primary)] hover:opacity-100 transition-colors cursor-pointer inline-block py-1 px-4">↓ Bấm hoặc cuộn để tải thêm</button>
                   )}
                 </div>
               ) : <div className="h-4" /> /* padding block */
@@ -555,10 +874,19 @@ function LiveCommentColumn({ liveId }: { liveId: string }) {
   );
 }
 
-function LiveOrderColumn({ liveId }: { liveId: string }) {
+function LiveOrderColumn({ liveId, liveStats }: { liveId: string; liveStats: LiveStats }) {
+  const { session } = useSession();
+  const queryClient = useQueryClient();
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
   const [printOrder, setPrintOrder] = useState<any>(null);
+  const [deleteLoading, setDeleteLoading] = useState(false);
+  const [customerPopupId, setCustomerPopupId] = useState<string | null>(null);
   const paperSize = useSettingsStore(state => state.paperSize) as "80mm" | "58mm" | "a5";
+
+  const { data: customerDetailData } = useCustomerDetail(customerPopupId || "");
+  const customerDetail = customerPopupId ? asRecord(extractApiData(customerDetailData)) : {};
+  const customerTags = extractCollection(customerDetail.tags);
+  const customerHistories = extractCollection(customerDetail.histories);
 
   const { data, status, error: queryError } = useLiveOrders(liveId);
 
@@ -577,10 +905,47 @@ function LiveOrderColumn({ liveId }: { liveId: string }) {
   const selectedOrder = orders.find((o) => pickString(o, ["id", "_id", "orderCode"]) === selectedOrderId);
   const totalAmount = orders.reduce((sum, order) => sum + (pickNumber(order, ["totalPrice", "amount"]) ?? 0), 0);
 
+  const handleDeleteOrder = async () => {
+    const orderId = pickString(selectedOrder!, ["id", "_id"]);
+    if (!orderId || deleteLoading) return;
+    setDeleteLoading(true);
+    try {
+      const res = await deleteOrderApi(session, orderId);
+      applyAuthResponses([res.response], () => {}, async () => {});
+      if (res.ok) {
+        setSelectedOrderId(null);
+        queryClient.invalidateQueries({ queryKey: ["live_orders"] });
+      }
+    } catch { /* ignore */ }
+    setDeleteLoading(false);
+  };
+
+  const handleRemoveComment = async (commentId: string) => {
+    const orderId = pickString(selectedOrder!, ["id", "_id"]);
+    if (!orderId || !commentId) return;
+    try {
+      const res = await removeCommentFromOrder(session, orderId, commentId);
+      applyAuthResponses([res.response], () => {}, async () => {});
+      if (res.ok) queryClient.invalidateQueries({ queryKey: ["live_orders"] });
+    } catch { /* ignore */ }
+  };
+
   return (
     <div className="flex h-full flex-col relative w-full overflow-hidden">
       <div className="flex items-center justify-between border-b border-[var(--border)] px-4 py-3 shrink-0">
         <h3 className="text-sm font-semibold text-[var(--foreground)]">Đơn hàng đã chốt</h3>
+        <div className="flex items-center gap-3">
+          {typeof liveStats.totalOrder === 'number' && (
+            <span className="text-[10px] font-semibold text-[var(--muted)] bg-[var(--surface-muted)] rounded-full px-2 py-0.5" title="Tổng số đơn hàng">
+              {formatNumber(liveStats.totalOrder)} đơn
+            </span>
+          )}
+          {typeof liveStats.totalItems === 'number' && (
+            <span className="text-[10px] font-semibold text-[var(--primary)] bg-[color:var(--primary-soft)] rounded-full px-2 py-0.5" title="Tổng số sản phẩm">
+              {formatNumber(liveStats.totalItems)} SP
+            </span>
+          )}
+        </div>
       </div>
 
       <div className="p-3 border-b border-[var(--border)] bg-[var(--surface-muted)]/20 shrink-0">
@@ -655,7 +1020,16 @@ function LiveOrderColumn({ liveId }: { liveId: string }) {
               <div className="space-y-3">
                 <h5 className="text-[10px] font-bold uppercase tracking-[0.1em] text-[var(--muted)]">Thông tin người mua</h5>
                 <div className="rounded-xl border border-[var(--border)] bg-[var(--surface-subdued)] p-3.5 space-y-2.5">
-                  <p className="font-semibold text-[var(--foreground)] text-sm">{pickString(asRecord(selectedOrder.customerId), ["igName"]) || pickString(selectedOrder, ["igName", "customerName"]) || "Người mua"}</p>
+                  <button
+                    onClick={() => {
+                      const custId = pickString(asRecord(selectedOrder.customerId), ["id", "_id"]) || pickString(selectedOrder, ["customerId"]);
+                      setCustomerPopupId(customerPopupId === custId ? null : custId);
+                    }}
+                    className="font-semibold text-[var(--primary)] text-sm hover:underline transition-colors text-left w-full flex items-center gap-1.5"
+                  >
+                    {pickString(asRecord(selectedOrder.customerId), ["igName"]) || pickString(selectedOrder, ["igName", "customerName"]) || "Người mua"}
+                    <svg className={`h-3 w-3 text-[var(--muted)] transition-transform ${customerPopupId ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" /></svg>
+                  </button>
                   <p className="text-xs text-[var(--foreground-soft)] flex items-center gap-1.5 font-medium">
                     <svg className="h-3.5 w-3.5 text-[var(--muted)]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" /></svg>
                     {pickString(selectedOrder, ["phone"]) || "Chưa gửi SĐT"}
@@ -665,7 +1039,89 @@ function LiveOrderColumn({ liveId }: { liveId: string }) {
                     <span className="truncate">{compactAddress(selectedOrder) || "Chưa gửi địa chỉ"}</span>
                   </p>
                 </div>
+
+                {/* Customer Detail Popup */}
+                {customerPopupId && Object.keys(customerDetail).length > 0 && (
+                  <div className="rounded-xl border border-[var(--primary)]/30 bg-[color:var(--primary-soft)] p-3.5 space-y-3 animate-in slide-in-from-top-2 duration-200">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--primary)]">Hồ sơ khách hàng</span>
+                      <button onClick={() => setCustomerPopupId(null)} className="text-[var(--muted)] hover:text-[var(--foreground)]">
+                        <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                      </button>
+                    </div>
+                    <div className="space-y-2 text-xs">
+                      {pickString(customerDetail, ["phone"]) && (
+                        <p className="flex items-center gap-1.5 text-[var(--foreground)]">
+                          <span className="text-[var(--muted)] font-medium w-16 shrink-0">SĐT:</span>
+                          {pickString(customerDetail, ["phone"])}
+                        </p>
+                      )}
+                      {pickString(customerDetail, ["dayOfBirth"]) && (
+                        <p className="flex items-center gap-1.5 text-[var(--foreground)]">
+                          <span className="text-[var(--muted)] font-medium w-16 shrink-0">Sinh nhật:</span>
+                          {formatDateTime(pickString(customerDetail, ["dayOfBirth"]))}
+                        </p>
+                      )}
+                      {pickString(customerDetail, ["note"]) && (
+                        <p className="flex items-start gap-1.5 text-[var(--foreground)]">
+                          <span className="text-[var(--muted)] font-medium w-16 shrink-0">Ghi chú:</span>
+                          <span className="break-words">{pickString(customerDetail, ["note"])}</span>
+                        </p>
+                      )}
+                    </div>
+                    {customerTags.length > 0 && (
+                      <div className="flex flex-wrap gap-1.5 pt-1">
+                        {customerTags.map((tag, i) => (
+                          <span key={pickString(tag, ["id", "_id"]) || i} className="inline-flex rounded-md bg-[var(--surface)] px-2 py-0.5 text-[10px] font-semibold text-[var(--primary)] shadow-sm border border-[var(--border)]">
+                            {pickString(tag, ["label", "name"])}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                    {customerHistories.length > 0 && (
+                      <div className="pt-1 space-y-1.5">
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--muted)]">Lịch sử gần đây</span>
+                        {customerHistories.slice(0, 3).map((h, i) => (
+                          <p key={i} className="text-[10px] text-[var(--foreground-soft)] pl-2 border-l-2 border-[var(--primary)]/30">
+                            {pickString(h, ["title", "action", "type", "note"]) || "Hoạt động"}
+                          </p>
+                        ))}
+                      </div>
+                    )}
+                    <Link href="/customers" className="inline-flex items-center gap-1 text-[10px] font-bold text-[var(--primary)] hover:underline pt-1">
+                      Xem đầy đủ →
+                    </Link>
+                  </div>
+                )}
               </div>
+
+              {/* Comments in this order */}
+              {(() => {
+                const orderComments = extractCollection(selectedOrder.comments);
+                if (orderComments.length === 0) return null;
+                return (
+                  <div className="space-y-3">
+                    <h5 className="text-[10px] font-bold uppercase tracking-[0.1em] text-[var(--muted)]">Bình luận trong đơn ({orderComments.length})</h5>
+                    <div className="space-y-2">
+                      {orderComments.map((c, idx) => (
+                        <div key={pickString(c, ["id", "_id"]) || idx} className="flex items-center justify-between rounded-lg border border-[var(--border)] bg-[var(--surface-subdued)] px-3 py-2">
+                          <div className="min-w-0">
+                            <p className="text-xs font-semibold text-[var(--foreground)] truncate">{pickString(c, ["igUsername", "username"])}</p>
+                            <p className="text-[10px] text-[var(--foreground-soft)] truncate">{pickString(c, ["text", "content"])}</p>
+                          </div>
+                          <button
+                            onClick={() => handleRemoveComment(pickString(c, ["id", "_id"]))}
+                            className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[var(--muted)] hover:bg-red-50 hover:text-red-500 transition-colors ml-2"
+                            title="Gỡ comment khỏi đơn"
+                          >
+                            <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })()}
 
               <div className="space-y-3">
                 <h5 className="text-[10px] font-bold uppercase tracking-[0.1em] text-[var(--muted)]">Tổng kết đơn</h5>
@@ -677,11 +1133,12 @@ function LiveOrderColumn({ liveId }: { liveId: string }) {
             </div>
 
             <div className="p-4 border-t border-[var(--border)] bg-[var(--surface-subdued)] shrink-0 flex gap-3">
-              <button className="flex-1 rounded-xl bg-[var(--surface-strong)] px-4 py-2.5 text-xs font-bold text-[var(--foreground)] shadow-[var(--shadow-soft)] hover:bg-[var(--surface-muted)] transition-colors border border-[var(--border)]">
-                Huỷ / Xoá
-              </button>
-              <button className="flex-1 rounded-xl bg-[var(--primary)] px-4 py-2.5 text-xs font-bold text-white shadow-sm hover:bg-[var(--primary-strong)] transition-colors">
-                Phát link Pay
+              <button
+                onClick={handleDeleteOrder}
+                disabled={deleteLoading}
+                className="flex-1 rounded-xl bg-red-50 px-4 py-2.5 text-xs font-bold text-red-600 shadow-[var(--shadow-soft)] hover:bg-red-100 transition-colors border border-red-200 disabled:opacity-50 dark:bg-red-900/20 dark:text-red-400 dark:border-red-800"
+              >
+                {deleteLoading ? "Đang xoá..." : "Xoá đơn"}
               </button>
             </div>
           </>

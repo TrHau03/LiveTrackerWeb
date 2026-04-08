@@ -66,3 +66,13 @@ export function streamLiveComments(
     signal,
   );
 }
+
+export async function detectLive(
+  session: SessionSettings,
+  shopId: string,
+) {
+  return proxyRequest(session, {
+    path: `/lives/detect/${shopId}`,
+  });
+}
+

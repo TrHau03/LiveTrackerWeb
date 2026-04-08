@@ -61,12 +61,42 @@ export async function exportOrdersExcel(
   });
 }
 
+export async function createOrder(
+  session: SessionSettings,
+  body: {
+    igId: string;
+    igName: string;
+    liveId: string;
+    commentId: string;
+    deposit?: number;
+    isNewCustomer?: boolean;
+    actionType: "NORMAL" | "BACKUP" | "CONFIRMED_ERROR";
+  },
+) {
+  return proxyRequest(session, {
+    path: "/orders",
+    method: "POST",
+    body,
+  });
+}
+
 export async function deleteOrder(
   session: SessionSettings,
   orderId: string,
 ) {
   return proxyRequest(session, {
     path: `/orders/${orderId}`,
+    method: "DELETE",
+  });
+}
+
+export async function removeCommentFromOrder(
+  session: SessionSettings,
+  orderId: string,
+  commentId: string,
+) {
+  return proxyRequest(session, {
+    path: `/orders/${orderId}/comments/${commentId}`,
     method: "DELETE",
   });
 }
