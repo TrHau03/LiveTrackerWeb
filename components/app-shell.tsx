@@ -8,7 +8,6 @@ import { AuthScreen } from "@/components/auth-screen";
 import { Header } from "@/components/header";
 import { useSession } from "@/components/session-provider";
 import { useTheme } from "@/components/theme-provider";
-import { LivestreamsScreen } from "@/components/workspace-screens";
 import { appNavigation } from "@/lib/site";
 
 export function AppShell({ children }: { children: React.ReactNode }) {
@@ -204,10 +203,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <Header />
 
           <main className={`min-w-0 flex-1 px-4 sm:px-8 ${pathname === "/livestreams" ? "pb-0 flex flex-col overflow-hidden" : "pb-24 lg:pb-8"}`}>
-            <div className={`w-full h-full ${pathname === "/livestreams" ? "flex flex-col flex-1 overflow-hidden" : "hidden"}`}>
-              <LivestreamsScreen />
-            </div>
-            <div className={`w-full ${pathname !== "/livestreams" ? "block" : "hidden"}`}>{children}</div>
+            <div className={`w-full h-full ${pathname === "/livestreams" ? "flex flex-col flex-1 overflow-hidden" : "block"}`}>{children}</div>
           </main>
 
           {pathname !== "/livestreams" && (

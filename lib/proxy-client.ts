@@ -2,6 +2,86 @@
 
 import type { SessionSettings } from "@/lib/workspace-session";
 
+let isRefreshing = false;
+let refreshQueue: Array<{
+  resolve: (token: string) => void;
+  reject: (error: unknown) => void;
+}> = [];
+
+function processQueue(error: unknown, token: string | null = null) {
+  refreshQueue.forEach((prom) => {
+    if (error) {
+      prom.reject(error);
+    } else {
+      prom.resolve(token as string);
+    }
+  });
+  refreshQueue = [];
+}
+
+async function executeWithRefresh(
+  targetUrl: string,
+  options: RequestInit,
+  session: SessionSettings,
+  headers: Headers
+): Promise<Response> {
+  let response = await fetch(targetUrl, options);
+
+  if (response.status === 401 && session.refreshToken) {
+    if (isRefreshing) {
+      try {
+        const token = await new Promise<string>((resolve, reject) => {
+          refreshQueue.push({ resolve, reject });
+        });
+        headers.set("Authorization", `Bearer ${token}`);
+        headers.set("x-access-token", token);
+        options.headers = headers;
+        response = await fetch(targetUrl, options);
+      } catch (err) {
+        // queue failed, keep original 401 response
+      }
+    } else {
+      isRefreshing = true;
+      try {
+        const baseUrl = process.env.NEXT_PUBLIC_API_URL || "https://admin.livetracker.vn/api/v1";
+        const refreshRes = await fetch(`${baseUrl}/auth/refresh-token`, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ refreshToken: session.refreshToken }),
+        });
+        
+        if (refreshRes.ok) {
+           const payload = await refreshRes.json() as any;
+           const newToken = payload.data?.tokens?.accessToken || payload.data?.accessToken;
+           if (newToken) {
+             if (typeof window !== "undefined") {
+                 window.dispatchEvent(new CustomEvent("session_rehydrated", { detail: { accessToken: newToken } }));
+             }
+             processQueue(null, newToken);
+             headers.set("Authorization", `Bearer ${newToken}`);
+             headers.set("x-access-token", newToken);
+             options.headers = headers;
+             response = await fetch(targetUrl, options);
+           } else {
+             throw new Error("No access token in response");
+           }
+        } else {
+           throw new Error("Refresh failed");
+        }
+      } catch (err) {
+        processQueue(err, null);
+        if (typeof window !== "undefined") {
+            window.dispatchEvent(new CustomEvent("session_force_logout"));
+        }
+      } finally {
+        isRefreshing = false;
+      }
+    }
+  }
+
+  return response;
+}
+
 type ApiScope = "api" | "root";
 
 export type JsonRecord = Record<string, string | number | boolean>;
@@ -81,12 +161,17 @@ export async function proxyRequest<T>(
     requestBody = body;
   }
 
-  const response = await fetch(targetUrl, {
-    method,
-    headers,
-    body: requestBody,
-    cache: "no-store",
-  });
+  const response = await executeWithRefresh(
+    targetUrl,
+    {
+      method,
+      headers,
+      body: requestBody,
+      cache: "no-store",
+    },
+    session,
+    headers
+  );
 
   let payload: unknown = null;
   const contentType = response.headers.get("content-type") ?? "";
@@ -124,11 +209,16 @@ export async function proxyDownload(
     headers.set("x-refresh-token", session.refreshToken);
   }
 
-  const response = await fetch(targetUrl, {
-    method: options.method ?? "GET",
-    headers,
-    cache: "no-store",
-  });
+  const response = await executeWithRefresh(
+    targetUrl,
+    {
+      method: options.method ?? "GET",
+      headers,
+      cache: "no-store",
+    },
+    session,
+    headers
+  );
 
   const blob = await response.blob();
   const url = URL.createObjectURL(blob);
@@ -169,12 +259,17 @@ export async function streamProxyRequest(
     headers.set("x-refresh-token", session.refreshToken);
   }
 
-  const response = await fetch(targetUrl, {
-    method: options.method ?? "GET",
-    headers,
-    signal,
-    cache: "no-store",
-  });
+  const response = await executeWithRefresh(
+    targetUrl,
+    {
+      method: options.method ?? "GET",
+      headers,
+      signal,
+      cache: "no-store",
+    },
+    session,
+    headers
+  );
 
   if (!response.ok || !response.body) {
     return response;
