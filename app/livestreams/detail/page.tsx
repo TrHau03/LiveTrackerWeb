@@ -2,7 +2,7 @@
 
 import { Suspense } from "react";
 import { useSearchParams } from "next/navigation";
-import { LiveDetailScreen } from "@/components/workspace-screens";
+import { LiveDetailScreen } from "@/components/features/livestreams/live-detail-screen";
 
 function LivestreamDetailContent() {
   const searchParams = useSearchParams();

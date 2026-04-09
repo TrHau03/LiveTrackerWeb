@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 
-import { CustomersScreen } from "@/components/workspace-screens";
+import { CustomersScreen } from "@/components/features/customers/customers-screen";
 import { absoluteUrl } from "@/lib/site";
 
 export const metadata: Metadata = {

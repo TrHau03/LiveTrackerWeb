@@ -11,6 +11,8 @@ export const metadata: Metadata = {
   },
 };
 
+import { LivestreamsScreen } from "@/components/features/livestreams/livestreams-screen";
+
 export default function LivestreamsPage() {
-  return null;
+  return <LivestreamsScreen />;
 }

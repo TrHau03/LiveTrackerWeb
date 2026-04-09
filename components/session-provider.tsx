@@ -96,6 +96,37 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     return () => controller.abort();
   }, [isReady, session.accessToken, session.refreshToken, session.user]);
 
+  useEffect(() => {
+    const handleRehydrate = (e: Event) => {
+      const customEvent = e as CustomEvent<{ accessToken: string }>;
+      startTransition(() => {
+        setSession((current) => ({
+          ...current,
+          accessToken: customEvent.detail.accessToken,
+        }));
+      });
+    };
+
+    const handleForceLogout = () => {
+      startTransition(() => {
+        setSession(DEFAULT_SESSION);
+        setLoginError("Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.");
+      });
+    };
+
+    if (typeof window !== "undefined") {
+      window.addEventListener("session_rehydrated", handleRehydrate);
+      window.addEventListener("session_force_logout", handleForceLogout);
+    }
+
+    return () => {
+      if (typeof window !== "undefined") {
+        window.removeEventListener("session_rehydrated", handleRehydrate);
+        window.removeEventListener("session_force_logout", handleForceLogout);
+      }
+    };
+  }, []);
+
   const value = useMemo<SessionContextValue>(
     () => ({
       authStatus: !isReady
