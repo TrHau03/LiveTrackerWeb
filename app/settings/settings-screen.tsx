@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useSettingsStore } from "@/stores/settings-store";
 import { useSession } from "@/components/session-provider";
+import { PrintSettingsPanel } from "@/components/print/PrintSettingsPanel";
 
 export function SettingsScreen() {
   const { session } = useSession();
@@ -117,6 +118,15 @@ export function SettingsScreen() {
                       <option value="a5">A5</option>
                     </select>
                   </div>
+
+                  <div className="h-px w-full bg-[var(--border)]" />
+                  
+                  <div>
+                    <h3 className="font-medium text-[var(--foreground)] mb-4">Nội dung in</h3>
+                    <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] overflow-hidden">
+                      <PrintSettingsPanel />
+                    </div>
+                  </div>
                </>
             )}
           </div>
@@ -139,7 +149,14 @@ export function SettingsScreen() {
             </div>
             
             <div className="mt-8 border-t border-[var(--border)] pt-5">
-               <button className="rounded-lg bg-red-50 text-red-600 px-4 py-2 text-sm font-semibold hover:bg-red-100 transition-colors">
+               <button 
+                 onClick={() => {
+                   import("@/components/session-provider").then(m => {
+                     // Get function out of react Context if possible, but for now we just use best effort
+                   });
+                 }}
+                 className="rounded-lg bg-red-50 text-red-600 px-4 py-2 text-sm font-semibold hover:bg-red-100 transition-colors"
+               >
                   Đăng xuất khỏi thiết bị này
                </button>
             </div>

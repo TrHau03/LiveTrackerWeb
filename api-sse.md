@@ -76,7 +76,8 @@ Làm mới access token.
   {
     "success": true,
     "data": {
-      "tokens": { "accessToken": "eyJ...", "refreshToken": "eyJ..." }
+        "accessToken": "eyJ...",
+        "refreshToken": "eyJ..."
     }
   }
   ```
@@ -346,10 +347,10 @@ Kết nối Server-Sent Events để nhận bình luận realtime.
 |---|---|---|
 | `connected` | Xác nhận kết nối thành công | `{ type: "connected", timestamp, liveId, connectionId }` |
 | `ping` | Heartbeat mỗi 30s | `{ type: "ping", timestamp }` |
-| `new_comment` | Bình luận mới (từ khách hoặc tạo thủ công) | `{ type: "new_comment", timestamp, comment: { _id, commentId, igUserId, igUsername, text, price, quantity, createdAt, status, customerTag, customerClosedCount, isNewCustomer } }` |
+| `new_comment` | Bình luận mới (từ khách hoặc tạo thủ công) | `{ type: "new_comment", timestamp, comment: { _id, commentId, igUserId, igUsername, text, price, quantity, createdAt, status, customerTag, customerClosedCount, isNewCustomer, customerPhone, customerProvince, customerWard, customerStreet } }` |
 | `comment_updated` | Cập nhật nội dung/giá/số lượng/status của bình luận | `{ type: "comment_updated", timestamp, data: { _id, text, price, quantity, status? } }` |
 | `live_stats_updated` | Cập nhật thống kê live (được throttle 2 giây để tránh spam) | `{ type: "live_stats_updated", timestamp, data: { liveId, totalOrder, totalComment, totalItems } }` |
-| `customer_info_updated` | Gộp chung thông tin trạng thái KH. Payload dạng tuỳ chọn (partial update), chỉ gửi thông tin bị biên đổi. | `{ type: "customer_info_updated", timestamp, data: { igUserId, igUsername?, customerClosedCount?, isNewCustomer?, customerTag? } }` |
+| `customer_info_updated` | Gộp chung thông tin trạng thái KH. Payload dạng tuỳ chọn (partial update), chỉ gửi thông tin bị biên đổi. | `{ type: "customer_info_updated", timestamp, data: { igUserId, igUsername?, customerClosedCount?, isNewCustomer?, customerTag?, customerPhone?, customerProvince?, customerWard?, customerStreet? } }` |
 | `backup_event` | Sự kiện quản lý comment dự bị thay thế cho các action thành phần. | `{ type: "backup_event", timestamp, data: { action: "LINKED" \| "UNLINKED" \| "ACTIVATED", targetCommentId?, backupCommentId?, activatedCommentId?, previousTargetCommentId?, unlinkedCommentId?, targetComment?: {...}, backupComment?: {...}, comment?: {...} } }` |
 
 > **Ghi chú kỹ thuật**: `customer_info_updated` là một Event Gộp. Frontend khi nhận được vui lòng merge (lodash merge hoặc ES6 spread) nội dung của `data` vào object state của khách hàng (hoặc comment) tương ứng, KHÔNG ĐƯỢC ghi đè thành rỗng. Điều này nhằm tối ưu payload cho hệ thống (ví dụ: gán Tag thì backend chỉ phải gửi xuống Tag mới, giữ nguyên số count đơn hàng).

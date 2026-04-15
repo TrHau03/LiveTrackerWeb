@@ -98,11 +98,12 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     const handleRehydrate = (e: Event) => {
-      const customEvent = e as CustomEvent<{ accessToken: string }>;
+      const customEvent = e as CustomEvent<{ accessToken: string; refreshToken?: string }>;
       startTransition(() => {
         setSession((current) => ({
           ...current,
           accessToken: customEvent.detail.accessToken,
+          ...(customEvent.detail.refreshToken ? { refreshToken: customEvent.detail.refreshToken } : {}),
         }));
       });
     };
@@ -319,6 +320,28 @@ async function fetchUserProfile(
       email: pickString(record, ["email"]),
       role: pickString(record, ["role"]) || "user",
       avatar: pickString(record, ["avatar"]),
+      shops: (() => {
+        if (Array.isArray(record.shops) && record.shops.length > 0) {
+          return record.shops.map((s: any) => ({
+            id: pickString(s as Record<string, unknown>, ["id", "_id"]),
+            name: pickString(s as Record<string, unknown>, ["name"]) || "Shop",
+            avatar: pickString(s as Record<string, unknown>, ["avatar"]),
+            phone: pickString(s as Record<string, unknown>, ["phone"]),
+            address: pickString(s as Record<string, unknown>, ["address"])
+          }));
+        }
+        if (record.shop && typeof record.shop === "object") {
+          const shop = record.shop as Record<string, unknown>;
+          return [{
+            id: pickString(shop, ["id", "_id"]),
+            name: pickString(shop, ["name"]) || pickString(record, ["shopName", "fullName"]) || "Shop",
+            avatar: pickString(shop, ["avatar"]),
+            phone: pickString(shop, ["phone"]),
+            address: pickString(shop, ["address"])
+          }];
+        }
+        return [];
+      })(),
     },
   };
 }

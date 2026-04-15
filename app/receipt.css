@@ -1,0 +1,47 @@
+/* Thermal Receipt Specific CSS */
+.receipt-wrapper {
+  background: white;
+  min-height: 100vh;
+  padding: 20px;
+}
+
+@media print {
+  @page {
+    size: 80mm auto;
+    margin: 0;
+  }
+  
+  body * {
+    visibility: hidden;
+  }
+  
+  #print-container, 
+  #print-container * {
+    visibility: visible;
+  }
+  
+  #print-container {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    margin: 0;
+    padding: 0;
+  }
+  
+  /* Reset background for thermal printers */
+  * {
+    background: transparent !important;
+    color: black !important;
+    text-shadow: none !important;
+    filter: none !important;
+    -ms-filter: none !important;
+  }
+
+  /* Force breaking layout appropriately */
+  .receipt {
+    width: 80mm !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+}

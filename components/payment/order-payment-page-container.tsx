@@ -55,21 +55,13 @@ export function OrderPaymentPageContainer({
     }
 
     if (error || !orderData) {
-        const isTokenError = error?.includes("Token");
+        if (typeof window !== "undefined") {
+            window.location.href = "https://livetracker.vn";
+        }
         return (
             <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-gray-50 to-gray-100 px-4">
-                <div className="w-full max-w-md bg-white rounded-2xl shadow-lg p-6 text-center">
-                    <h1 className="text-2xl font-bold text-gray-900">
-                        ⚠️ {isTokenError ? "Link thanh toán đã hết hạn" : "Đường dẫn không hợp lệ"}
-                    </h1>
-                    <p className="mt-2 text-gray-600">
-                        {isTokenError
-                            ? "Token truy cập không hợp lệ hoặc bị thiếu. Link thanh toán này không còn giá trị."
-                            : "Link thanh toán này không tồn tại hoặc đã hết hạn."}
-                    </p>
-                    <p className="mt-4 text-sm text-gray-500">
-                        Vui lòng quay lại chat để lấy link thanh toán mới hoặc liên hệ với cửa hàng.
-                    </p>
+                <div className="text-center">
+                    <p className="text-gray-600">Đang chuyển hướng về trang chủ...</p>
                 </div>
             </div>
         );

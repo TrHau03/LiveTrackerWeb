@@ -27,9 +27,19 @@ async function executeWithRefresh(
 ): Promise<Response> {
   let response = await fetch(targetUrl, options);
 
-  if (response.status === 401 && session.refreshToken) {
+  console.log(`[PROXY] Request to ${targetUrl} returned ${response.status}. session.refreshToken:`, session.refreshToken ? "PRESENT" : "MISSING");
+
+  if (response.status === 401) {
+    if (!session.refreshToken) {
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new CustomEvent("session_force_logout"));
+      }
+      return response;
+    }
+
     if (isRefreshing) {
       try {
+        console.log(`[PROXY] Waiting in queue for ${targetUrl}`);
         const token = await new Promise<string>((resolve, reject) => {
           refreshQueue.push({ resolve, reject });
         });
@@ -43,6 +53,7 @@ async function executeWithRefresh(
     } else {
       isRefreshing = true;
       try {
+        console.log(`[PROXY] Initiating /auth/refresh-token`);
         const baseUrl = process.env.NEXT_PUBLIC_API_URL || "https://admin.livetracker.vn/api/v1";
         const refreshRes = await fetch(`${baseUrl}/auth/refresh-token`, {
           method: "POST",
@@ -50,12 +61,24 @@ async function executeWithRefresh(
           body: JSON.stringify({ refreshToken: session.refreshToken }),
         });
         
+        console.log(`[PROXY] /auth/refresh-token returned ${refreshRes.status}`);
+
         if (refreshRes.ok) {
            const payload = await refreshRes.json() as any;
            const newToken = payload.data?.tokens?.accessToken || payload.data?.accessToken;
+           const newRefreshToken = payload.data?.tokens?.refreshToken || payload.data?.refreshToken;
+           
            if (newToken) {
              if (typeof window !== "undefined") {
-                 window.dispatchEvent(new CustomEvent("session_rehydrated", { detail: { accessToken: newToken } }));
+                 window.dispatchEvent(new CustomEvent("session_rehydrated", { 
+                     detail: { 
+                         accessToken: newToken,
+                         refreshToken: newRefreshToken
+                     } 
+                 }));
+             }
+             if (newRefreshToken) {
+                 session.refreshToken = newRefreshToken;
              }
              processQueue(null, newToken);
              headers.set("Authorization", `Bearer ${newToken}`);
@@ -66,12 +89,18 @@ async function executeWithRefresh(
              throw new Error("No access token in response");
            }
         } else {
-           throw new Error("Refresh failed");
+           if (refreshRes.status === 401 || refreshRes.status === 403) {
+             throw new Error("Refresh token expired or invalid");
+           } else {
+             throw new Error(`Refresh failed with status ${refreshRes.status}`);
+           }
         }
-      } catch (err) {
+      } catch (err: any) {
         processQueue(err, null);
-        if (typeof window !== "undefined") {
-            window.dispatchEvent(new CustomEvent("session_force_logout"));
+        if (err?.message === "Refresh token expired or invalid" || err?.message === "No access token in response") {
+          if (typeof window !== "undefined") {
+              window.dispatchEvent(new CustomEvent("session_force_logout"));
+          }
         }
       } finally {
         isRefreshing = false;
@@ -403,7 +432,7 @@ export function formatLiveDateTime(value: unknown) {
   const year = date.getFullYear();
   const hours = String(date.getHours()).padStart(2, '0');
   const minutes = String(date.getMinutes()).padStart(2, '0');
-  return `Live - ${day}/${month}/${year} ${hours}:${minutes}`;
+  return `Live - ${day}/${month}/${year}, ${hours}:${minutes}`;
 }
 
 export function formatTimeOnly(value: unknown) {

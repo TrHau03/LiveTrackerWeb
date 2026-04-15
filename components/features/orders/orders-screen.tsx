@@ -1,10 +1,13 @@
 "use client";
 
 import React, { useState, useDeferredValue } from "react";
+import { createPortal } from "react-dom";
 import { useOrders, useExportOrders } from "@/hooks/use-orders";
 import { useSettingsStore } from "@/stores/settings-store";
+import { usePrintSettings } from "@/hooks/usePrintSettings";
 import { asRecord, extractCollection, pickString, pickNumber, formatCurrency, formatDateTime } from "@/lib/proxy-client";
-import { PrintTemplate } from "@/components/printer/print-template";
+import { printReceiptHtml } from "@/lib/printUtils";
+import { OrderReceipt } from "@/components/print/OrderReceipt";
 import { compactAddress } from "@/components/ui/workspace-shared";
 
 import {
@@ -25,8 +28,10 @@ export function OrdersScreen() {
   const [query, setQuery] = useState("");
   const search = useDeferredValue(query);
   const [selectedOrderId, setSelectedOrderId] = useState("");
-  const [printOrder, setPrintOrder] = useState<any>(null);
-  const paperSize = useSettingsStore(state => state.paperSize) as "80mm" | "58mm" | "a5";
+  const [selectedBatchIds, setSelectedBatchIds] = useState<Set<string>>(new Set());
+  const [isPrinting, setIsPrinting] = useState(false);
+  const [printProgress, setPrintProgress] = useState<{ current: number; total: number } | null>(null);
+  const { getPrintSettings } = usePrintSettings();
 
   const { data, status, error: queryError } = useOrders(search);
 
@@ -64,6 +69,112 @@ export function OrdersScreen() {
     const result = await doExport(range);
     setExportState(result.ok ? result.filename : "Export failed");
   }
+
+  const handleToggleSelectAll = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.checked) {
+      const allIds = orders.map(o => pickString(o, ["id", "_id", "orderCode"])).filter(Boolean);
+      setSelectedBatchIds(new Set(allIds));
+    } else {
+      setSelectedBatchIds(new Set());
+    }
+  };
+
+  const handleToggleSelect = (id: string) => {
+    setSelectedBatchIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const handleBatchPrint = async () => {
+    if (selectedBatchIds.size === 0 || isPrinting) return;
+    const ordersToPrint = orders.filter(o => {
+      const id = pickString(o, ["id", "_id", "orderCode"]);
+      return id && selectedBatchIds.has(id);
+    });
+
+    if (ordersToPrint.length === 0) return;
+
+    setIsPrinting(true);
+    setPrintProgress({ current: 0, total: ordersToPrint.length });
+
+    try {
+      const settings = await getPrintSettings("order");
+      const shopInfo = { name: "MINI SHOP", address: "", phone: "" };
+      const { createRoot } = await import("react-dom/client");
+
+      for (let i = 0; i < ordersToPrint.length; i++) {
+        setPrintProgress({ current: i + 1, total: ordersToPrint.length });
+        
+        const container = document.createElement("div");
+        container.style.position = "absolute";
+        container.style.left = "-9999px";
+        document.body.appendChild(container);
+        
+        const root = createRoot(container);
+        await new Promise<void>(resolve => {
+          root.render(<OrderReceipt order={ordersToPrint[i]} settings={settings} shopInfo={shopInfo} />);
+          setTimeout(resolve, 150);
+        });
+
+        const receiptEl = container.querySelector(".receipt") as HTMLElement;
+        if (receiptEl) {
+          printReceiptHtml(receiptEl);
+        }
+
+        setTimeout(() => {
+          root.unmount();
+          if (container.parentNode) document.body.removeChild(container);
+        }, 2000);
+
+        // Wait a bit between prints so browser can process IFRAMEs
+        await new Promise(r => setTimeout(r, 600));
+      }
+    } catch (e) {
+      console.error("Batch print error:", e);
+    } finally {
+      setIsPrinting(false);
+      setPrintProgress(null);
+      setSelectedBatchIds(new Set());
+    }
+  };
+
+  const handlePrintSingle = async (order: Record<string, unknown>) => {
+    if (isPrinting) return;
+    setIsPrinting(true);
+    try {
+      const settings = await getPrintSettings("order");
+      const shopInfo = { name: "MINI SHOP", address: "", phone: "" };
+      const { createRoot } = await import("react-dom/client");
+
+      const container = document.createElement("div");
+      container.style.position = "absolute";
+      container.style.left = "-9999px";
+      document.body.appendChild(container);
+      
+      const root = createRoot(container);
+      await new Promise<void>(resolve => {
+        root.render(<OrderReceipt order={order} settings={settings} shopInfo={shopInfo} />);
+        setTimeout(resolve, 150);
+      });
+
+      const receiptEl = container.querySelector(".receipt") as HTMLElement;
+      if (receiptEl) {
+        printReceiptHtml(receiptEl);
+      }
+
+      setTimeout(() => {
+        root.unmount();
+        if (container.parentNode) document.body.removeChild(container);
+      }, 2000);
+    } catch (e) {
+      console.error("Print error:", e);
+    } finally {
+      setIsPrinting(false);
+    }
+  };
 
   return (
     <div className="space-y-8 pb-28 lg:pb-6">
@@ -113,6 +224,16 @@ export function OrdersScreen() {
           </div>
 
           <div className="flex items-center gap-3 shrink-0">
+            {selectedBatchIds.size > 0 && (
+              <button
+                type="button"
+                onClick={handleBatchPrint}
+                disabled={isPrinting}
+                className={`${PRIMARY_BUTTON_CLASS} h-11 px-5 rounded-xl bg-[var(--primary)] text-white hover:bg-[var(--primary-strong)] disabled:opacity-50`}
+              >
+                In {selectedBatchIds.size} đơn
+              </button>
+            )}
             <button
               type="button"
               onClick={handleExport}
@@ -140,6 +261,14 @@ export function OrdersScreen() {
             <table className="w-full text-left text-sm whitespace-nowrap">
               <thead className="bg-[var(--surface-muted)] text-[var(--muted)]">
                 <tr>
+                  <th className="px-5 py-3 w-10 text-center">
+                    <input 
+                      type="checkbox" 
+                      className="rounded border-[var(--border)] text-[var(--primary)] focus:ring-[var(--primary)]"
+                      checked={orders.length > 0 && selectedBatchIds.size === orders.length}
+                      onChange={handleToggleSelectAll}
+                    />
+                  </th>
                   <th className="px-5 py-3 font-semibold">Mã đơn</th>
                   <th className="px-5 py-3 font-semibold">Tên khách</th>
                   <th className="px-5 py-3 font-semibold">SĐT</th>
@@ -149,14 +278,23 @@ export function OrdersScreen() {
               </thead>
               <tbody className="divide-y divide-[var(--border)]">
                 {orders.map((order, index) => {
-                  const id = pickString(order, ["id", "_id", "orderCode"]);
+                  const id = pickString(order, ["id", "_id", "orderCode"]) || "";
                   const isActive = selectedOrderId === id;
+                  const isChecked = selectedBatchIds.has(id);
                   return (
                     <tr
                       key={`${id || index}`}
-                      onClick={() => setSelectedOrderId(id || "")}
+                      onClick={() => setSelectedOrderId(id)}
                       className={`cursor-pointer transition hover:bg-[var(--surface-muted)]/60 ${isActive ? "bg-[var(--primary)]/5" : ""}`}
                     >
+                      <td className="px-5 py-2 text-center" onClick={e => e.stopPropagation()}>
+                        <input 
+                          type="checkbox" 
+                          className="rounded border-[var(--border)] text-[var(--primary)] focus:ring-[var(--primary)]"
+                          checked={isChecked}
+                          onChange={() => handleToggleSelect(id)}
+                        />
+                      </td>
                       <td className="px-4 py-2 font-mono text-sm font-semibold text-[var(--primary)]">#{pickString(order, ["orderCode", "code"]) || id?.substring(0, 8)}</td>
                       <td className="px-4 py-2 font-semibold text-[var(--foreground)] text-base">{pickString(order, ["igName", "customerName"]) || "Khách hàng"}</td>
                       <td className="px-4 py-2 text-[var(--foreground)] font-medium">{pickString(order, ["phone"]) || "—"}</td>
@@ -225,23 +363,12 @@ export function OrdersScreen() {
                     XÁC NHẬN ĐƠN HÀNG
                   </button>
                   <button
-                    onClick={() => {
-                      const orderData = {
-                        orderCode: pickString(selectedOrder, ["orderCode", "code"]) || "Order",
-                        customerName: pickString(selectedOrder, ["igName", "customerName"]) || "Khách hàng",
-                        phone: pickString(selectedOrder, ["phone"]),
-                        address: compactAddress(selectedOrder),
-                        totalPrice: pickNumber(selectedOrder, ["totalPrice", "amount"]) ?? 0,
-                        deposit: pickNumber(selectedOrder, ["deposit"]) ?? 0,
-                        createdAt: pickString(selectedOrder, ["createdAt", "updatedAt"]),
-                        shopName: "LiveTracker Shop",
-                      };
-                      setPrintOrder(orderData);
-                    }}
+                    onClick={() => handlePrintSingle(selectedOrder)}
+                    disabled={isPrinting}
                     className="w-full rounded-xl bg-[#28c840] hover:bg-[#23af37] px-4 py-4 text-base font-bold text-white shadow-lg transition-colors flex items-center justify-center gap-2"
                   >
                     <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" /></svg>
-                    IN VẬN ĐƠN
+                    {isPrinting ? "ĐANG IN..." : "IN VẬN ĐƠN"}
                   </button>
                 </div>
               </>
@@ -250,12 +377,21 @@ export function OrdersScreen() {
         </div>
       </Panel>
 
-      {printOrder && (
-        <PrintTemplate
-          order={printOrder}
-          paperSize={paperSize || "80mm"}
-          onClose={() => setPrintOrder(null)}
-        />
+      {/* Progress indicator via Portal */}
+      {printProgress && typeof document !== "undefined" && createPortal(
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm">
+          <div className="rounded-2xl bg-white p-8 w-80 shadow-2xl flex flex-col items-center">
+            <svg className="h-10 w-10 text-[var(--primary)] animate-spin mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+            <h3 className="text-lg font-bold text-gray-900 mb-1">Đang in đơn hàng</h3>
+            <p className="text-sm font-medium text-gray-500 mb-4">
+              Đơn thứ {printProgress.current} trong số {printProgress.total} đơn
+            </p>
+            <div className="w-full bg-gray-200 rounded-full h-2.5">
+              <div className="bg-[var(--primary)] h-2.5 rounded-full transition-all duration-300" style={{ width: `${(printProgress.current / printProgress.total) * 100}%` }}></div>
+            </div>
+          </div>
+        </div>,
+        document.body
       )}
     </div>
   );

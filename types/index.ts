@@ -58,6 +58,11 @@ export type Comment = {
   updatedAt?: string;
   customerId?: string;
   customerTagId?: string;
+  status?: 'NORMAL' | 'BACKUP' | 'CONFIRMED_ERROR' | null;
+  isNewCustomer?: boolean;
+  customerClosedCount?: number;
+  customerTag?: Tag | null;
+  backupOf?: string | { _id: string; igUsername?: string; text?: string } | null;
 };
 
 // ─── Order ───────────────────────────────────────────────────────────────────
@@ -83,11 +88,15 @@ export type Order = {
   totalPrice?: number;
   amount?: number;
   deposit?: number;
+  depositStatus?: string;
+  remainingTotal?: number;
   quantity?: number;
+  totalQuantity?: number;
   liveId?: string;
   commentId?: string;
-  commentIds?: string[];
-  customerId?: string;
+  commentIds?: string[] | Comment[];
+  comments?: Comment[];
+  customerId?: string | Customer;
   actionType?: "NORMAL" | "BACKUP" | "CONFIRMED_ERROR";
   isNewCustomer?: boolean;
   items?: OrderItem[];
@@ -191,6 +200,29 @@ export type PrintTemplate = {
     productInfo?: { product?: boolean; quantity?: boolean; price?: boolean };
   };
 };
+
+export type PrintContentSettings = {
+  storeInfo: {
+    name: boolean;
+    address: boolean;
+    phone: boolean;
+  };
+  customerInfo: {
+    address: boolean;
+    phone: boolean;
+  };
+  productInfo: {
+    product: boolean;
+    quantity: boolean;
+    price: boolean;
+    productList: boolean;
+    totalAmount: boolean;
+  };
+  endNote?: string;
+  endNoteEnabled?: boolean;
+};
+
+export type PrintMode = 'print_and_send' | 'print_only' | 'send_only';
 
 // ─── API Response Wrappers ───────────────────────────────────────────────────
 
