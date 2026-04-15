@@ -25,14 +25,20 @@ function middleware(context) {
         });
     }
 
-    // Rule 1: pay.livetracker.vn mà path KHÔNG bắt đầu bằng /order -> redirect về app.livetracker.vn
-    if (host === 'pay.livetracker.vn' && !pathname.startsWith('/order')) {
-        return new Response(null, {
-            status: 301,
-            headers: {
-                Location: `https://app.livetracker.vn${pathname}${search}`
-            }
-        });
+    // Rule 1: pay.livetracker.vn
+    if (host === 'pay.livetracker.vn') {
+        // Chỉ cho phép path /order (hoặc /order/) và phải có id tham số
+        const isOrderPath = pathname === '/order' || pathname === '/order/';
+        const hasOrderId = url.searchParams.has('id');
+
+        if (!isOrderPath || !hasOrderId) {
+            return new Response(null, {
+                status: 301,
+                headers: {
+                    Location: `https://livetracker.vn`
+                }
+            });
+        }
     }
 
     // Rule 2: app.livetracker.vn mà path BẮT ĐẦU bằng /order -> redirect về pay.livetracker.vn
