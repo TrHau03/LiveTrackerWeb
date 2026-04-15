@@ -6,6 +6,7 @@ import { ThemeProvider } from "@/components/theme-provider";
 import { ReactQueryProvider } from "@/providers/react-query-provider";
 import "@/lib/i18n/i18n";
 import { absoluteUrl, siteConfig } from "@/lib/site";
+import { SubdomainGuard } from "@/components/subdomain-guard";
 
 import "./globals.css";
 
@@ -52,6 +53,7 @@ export default function RootLayout({
         <ThemeProvider>
           <ReactQueryProvider>
             <SessionProvider>
+              <SubdomainGuard />
               <AppShell>{children}</AppShell>
             </SessionProvider>
           </ReactQueryProvider>

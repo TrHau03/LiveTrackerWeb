@@ -13,6 +13,7 @@ export function LivestreamsScreen() {
   const setActiveLiveId = useSettingsStore(state => state.setActiveLiveId);
   const [mobileView, setMobileView] = useState<"list" | "detail">("list");
   const [liveStats, setLiveStats] = useState<LiveStats>({ totalOrder: 0, totalComment: 0, totalItems: 0 });
+  const [filterQuery, setFilterQuery] = useState("");
 
   const handleSelectLive = (id: string) => {
     setActiveLiveId(id);
@@ -22,13 +23,13 @@ export function LivestreamsScreen() {
 
   return (
     <div className="flex flex-col flex-1 h-full overflow-hidden pb-4">
-      <div className="flex flex-1 min-h-0 gap-4 overflow-hidden">
-        <div className={`flex flex-col rounded-xl border border-[var(--border)] bg-[var(--surface)] shadow-[var(--shadow-soft)] transition-all duration-300 ${mobileView === "list" ? "w-full lg:w-[25%]" : "hidden lg:flex lg:w-[25%]"}`}>
+      <div className="flex flex-1 min-h-0 gap-2 overflow-hidden">
+        <div className={`flex flex-col border border-[var(--border)] bg-[var(--surface)] shadow-[var(--shadow-soft)] transition-all duration-300 ${mobileView === "list" ? "w-full lg:w-[25%]" : "hidden lg:flex lg:w-[25%]"}`}>
           <LiveListColumn activeLiveId={activeLiveId} onSelectLive={handleSelectLive} liveStats={liveStats} />
         </div>
 
-        <div className={`flex-1 flex min-h-0 gap-4 overflow-hidden transition-all duration-300 ${mobileView === "detail" ? "w-full flex-col lg:flex-row" : "hidden lg:flex"}`}>
-          <div className="flex flex-col flex-[1.5] min-h-0 rounded-xl border border-[var(--border)] bg-[var(--surface)] shadow-[var(--shadow-soft)] overflow-hidden">
+        <div className={`flex-1 flex min-h-0 gap-2 overflow-hidden transition-all duration-300 ${mobileView === "detail" ? "w-full flex-col lg:flex-row" : "hidden lg:flex"}`}>
+          <div className="flex flex-col flex-[1.5] min-h-0 border border-[var(--border)] bg-[var(--surface)] shadow-[var(--shadow-soft)] overflow-hidden">
             {activeLiveId ? (
               <div className="flex flex-col h-full">
                 <div className="lg:hidden p-3 border-b border-[var(--border)] bg-[var(--surface-muted)]/30">
@@ -37,10 +38,14 @@ export function LivestreamsScreen() {
                     Quay lại danh sách
                   </button>
                 </div>
-                <LiveCommentColumn liveId={activeLiveId} onLiveStatsUpdate={setLiveStats} />
+                <LiveCommentColumn 
+                  liveId={activeLiveId} 
+                  onLiveStatsUpdate={setLiveStats} 
+                  onFilterCustomer={setFilterQuery}
+                />
               </div>
             ) : (
-              <div className="flex flex-1 flex-col items-center justify-center rounded-xl bg-[var(--surface-muted)]/20 p-8 text-center">
+              <div className="flex flex-1 flex-col items-center justify-center bg-[var(--surface-muted)]/20 p-8 text-center">
                 <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-[var(--surface-muted)] shadow-inner text-[var(--muted)]">
                   <svg className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" /></svg>
                 </div>
@@ -49,12 +54,18 @@ export function LivestreamsScreen() {
               </div>
             )}
           </div>
-
-          <div className="flex flex-col flex-1 min-h-0 rounded-xl border border-[var(--border)] bg-[var(--surface)] shadow-[var(--shadow-soft)] relative overflow-hidden h-[400px] lg:h-full">
+ 
+          <div className="flex flex-col flex-1 min-h-0 border border-[var(--border)] bg-[var(--surface)] shadow-[var(--shadow-soft)] relative overflow-hidden h-[400px] lg:h-full">
             {activeLiveId ? (
-              <LiveOrderColumn key={activeLiveId} liveId={activeLiveId} liveStats={liveStats} />
+              <LiveOrderColumn 
+                key={activeLiveId} 
+                liveId={activeLiveId} 
+                liveStats={liveStats}
+                filterQuery={filterQuery}
+                onFilterChange={setFilterQuery}
+              />
             ) : (
-              <div className="flex flex-1 flex-col items-center justify-center rounded-xl bg-[var(--surface-muted)]/20 p-8 text-center">
+              <div className="flex flex-1 flex-col items-center justify-center bg-[var(--surface-muted)]/20 p-8 text-center">
                 <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-[var(--surface-muted)] shadow-inner text-[var(--muted)]">
                   <svg className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" /></svg>
                 </div>

@@ -18,8 +18,8 @@ export const siteConfig = {
 export const appNavigation = [
   {
     href: "/",
-    label: "BẢN TIN",
-    shortLabel: "Bản tin",
+    label: "Trang chủ",
+    shortLabel: "Trang chủ",
   },
   {
     href: "/livestreams",

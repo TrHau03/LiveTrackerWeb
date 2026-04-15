@@ -17,8 +17,8 @@
   --shadow-soft: 0 10px 30px rgba(0, 0, 0, 0.04);
   --shadow-strong: 0 20px 50px rgba(0, 0, 0, 0.08);
   --radius-lg: 16px;
-  --sidebar-width: 280px;
-  --sidebar-width-icon: 88px;
+  --sidebar-width: 220px;
+  --sidebar-width-icon: 68px;
   color-scheme: light;
 }
 
@@ -33,7 +33,7 @@
   --surface-strong: rgba(13, 21, 35, 0.96);
   --surface-elevated: #111827;
   --surface-muted: rgba(19, 27, 43, 0.88);
-  --sidebar-width-icon: 88px;
+  --sidebar-width-icon: 68px;
   --primary: #4D7CFF;
   --primary-strong: #1447E6;
   --primary-soft: rgba(77, 124, 255, 0.2);

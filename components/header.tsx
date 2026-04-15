@@ -23,15 +23,15 @@ export function Header() {
     const [endDate, setEndDate] = React.useState("10-10-2021");
 
     return (
-        <header className="bg-transparent px-4 sm:px-8 py-6 border-b border-[var(--border)]">
-            <div className="flex flex-col gap-4">
+        <header className="bg-transparent px-4 sm:px-8 py-2 border-b border-[var(--border)]">
+            <div className="flex flex-col gap-2">
                 {/* Title Section */}
-                <div className="flex items-center justify-between gap-4">
+                <div className="flex items-center justify-between gap-2">
                     <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-3">
                             {/* Mobile menu trigger placeholder */}
                             <div className="flex-1 min-w-0">
-                                <h1 className="text-2xl sm:text-3xl font-bold text-[var(--foreground)] truncate">
+                                <h1 className="text-lg sm:text-xl font-bold text-[var(--foreground)] truncate">
                                     {config.title}
                                 </h1>
                                 {config.subtitle && (

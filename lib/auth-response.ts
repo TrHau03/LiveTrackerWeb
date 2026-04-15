@@ -14,8 +14,4 @@ export function applyAuthResponses(
       accessToken: refreshedAccessToken,
     });
   }
-
-  if (responses.some((response) => response.status === 401)) {
-    void logout();
-  }
 }

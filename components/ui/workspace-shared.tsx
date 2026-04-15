@@ -343,16 +343,20 @@ export function formatDateTime(value: string | undefined | null) {
 }
 
 export function formatLiveDateTime(value: string | undefined | null) {
-  if (!value) return "No data";
+  if (!value) return "Live - No data";
   try {
-    return new Intl.DateTimeFormat("en-US", {
-      month: "short",
-      day: "numeric",
-      hour: "numeric",
-      minute: "2-digit"
-    }).format(new Date(value));
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return "Live - No data";
+    
+    const day = String(date.getDate()).padStart(2, '0');
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const year = date.getFullYear();
+    const hours = String(date.getHours()).padStart(2, '0');
+    const minutes = String(date.getMinutes()).padStart(2, '0');
+    
+    return `Live - ${day}/${month}/${year}, ${hours}:${minutes}`;
   } catch {
-    return String(value);
+    return `Live - ${String(value)}`;
   }
 }
 

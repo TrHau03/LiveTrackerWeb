@@ -1,15 +1,22 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
+import { createPortal } from "react-dom";
 import Link from "next/link";
 import { useSession } from "@/components/session-provider";
 import { useQueryClient } from "@tanstack/react-query";
 import { useLiveOrders } from "@/hooks/use-orders";
 import { useCustomerDetail } from "@/hooks/use-customers";
 import { useSettingsStore } from "@/stores/settings-store";
+import { usePrintSettings } from "@/hooks/usePrintSettings";
 import { applyAuthResponses } from "@/hooks/use-auth-sync";
 import { asRecord, extractApiData, extractCollection, pickString, pickNumber, formatCurrency, formatDateTime } from "@/lib/proxy-client";
+import { printReceiptHtml, renderReceiptToImage } from "@/lib/printUtils";
+import { sendBill, deleteOrder, removeCommentFromOrder } from "@/lib/services/orders-service";
+import { OrderReceipt } from "@/components/print/OrderReceipt";
+import { PrintModeDropdown } from "@/components/print/PrintModeDropdown";
 import type { LiveStats } from "@/hooks/use-comments";
+import type { PrintMode } from "@/types";
 
 import {
   LoadingState,
@@ -19,12 +26,40 @@ import {
   compactAddress,
 } from "@/components/ui/workspace-shared";
 
-export function LiveOrderColumn({ liveId, liveStats }: { liveId: string; liveStats: LiveStats }) {
+function Toast({ message, type = "success" }: { message: string; type?: "success" | "error" }) {
+  return (
+    <div className={`fixed bottom-6 left-1/2 -translate-x-1/2 z-[9999] px-5 py-2.5 rounded-xl text-xs font-bold shadow-xl animate-in fade-in slide-in-from-bottom-4 duration-300 ${type === "error" ? "bg-red-600 text-white" : "bg-green-600 text-white"}`}>
+      {message}
+    </div>
+  );
+}
+
+export function LiveOrderColumn({ 
+  liveId, 
+  liveStats,
+  filterQuery = "",
+  onFilterChange
+}: { 
+  liveId: string; 
+  liveStats: LiveStats;
+  filterQuery?: string;
+  onFilterChange?: (query: string) => void;
+}) {
   const { session } = useSession();
   const queryClient = useQueryClient();
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
   const [customerPopupId, setCustomerPopupId] = useState<string | null>(null);
+  const [isPrinting, setIsPrinting] = useState(false);
+  const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
+  const toastTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const { getPrintSettings } = usePrintSettings();
+
+  const showToast = useCallback((message: string, type: "success" | "error" = "success") => {
+    setToast({ message, type });
+    if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current);
+    toastTimeoutRef.current = setTimeout(() => setToast(null), 3000);
+  }, []);
 
   const { data: customerDetailData } = useCustomerDetail(customerPopupId || "");
   const customerDetail = customerPopupId ? asRecord(extractApiData(customerDetailData)) : {};
@@ -44,6 +79,14 @@ export function LiveOrderColumn({ liveId, liveStats }: { liveId: string; liveSta
   }
 
   const orders = extractCollection(state.data);
+  const filteredOrders = orders.filter(o => {
+    if (!filterQuery) return true;
+    const q = filterQuery.toLowerCase();
+    const name = (pickString(asRecord(o.customerId), ["igName"]) || pickString(o, ["igName", "customerName"]) || "").toLowerCase();
+    const code = (pickString(o, ["orderCode", "code"]) || "").toLowerCase();
+    return name.includes(q) || code.includes(q);
+  });
+  
   const selectedOrder = orders.find((o) => pickString(o, ["id", "_id", "orderCode"]) === selectedOrderId);
   const totalAmount = orders.reduce((sum, order) => sum + (pickNumber(order, ["totalPrice", "amount"]) ?? 0), 0);
 
@@ -52,38 +95,33 @@ export function LiveOrderColumn({ liveId, liveStats }: { liveId: string; liveSta
     if (!orderId || deleteLoading || !session.accessToken) return;
     setDeleteLoading(true);
     try {
-      const res = await fetch(`/api/proxy`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          path: `/orders/${orderId}`,
-          method: "DELETE",
-          headers: { "Authorization": `Bearer ${session.accessToken}` },
-        }),
-      });
+      const res = await deleteOrder(session, orderId);
       if (res.ok) {
         setSelectedOrderId(null);
         queryClient.invalidateQueries({ queryKey: ["live_orders"] });
+        showToast("Đã xoá đơn hàng");
+      } else {
+        showToast("Lỗi khi xoá đơn hàng", "error");
       }
-    } catch { /* ignore */ }
+    } catch { 
+      showToast("Lỗi kết nối khi xoá đơn", "error");
+    }
     setDeleteLoading(false);
   };
 
   const handleRemoveComment = async (commentId: string) => {
-    const orderId = pickString(selectedOrder!, ["id", "_id"]);
-    if (!orderId || !commentId || !session.accessToken) return;
+    if (!commentId || !session.accessToken) return;
     try {
-      const res = await fetch(`/api/proxy`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          path: `/orders/${orderId}/comments/${commentId}`,
-          method: "DELETE",
-          headers: { "Authorization": `Bearer ${session.accessToken}` },
-        }),
-      });
-      if (res.ok) queryClient.invalidateQueries({ queryKey: ["live_orders"] });
-    } catch { /* ignore */ }
+      const res = await removeCommentFromOrder(session, commentId);
+      if (res.ok) {
+        showToast("Đã gỡ comment khỏi đơn");
+        queryClient.invalidateQueries({ queryKey: ["live_orders"] });
+      } else {
+        showToast("Không thể gỡ comment", "error");
+      }
+    } catch { 
+      showToast("Lỗi kết nối khi gỡ comment", "error");
+    }
   };
 
   return (
@@ -104,22 +142,41 @@ export function LiveOrderColumn({ liveId, liveStats }: { liveId: string; liveSta
         </div>
       </div>
 
-      <div className="p-3 border-b border-[var(--border)] bg-[var(--surface-muted)]/20 shrink-0">
+      <div className="p-3 border-b border-[var(--border)] bg-[var(--surface-muted)]/20 shrink-0 space-y-2">
         <div className="flex justify-between items-center px-2 py-1">
           <span className="text-xs font-semibold uppercase tracking-widest text-[var(--muted)]">Tổng thu</span>
           <span className="text-base font-bold tracking-tight text-[var(--primary)]">{formatCurrency(totalAmount)}</span>
+        </div>
+        
+        <div className="relative">
+            <input 
+                type="text"
+                placeholder="Tìm tên khách hoặc mã đơn..."
+                value={filterQuery}
+                onChange={(e) => onFilterChange?.(e.target.value)}
+                className="w-full bg-[var(--surface)] border border-[var(--border)] rounded-lg pl-8 pr-8 py-1.5 text-xs focus:ring-1 focus:ring-[var(--primary)] focus:border-[var(--primary)] outline-none transition-all"
+            />
+            <svg className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[var(--muted)]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+            {filterQuery && (
+                <button 
+                    onClick={() => onFilterChange?.("")}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 rounded-full hover:bg-[var(--surface-muted)] text-[var(--muted)] hover:text-red-500 transition-colors"
+                >
+                    <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                </button>
+            )}
         </div>
       </div>
 
       <div className="flex-1 overflow-y-auto p-3">
         {state.status === "loading" ? <LoadingState compact /> : null}
         {state.status === "error" ? <ErrorState message={state.error} compact /> : null}
-        {state.status === "ready" && orders.length === 0 ? (
-          <EmptyState message="Livestream này chưa có đơn hàng." compact />
+        {state.status === "ready" && filteredOrders.length === 0 ? (
+          <EmptyState message={filterQuery ? "Không tìm thấy kết quả." : "Livestream này chưa có đơn hàng."} compact />
         ) : null}
 
         <div className="space-y-2.5">
-          {orders.map((order, i) => {
+          {filteredOrders.map((order, i) => {
             const id = pickString(order, ["id", "_id", "orderCode"]);
             const isActive = selectedOrderId === id;
             return (
@@ -153,11 +210,11 @@ export function LiveOrderColumn({ liveId, liveStats }: { liveId: string; liveSta
 
       {/* Slide-out Panel For Order Detail */}
       <div
-        className={`absolute inset-x-0 bottom-0 top-1/3 z-10 flex flex-col bg-[var(--surface)] shadow-[0_-15px_60px_-15px_rgba(0,0,0,0.3)] rounded-t-2xl border border-[var(--border)] transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] ${selectedOrder ? 'translate-y-0 h-auto' : 'translate-y-full h-auto pointer-events-none opacity-0'}`}
+        className={`absolute inset-x-0 bottom-0 top-1/3 z-10 flex flex-col bg-[var(--surface)] shadow-[0_-15px_60px_-15px_rgba(0,0,0,0.3)] border border-[var(--border)] transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] ${selectedOrder ? 'translate-y-0 h-auto' : 'translate-y-full h-auto pointer-events-none opacity-0'}`}
       >
         {selectedOrder && (
           <>
-            <div className="flex items-center justify-between border-b border-[var(--border)] p-4 shrink-0 bg-[var(--surface-muted)]/30 rounded-t-2xl">
+            <div className="flex items-center justify-between border-b border-[var(--border)] p-4 shrink-0 bg-[var(--surface-muted)]/30">
               <div>
                 <h4 className="text-sm font-bold text-[var(--foreground)]">Chi tiết đơn</h4>
                 <p className="font-mono text-[10px] text-[var(--muted)] tracking-widest mt-0.5 uppercase">
@@ -290,17 +347,98 @@ export function LiveOrderColumn({ liveId, liveStats }: { liveId: string; liveSta
               <button
                 onClick={handleDeleteOrder}
                 disabled={deleteLoading}
-                className="flex-1 rounded-xl bg-red-50 px-4 py-2.5 text-xs font-bold text-red-600 shadow-[var(--shadow-soft)] hover:bg-red-100 transition-colors border border-red-200 disabled:opacity-50 dark:bg-red-900/20 dark:text-red-400 dark:border-red-800"
+                className="rounded-xl bg-red-50 px-4 py-2.5 text-xs font-bold text-red-600 shadow-[var(--shadow-soft)] hover:bg-red-100 transition-colors border border-red-200 disabled:opacity-50 dark:bg-red-900/20 dark:text-red-400 dark:border-red-800"
               >
                 {deleteLoading ? "Đang xoá..." : "Xoá đơn"}
               </button>
-              <button className="flex-1 rounded-xl bg-[var(--primary)] px-4 py-2.5 text-xs font-bold text-white shadow-sm hover:bg-[var(--primary-strong)] transition-colors">
+              <button className="flex-1 rounded-xl bg-[var(--surface)] border border-[var(--border)] px-4 py-2.5 text-xs font-bold text-[var(--foreground)] shadow-sm hover:bg-[var(--surface-muted)] transition-colors">
                 Phát link Pay
               </button>
+              <PrintModeDropdown
+                size="md"
+                disabled={isPrinting}
+                onSelect={async (mode: PrintMode) => {
+                  if (!selectedOrder || isPrinting) return;
+                  setIsPrinting(true);
+                  try {
+                    const settings = await getPrintSettings("order");
+                    const shopInfo = { name: "MINI SHOP", address: "", phone: "" };
+
+                    if (mode === "print_only" || mode === "print_and_send") {
+                      // Render to hidden container and print
+                      const container = document.createElement("div");
+                      container.style.position = "absolute";
+                      container.style.left = "-9999px";
+                      document.body.appendChild(container);
+
+                      const { createRoot } = await import("react-dom/client");
+                      const root = createRoot(container);
+                      root.render(
+                        <OrderReceipt order={selectedOrder} settings={settings} shopInfo={shopInfo} />
+                      );
+
+                      await new Promise(r => setTimeout(r, 150));
+                      const receiptEl = container.querySelector(".receipt") as HTMLElement;
+                      if (receiptEl) printReceiptHtml(receiptEl);
+
+                      setTimeout(() => {
+                        root.unmount();
+                        if (container.parentNode) document.body.removeChild(container);
+                      }, 2000);
+                    }
+
+                    if (mode === "send_only" || mode === "print_and_send") {
+                      const igUserId = pickString(asRecord(selectedOrder.customerId), ["igId"]) || pickString(selectedOrder, ["igId", "customerId"]);
+                      const orderId = pickString(selectedOrder, ["id", "_id"]);
+                      
+                      if (igUserId && orderId) {
+                        const container = document.createElement("div");
+                        container.style.position = "absolute";
+                        container.style.left = "-9999px";
+                        document.body.appendChild(container);
+
+                        const { createRoot } = await import("react-dom/client");
+                        const root = createRoot(container);
+                        root.render(
+                          <div style={{ padding: "20px" }}>
+                            <OrderReceipt order={selectedOrder} settings={settings} shopInfo={shopInfo} />
+                          </div>
+                        );
+
+                        await new Promise(r => setTimeout(r, 200));
+                        const receiptEl = container.querySelector(".receipt") as HTMLElement;
+                        
+                        if (receiptEl && session.accessToken) {
+                          try {
+                            const blob = await renderReceiptToImage(receiptEl);
+                            const res = await sendBill(session, orderId, blob, igUserId);
+                            if (res.ok) {
+                              console.log("Send bill success", res.status);
+                            } else {
+                              console.error("Send bill failed");
+                            }
+                          } catch (e) {
+                            console.error("html2canvas error", e);
+                          }
+                        }
+
+                        root.unmount();
+                        if (container.parentNode) document.body.removeChild(container);
+                      }
+                    }
+                  } catch (err) {
+                    console.error("Print error:", err);
+                  } finally {
+                    setIsPrinting(false);
+                  }
+                }}
+              />
             </div>
           </>
         )}
       </div>
+
+      {toast && typeof document !== "undefined" && createPortal(<Toast message={toast.message} type={toast.type} />, document.body)}
     </div>
   );
 }

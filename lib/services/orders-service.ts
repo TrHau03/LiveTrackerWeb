@@ -92,11 +92,10 @@ export async function deleteOrder(
 
 export async function removeCommentFromOrder(
   session: SessionSettings,
-  orderId: string,
   commentId: string,
 ) {
   return proxyRequest(session, {
-    path: `/orders/${orderId}/comments/${commentId}`,
+    path: `/orders/remove-comment/${commentId}`,
     method: "DELETE",
   });
 }
@@ -110,5 +109,23 @@ export async function updateOrder(
     path: `/orders/${orderId}`,
     method: "PATCH",
     body,
+  });
+}
+
+export async function sendBill(
+  session: SessionSettings,
+  orderId: string,
+  imageBlob: Blob,
+  igUserId: string,
+) {
+  const formData = new FormData();
+  formData.append("image", imageBlob, `bill_${orderId}.jpg`);
+  formData.append("igUserId", igUserId);
+
+  return proxyRequest(session, {
+    path: `/orders/${orderId}/send-bill`,
+    method: "POST",
+    body: formData,
+    bodyMode: "form-data",
   });
 }

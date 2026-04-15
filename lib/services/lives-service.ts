@@ -6,7 +6,7 @@ import type { SessionSettings } from "@/lib/workspace-session";
 
 export async function fetchMyLives(
   session: SessionSettings,
-  query?: { page?: number; limit?: number; search?: string },
+  query?: { page?: number; limit?: number; search?: string; shopId?: string; startDate?: string; endDate?: string },
 ) {
   return proxyRequest(session, {
     path: "/lives/my-lives",
@@ -14,6 +14,9 @@ export async function fetchMyLives(
       page: query?.page ?? 1,
       limit: query?.limit ?? 50,
       search: query?.search || undefined,
+      shopId: query?.shopId || undefined,
+      startDate: query?.startDate || undefined,
+      endDate: query?.endDate || undefined,
     },
   });
 }

@@ -101,8 +101,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         )}
 
         <aside
-          className={`fixed inset-y-0 left-0 z-50 flex h-screen shrink-0 flex-col border-r border-[var(--border)] bg-[var(--surface)] transition-all duration-300 lg:sticky lg:flex ${isMobileMenuOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
-            } ${isCollapsed ? "w-[var(--sidebar-width-icon)] px-4 py-6" : "w-[var(--sidebar-width)] p-6"
+          className={`fixed inset-y-0 left-0 z-50 flex h-screen shrink-0 flex-col border-r border-white/10 bg-[#007fff] transition-all duration-300 lg:sticky lg:flex ${isMobileMenuOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
+            } ${isCollapsed ? "w-[var(--sidebar-width-icon)] px-2 py-6" : "w-[var(--sidebar-width)] pt-5 pb-5 pl-3 pr-1"
             }`}
         >
           <div className={`mb-10 flex items-center ${isCollapsed ? "justify-center" : "justify-between px-2"}`}>
@@ -111,7 +111,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               className="flex items-center gap-3 transition duration-300"
             >
               <img
-                src={isCollapsed ? "/logoicon.png" : (theme === "dark" ? "/logo.png" : "/logo-2.png")}
+                src={isCollapsed ? "/logoicon.png" : "/logo.png"}
                 alt="LiveTracker Logo"
                 className={`${isCollapsed ? "h-11 w-11" : "h-9 w-auto"} object-contain`}
               />
@@ -119,7 +119,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             {!isCollapsed && (
               <button
                 onClick={() => setIsCollapsed(true)}
-                className="hidden lg:flex h-8 w-8 items-center justify-center rounded-lg text-[var(--muted)] hover:bg-[var(--surface-muted)] hover:text-[var(--foreground)]"
+                className="hidden lg:flex h-8 w-8 items-center justify-center rounded-lg text-white/70 hover:bg-white/10 hover:text-white"
               >
                 <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 19l-7-7 7-7m8 14l-7-7 7-7" /></svg>
               </button>
@@ -127,14 +127,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             {isCollapsed && (
               <button
                 onClick={() => setIsCollapsed(false)}
-                className="absolute -right-3 top-20 flex h-6 w-6 items-center justify-center rounded-full border border-[var(--border)] bg-[var(--surface)] text-[var(--muted)] hover:text-[var(--foreground)] shadow-sm"
+                className="absolute -right-3 top-20 flex h-6 w-6 items-center justify-center rounded-full border border-white/10 bg-[#007fff] text-white/70 hover:text-white shadow-sm"
               >
                 <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" /></svg>
               </button>
             )}
           </div>
 
-          <nav className="flex-1 space-y-2 overflow-y-auto pr-2 custom-scrollbar">
+          <nav className="flex-1 space-y-2 overflow-y-auto pr-0 custom-scrollbar">
             {appNavigation.map((item) => {
               const active =
                 item.href === "/"
@@ -148,8 +148,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   title={isCollapsed ? item.label : ""}
                   className={`group flex items-center rounded-xl p-3 text-sm font-semibold transition-all duration-200 ${isCollapsed ? "justify-center" : "gap-4 px-4"
                     } ${active
-                      ? "bg-[var(--primary-soft)] text-[var(--primary)]"
-                      : "text-[var(--muted)] hover:text-[var(--foreground)] hover:bg-[var(--surface-muted)]"
+                      ? "bg-white/20 text-white"
+                      : "text-white/70 hover:text-white hover:bg-white/10"
                     }`}
                 >
                   <NavIcon href={item.href} active={active} />
@@ -160,38 +160,25 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </nav>
 
           <div className="mt-auto space-y-6">
-            {/* Upgrade Card */}
-            {!isCollapsed && (
-              <div className="relative overflow-hidden rounded-2xl bg-[var(--primary)] p-5 text-white shadow-lg shadow-[var(--primary-soft)]">
-                <div className="relative z-10">
-                  <div className="mb-4 flex h-10 w-10 items-center justify-center rounded-xl bg-white/20 backdrop-blur-md">
-                    <svg className="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
-                  </div>
-                  <button className="w-full rounded-xl bg-white py-2.5 text-xs font-bold text-[var(--primary)] transition hover:bg-opacity-90">
-                    Upgrade Now
-                  </button>
-                </div>
-                <div className="absolute -right-4 -top-4 h-24 w-24 rounded-full bg-white/10" />
-              </div>
-            )}
+
 
             {/* Profile Section */}
-            <div className={`flex items-center border-t border-[var(--border)] pt-6 ${isCollapsed ? "justify-center" : "justify-between"}`}>
+            <div className={`flex items-center border-t border-white/10 pt-6 ${isCollapsed ? "justify-center" : "justify-between"}`}>
               <div className="flex items-center gap-3">
-                <div className="h-10 w-10 shrink-0 overflow-hidden rounded-full bg-[var(--primary-soft)]">
-                  <button className="flex h-full w-full items-center justify-center text-xs font-bold text-[var(--primary)] uppercase">
+                <div className="h-10 w-10 shrink-0 overflow-hidden rounded-full bg-white/20">
+                  <button className="flex h-full w-full items-center justify-center text-xs font-bold text-white uppercase">
                     {getInitials(session.user?.fullName)}
                   </button>
                 </div>
                 {!isCollapsed && (
                   <div className="min-w-0">
-                    <p className="truncate text-sm font-bold text-[var(--foreground)]">{session.user?.fullName || "Easin Arafat"}</p>
-                    <p className="truncate text-xs text-[var(--muted)]">Free Account</p>
+                    <p className="truncate text-sm font-bold text-white">{session.user?.fullName || "Easin Arafat"}</p>
+                    <p className="truncate text-xs text-white/70">Free Account</p>
                   </div>
                 )}
               </div>
               {!isCollapsed && (
-                <button onClick={() => void logout()} className="text-[var(--muted)] hover:text-red-500 transition-colors">
+                <button onClick={() => void logout()} className="text-white/70 hover:text-red-300 transition-colors">
                   <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
                 </button>
               )}
@@ -202,7 +189,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <div className={`flex min-w-0 flex-1 flex-col ${pathname === "/livestreams" ? "h-screen overflow-hidden" : "min-h-screen"}`}>
           <Header />
 
-          <main className={`min-w-0 flex-1 px-4 sm:px-8 ${pathname === "/livestreams" ? "pb-0 flex flex-col overflow-hidden" : "pb-24 lg:pb-8"}`}>
+          <main className={`min-w-0 flex-1 ${pathname === "/livestreams" ? "px-2 sm:px-3 pb-0 flex flex-col overflow-hidden" : "px-4 sm:px-8 pb-24 lg:pb-8"}`}>
             <div className={`w-full h-full ${pathname === "/livestreams" ? "flex flex-col flex-1 overflow-hidden" : "block"}`}>{children}</div>
           </main>
 
