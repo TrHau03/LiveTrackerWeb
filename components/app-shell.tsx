@@ -58,6 +58,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const isPublicRoute = publicRoutes.some((route) => pathname === route || pathname.startsWith(`${route}/`));
 
   if (authStatus === "booting") {
+    // Nếu là public route, render children ngay lập tức (không cần chờ booting của session)
+    if (isPublicRoute) {
+      return <div className="min-h-screen">{children}</div>;
+    }
+
     return (
       <div className="flex min-h-screen items-center justify-center px-6">
         <div className="flex items-center gap-3 rounded-full border border-[var(--border)] bg-[var(--surface)] px-5 py-3 text-sm font-medium text-[var(--muted)] shadow-[var(--shadow-soft)] backdrop-blur-2xl">
