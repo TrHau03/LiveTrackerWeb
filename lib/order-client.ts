@@ -49,30 +49,32 @@ export async function getPublicOrderDetails(
 ): Promise<GetOrderResponse> {
     try {
         const apiBase = process.env.NEXT_PUBLIC_API_URL || "https://admin.livetracker.vn/api/v1";
-        // If apiBase already includes /api/v1, don't add it again
-        const basePath = apiBase.endsWith("/api/v1") ? apiBase : `${apiBase}/api/v1`;
-
-        // Build URL with token parameter if provided
-        let url = `${basePath}/public/orders/${orderCode}`;
+        
+        // Sử dụng URL constructor để đảm bảo đường dẫn chuẩn xác
+        const urlObj = new URL(`${apiBase.endsWith('/') ? apiBase.slice(0, -1) : apiBase}/public/orders/${orderCode}`);
         if (token) {
-            url += `?token=${encodeURIComponent(token)}`;
+            urlObj.searchParams.set("token", token);
         }
-
-        console.log(`[ORDER-CLIENT] Fetching public order from: ${url}`);
+        
+        const url = urlObj.toString();
+        console.log(`[ORDER-CLIENT] Initiating fetch for order code: ${orderCode}`);
+        console.log(`[ORDER-CLIENT] Full Target URL: ${url}`);
 
         // Set timeout for fetch
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 10000);
+        const timeoutId = setTimeout(() => {
+            console.warn(`[ORDER-CLIENT] Fetch timeout reached after 10s for: ${orderCode}`);
+            controller.abort();
+        }, 10000);
 
         const response = await fetch(url, {
             method: "GET",
-            headers: {
-                "Content-Type": "application/json",
-            },
+            // Loại bỏ Content-Type header cho GET request để tránh kích hoạt CORS Preflight không cần thiết
             signal: controller.signal
         });
 
         clearTimeout(timeoutId);
+        console.log(`[ORDER-CLIENT] Received response status: ${response.status} for: ${orderCode}`);
 
         // Handle token validation errors (400 or 403)
         if (response.status === 400 || response.status === 403) {

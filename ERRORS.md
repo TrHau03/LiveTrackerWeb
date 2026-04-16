@@ -30,19 +30,22 @@
 
 ## [2026-04-16 23:23] - Hang/Loop: Infinite Loading on Public Order Page
 
-- **Type**: Configuration / Logic Error
+- **Type**: Configuration / Logic Error / CORS
 - **Severity**: Critical
-- **File**: `lib/order-client.ts`
+- **File**: `lib/order-client.ts`, `components/payment/order-payment-page-container.tsx`
 - **Agent**: Jarvis
 - **Root Cause**: 
-  1. Inconsistent default API URL (`localhost:3001` vs `admin.livetracker.vn`). Missing environment variables caused the client to hit an unreachable localhost endpoint in production.
+  1. Inconsistent default API URL (`localhost:3001` vs `admin.livetracker.vn`).
   2. Lack of fetch timeout allowed requests to hang indefinitely.
-- **Error Message**: Giao diện kẹt ở "Đang tải thông tin đơn hàng..." mà không bao giờ chuyển tiếp.
+  3. **New finding**: `Content-Type: application/json` header in a GET request was likely triggering CORS Preflight (OPTIONS) which the server might not allow from the payment domain.
+  4. Instant redirect on error made it impossible for users to see what went wrong.
 - **Fix Applied**: 
-  - Aligned default API URL with production endpoint to ensure consistency if `.env` fails.
-  - Implemented `AbortController` with a 10-second timeout for public API calls.
-  - Added debug logging to track the actual URL being fetched.
-- **Prevention**: Use centralized configuration for API endpoints instead of hardcoding defaults in multiple files. Always implement global or per-request timeouts for data fetching.
+  - Aligned default API URL with production endpoint.
+  - Implemented 10s timeout using `AbortController`.
+  - **Optimized CORS**: Removed `Content-Type` header for GET requests.
+  - **Improved UX**: Replaced instant redirect with a detailed Error UI and Retry button.
+  - **Standardized URL construction**: Switched to `URL` constructor for robust path joining.
+- **Prevention**: Avoid unnecessary headers in GET requests to prevent sensitive CORS issues. Provide clear feedback to users when data fails to load instead of silent failure/redirect.
 - **Status**: Fixed
 
 ---
