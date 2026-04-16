@@ -139,7 +139,9 @@ export function DeliveryModal({ isOpen, onClose, order }: DeliveryModalProps) {
         receiverArea: form.receiverArea,
         weight: form.weight,
       });
-      alert(`Phí dự tính: ${formatCurrency(result.fee)}`);
+      if (result) {
+        alert(`Phí dự tính: ${formatCurrency(result.fee)}`);
+      }
     } catch (err: any) {
       alert(err.message);
     }
