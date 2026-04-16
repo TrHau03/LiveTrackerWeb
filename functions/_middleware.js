@@ -2,7 +2,7 @@ export const onRequest = [middleware];
 
 /**
  * Middleware để phân luồng app.livetracker.vn và pay.livetracker.vn
- * Tối ưu hóa cho Cloudflare Pages Static Export
+ * Tối ưu hóa tính tương thích trên mọi trình duyệt (Safari, Chrome, iOS)
  */
 async function middleware(context) {
     try {
@@ -11,7 +11,21 @@ async function middleware(context) {
         const pathname = url.pathname;
         const search = url.search;
 
-        // Rule 0: Bỏ qua kiểm tra cho các file tĩnh và hệ thống (Ưu tiên hàng đầu để tránh lỗi 404/Redirect loop)
+        const PAY_DOMAIN = 'pay.livetracker.vn';
+        const MAIN_DOMAIN = 'livetracker.vn';
+
+        // Helper function để tạo redirect response chuẩn (tránh lỗi Safari "No content available")
+        const redirect = (targetUrl, status = 301) => {
+            return new Response(null, {
+                status,
+                headers: {
+                    'Location': targetUrl,
+                    'Cache-Control': 'no-cache'
+                }
+            });
+        };
+
+        // Rule 0: Whitelist Assets & System files (Luôn cho phép đi qua)
         const isNextAsset = pathname.startsWith('/_next/');
         const isStaticFile = pathname.match(/\.(png|jpg|jpeg|gif|svg|ico|css|js|woff2?|webp|html)$/i);
         const isPublicAsset = pathname.startsWith('/favicon') || pathname.startsWith('/logo');
@@ -20,42 +34,43 @@ async function middleware(context) {
             return await context.next();
         }
 
-        // Rule 1: Xử lý tên miền thanh toán pay.livetracker.vn
-        if (host === 'pay.livetracker.vn') {
-            // Chuyển đổi định dạng cũ /order/XXX sang /order?id=XXX
+        // Rule 1: Xử lý các đường dẫn đơn hàng (/order/*)
+        if (pathname.startsWith('/order')) {
+            // 1.1. Chuyển đổi định dạng URL cũ /order/XXX sang /order?id=XXX
             const orderMatch = pathname.match(/^\/order\/([^/]+)$/);
             if (orderMatch) {
                 const orderCode = orderMatch[1];
                 const extraParams = search ? (search.startsWith('?') ? `&${search.substring(1)}` : `&${search}`) : '';
-                return Response.redirect(`https://pay.livetracker.vn/order?id=${encodeURIComponent(orderCode)}${extraParams}`, 301);
+                return redirect(`https://${PAY_DOMAIN}/order?id=${encodeURIComponent(orderCode)}${extraParams}`);
             }
 
-            // Kiểm tra đường dẫn trang đơn hàng (chế độ whitelist)
-            const isOrderPage = pathname === '/order' || pathname === '/order/' || pathname === '/order.html';
+            // 1.2. Chuyển hướng domain nếu chưa ở đúng tên miền pay.livetracker.vn
+            if (host !== PAY_DOMAIN) {
+                const targetUrl = new URL(url.toString());
+                targetUrl.hostname = PAY_DOMAIN;
+                return redirect(targetUrl.toString());
+            }
+
+            // 1.3. Kiểm tra tính hợp lệ của trang đơn hàng trên tên miền pay
+            const isBaseOrderPath = pathname === '/order' || pathname === '/order/' || pathname === '/order.html';
             const hasOrderId = url.searchParams.has('id');
 
-            // Nếu là trang order hợp lệ, cho phép đi qua
-            if (isOrderPage && hasOrderId) {
+            if (isBaseOrderPath && hasOrderId) {
                 return await context.next();
             }
 
-            // Nếu truy cập gốc hoặc các trang khác trên tên miền pay -> Đưa về trang chủ
-            if (pathname === '/' || !isOrderPage) {
-                return Response.redirect('https://livetracker.vn', 301);
-            }
+            // Nếu không có id hoặc sai path -> Redirect về trang chủ
+            return redirect(`https://${MAIN_DOMAIN}`);
         }
 
-        //Rule 2: app.livetracker.vn (Mặc định)
-        // Nếu truy cập vào /order trên app -> Chuyển sang pay
-        if (pathname.startsWith('/order') && host !== 'pay.livetracker.vn') {
-            const payUrl = new URL(context.request.url);
-            payUrl.hostname = 'pay.livetracker.vn';
-            return Response.redirect(payUrl.toString(), 301);
+        // Rule 2: Xử lý các trang khác trên tên miền pay.livetracker.vn (không cho phép)
+        if (host === PAY_DOMAIN && pathname === '/') {
+            return redirect(`https://${MAIN_DOMAIN}`);
         }
 
+        // Các trường hợp khác cho phép đi tiếp
         return await context.next();
     } catch (e) {
-        // Nếu có lỗi trong middleware, cho phép request đi tiếp để tránh sập toàn bộ trang
         console.error('Middleware Error:', e);
         return await context.next();
     }
