@@ -1,203 +1,485 @@
 "use client";
 
 import React from "react";
-import { Area, AreaChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import {
+  Area,
+  AreaChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+  CartesianGrid
+} from "recharts";
 import { useSession } from "@/components/session-provider";
 import { asRecord, extractApiData, extractCollection, pickNumber, pickString, formatNumber } from "@/lib/proxy-client";
 import { useDashboard } from "@/hooks/use-dashboard";
+import { useMetrics } from "@/hooks/use-metrics";
+import { useOrdersTimeSeries, useCommentsTimeSeries } from "@/hooks/use-time-series";
+import { useRevenueStatistics } from "@/hooks/use-statistics";
+import { useTheme } from "@/components/theme-provider";
 
 import {
   StatCard,
   Panel,
-  HeartIcon,
-  HomeIcon,
-  BagIcon,
-  BriefcaseIcon,
   LoadingState,
   ErrorState,
-  compactMetric,
 } from "@/components/ui/workspace-shared";
+import {
+  CalendarIcon,
+  TrendingUpIcon,
+  ShoppingCartIcon,
+  MessageSquareIcon,
+  UsersIcon,
+} from "lucide-react";
+import { useHeaderStore } from "@/lib/store/header-store";
 
 export function DashboardScreen() {
   const { session } = useSession();
-  const { data, status, error: queryError } = useDashboard();
+  const { theme } = useTheme();
+  const [period, setPeriod] = React.useState<"day" | "week" | "month" | "year">("month");
+
+  // Tính toán khoảng thời gian dựa trên period
+  const dateRange = React.useMemo(() => {
+    const end = new Date();
+    const start = new Date();
+    switch (period) {
+      case "day":
+        start.setHours(0, 0, 0, 0);
+        break;
+      case "week":
+        start.setDate(end.getDate() - 7);
+        break;
+      case "month":
+        start.setDate(end.getDate() - 30);
+        break;
+      case "year":
+        start.setDate(end.getDate() - 365);
+        break;
+    }
+    return {
+      startDate: start.toISOString(),
+      endDate: end.toISOString()
+    };
+  }, [period]);
+
+  // Hooks cho dữ liệu thời gian thực
+  const { data: dashboardData, status: metricsStatus } = useMetrics({ ...dateRange, period });
+  const { data: revenueStats } = useRevenueStatistics({ ...dateRange, period });
+
+  const { data: ordersSeries, status: seriesStatus } = useOrdersTimeSeries({
+    ...dateRange,
+    groupBy: period === "year" ? "month" : "day"
+  });
+
+  const { data: commentsSeries } = useCommentsTimeSeries({
+    ...dateRange,
+    groupBy: period === "year" ? "month" : "day"
+  });
+
+  // Dashboard hook cho Recent Orders
+  const { data, status: dashboardStatus, error: queryError } = useDashboard();
 
   const state = {
-    status: status === "pending" ? "loading" : status === "success" ? "ready" : "error",
-    data: data || null,
-    error: queryError ? queryError.message : "",
+    status: (metricsStatus === "pending" || dashboardStatus === "pending" || seriesStatus === "pending") ? "loading" : "ready",
+    error: queryError?.message || "",
   }
 
-  const metrics = asRecord(extractApiData(state.data?.dashboard));
-  const ordersMetric = compactMetric(metrics.orders);
-  const commentsMetric = compactMetric(metrics.comments);
-  const livesMetric = compactMetric(metrics.lives);
-  const customersMetric = compactMetric(metrics.customers);
-  const subscription = asRecord(extractApiData(state.data?.subscription));
-  const recentOrders = extractCollection(state.data?.orders).slice(0, 4);
-  const notifications = extractCollection(state.data?.notifications).slice(0, 4);
+  // Chuyển đổi dữ liệu từ API sang định dạng hiển thị
+  const metrics = asRecord(extractApiData(dashboardData));
+
+  // Helper để map dữ liệu biểu đồ
+  const mapSeriesData = (payload: unknown, valueKey: string) => {
+    const collection = extractCollection(payload);
+    if (!collection || collection.length === 0) return [];
+
+    const mapped = collection.map((item) => {
+      const val = Number(item[valueKey] ?? item.revenue ?? item.value ?? item.count ?? item.total ?? 0);
+
+      let name = 'N/A';
+      const rawDate = item.date || item.label || item.name;
+
+      if (rawDate && typeof rawDate === 'string') {
+        const dateObj = new Date(rawDate);
+        if (!isNaN(dateObj.getTime())) {
+          name = dateObj.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' });
+        } else {
+          name = rawDate;
+        }
+      }
+
+      return {
+        name,
+        value: val,
+        fullDate: String(rawDate || ''),
+        count: Number(item.count ?? item.value ?? 0),
+        total: Number(item.total ?? item.count ?? item.value ?? 0),
+        revenue: Number(item.revenue ?? item.value ?? 0)
+      };
+    });
+
+    // Nếu chỉ có 1 điểm, nhân bản để Recharts vẽ được vùng Area
+    if (mapped.length === 1) {
+      return [
+        { ...mapped[0], name: '', value: 0, revenue: 0, count: 0, total: 0 },
+        mapped[0]
+      ];
+    }
+
+    return mapped;
+  };
+
+  const revenueChartData = mapSeriesData(revenueStats, 'value');
+  const ordersChartData = mapSeriesData(ordersSeries, 'count');
+  const commentsChartData = mapSeriesData(commentsSeries, 'count');
+
+  const getSummary = (data: Array<Record<string, any>>, key: string, fallbackTotal?: number) => {
+    if (!data.length) return { total: fallbackTotal || 0, avg: 0, max: 0 };
+    const values = data.map(d => Number(d[key] || 0));
+    const total = values.reduce((a, b) => a + b, 0);
+    return {
+      total: total || fallbackTotal || 0,
+      avg: Math.round(total / data.length),
+      max: Math.max(...values)
+    };
+  };
+
+  // Lấy tổng bình luận và doanh thu từ metrics (phòng trường hợp API time-series trả về mảng rỗng)
+  const totalCommentsFromMetrics = pickNumber(metrics.comments, ["total", "count"]) ?? (typeof metrics.comments === 'number' ? metrics.comments : 0);
+  const totalOrdersFromMetrics = pickNumber(metrics.orders, ["total", "count"]) ?? (typeof metrics.orders === 'number' ? metrics.orders : 0);
+  const totalRevenueFromMetrics = pickNumber(metrics.revenue, ["total", "value"]) ?? (typeof metrics.revenue === 'number' ? metrics.revenue : 0);
+
+  const revenueSummary = getSummary(revenueChartData, 'value', totalRevenueFromMetrics);
+  const ordersSummary = getSummary(ordersChartData, 'value');
+  const commentsSummary = getSummary(commentsChartData, 'value'); // Luôn dùng 'value' vì đã được chuẩn hóa trong mapSeriesData
+
+  const recentOrders = extractCollection(data?.orders).slice(0, 5);
+
+  const formatVNCurrency = (num: number) => {
+    if (num >= 1000000) return `${(num / 1000000).toFixed(1)}tr`;
+    if (num >= 1000) return `${(num / 1000).toFixed(0)}k`;
+    return num.toString();
+  };
+
+  const periods = [
+    { id: "day", label: "Hôm nay" },
+    { id: "week", label: "Tuần này" },
+    { id: "month", label: "Tháng này" },
+    { id: "year", label: "Năm nay" },
+  ] as const;
+
+  const setHeader = useHeaderStore((state) => state.setHeader);
+  const resetHeader = useHeaderStore((state) => state.resetHeader);
+
+  // Chart styles based on theme
+  const gridStroke = theme === "dark" ? "rgba(255, 255, 255, 0.08)" : "rgba(0, 0, 0, 0.08)";
+  const textFill = theme === "dark" ? "#94A3B8" : "#64748B";
+
+  // Cập nhật Header chung
+  React.useEffect(() => {
+    const startStr = dateRange.startDate.split('T')[0].split('-').reverse().join('-');
+    const endStr = dateRange.endDate.split('T')[0].split('-').reverse().join('-');
+
+    setHeader({
+      title: `Xin chào, ${session.user?.fullName?.split(' ').pop() || "User"}!`,
+      subtitle: "Đây là những gì đang diễn ra với shop của bạn.",
+      startDate: startStr,
+      endDate: endStr,
+      customContent: (
+        <div className="flex items-center gap-1 bg-[var(--surface-muted)] p-1 rounded-xl border border-[var(--border)]">
+          {periods.map((p) => (
+            <button
+              key={p.id}
+              onClick={() => setPeriod(p.id)}
+              className={`px-3 py-1.5 text-[10px] font-bold rounded-lg transition-all ${period === p.id
+                ? "bg-[#1447E6] text-white shadow-sm"
+                : "text-[var(--muted)] hover:text-[var(--foreground)] hover:bg-[var(--hover)]"
+                }`}
+            >
+              {p.label}
+            </button>
+          ))}
+        </div>
+      )
+    });
+
+    return () => resetHeader();
+  }, [period, dateRange, session.user, setHeader, resetHeader]);
 
   return (
-    <div className="space-y-8 pb-28 lg:pb-6">
+    <div className="space-y-8 pb-28 lg:pb-6 pt-4">
+
       <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard
-          label="Save Products"
-          value={178}
-          icon={<HeartIcon />}
-          iconBg="bg-[#eef2ff]"
-          iconColor="text-[#1447E6]"
+          label="Doanh thu ước tính"
+          value={formatVNCurrency(revenueSummary.total)}
+          change={pickNumber(metrics.revenue, ["change"])}
+          icon={<TrendingUpIcon className="w-5 h-5" />}
+          iconBg="bg-blue-50 dark:bg-blue-900/20"
+          iconColor="text-blue-600 dark:text-blue-400"
         />
         <StatCard
-          label="Stock Products"
-          value={20}
-          icon={<HomeIcon />}
-          iconBg="bg-[#fff9e6]"
-          iconColor="text-[#ffc107]"
+          label="Tổng Đơn hàng"
+          value={ordersSummary.total}
+          change={pickNumber(metrics.orders, ["change"])}
+          icon={<ShoppingCartIcon className="w-5 h-5" />}
+          iconBg="bg-orange-50 dark:bg-orange-900/20"
+          iconColor="text-orange-600 dark:text-orange-400"
         />
         <StatCard
-          label="Sales Products"
-          value={190}
-          icon={<BagIcon />}
-          iconBg="bg-[#fff0e6]"
-          iconColor="text-[#ff8a00]"
+          label="Bình luận"
+          value={commentsSummary.total}
+          icon={<MessageSquareIcon className="w-5 h-5" />}
+          iconBg="bg-green-50 dark:bg-green-900/20"
+          iconColor="text-green-600 dark:text-green-400"
         />
         <StatCard
-          label="Job Application"
-          value={12}
-          icon={<BriefcaseIcon />}
-          iconBg="bg-[#f3e8ff]"
-          iconColor="text-[#a855f7]"
+          label="Khách hàng"
+          value={pickNumber(metrics.customers, ["total", "count"]) || 0}
+          extra={pickNumber(metrics.customers, ["newCount", "newCustomers"]) ? `+${pickNumber(metrics.customers, ["newCount", "newCustomers"])} mới` : null}
+          icon={<UsersIcon className="w-5 h-5" />}
+          iconBg="bg-purple-50 dark:bg-purple-900/20"
+          iconColor="text-purple-600 dark:text-purple-400"
         />
       </div>
 
-      <div className="grid gap-6 xl:grid-cols-[7fr_3fr]">
-        <Panel title="Reports" action={<span className="text-[var(--muted)] underline cursor-pointer">...</span>}>
-          <div className="h-[300px] w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={[
-                { name: '10am', value: 55 },
-                { name: '11am', value: 30 },
-                { name: '12am', value: 65 },
-                { name: '01am', value: 35 },
-                { name: '02am', value: 40 },
-                { name: '03am', value: 50 },
-                { name: '04am', value: 20 },
-                { name: '05am', value: 35 },
-                { name: '06am', value: 70 },
-                { name: '07am', value: 55 },
-              ]} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
-                <defs>
-                  <linearGradient id="lineGradient" x1="0" y1="0" x2="1" y2="0">
-                    <stop offset="0%" stopColor="#1447E6" />
-                    <stop offset="100%" stopColor="#f472b6" />
-                  </linearGradient>
-                </defs>
-                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: 'var(--muted)' }} dy={10} />
-                <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: 'var(--muted)' }} />
-                <Tooltip
-                  content={({ active, payload }) => {
-                    if (active && payload && payload.length) {
-                      return (
-                        <div className="rounded-lg bg-black p-2 text-white shadow-lg">
-                          <p className="text-[10px] opacity-70">Sales</p>
-                          <p className="text-xs font-bold">{formatNumber(payload[0].value as number)}</p>
-                        </div>
-                      );
-                    }
-                    return null;
-                  }}
-                />
-                <Area type="monotone" dataKey="value" stroke="url(#lineGradient)" strokeWidth={3} fill="transparent" dot={{ r: 4, fill: '#fff', stroke: '#1447E6', strokeWidth: 2 }} activeDot={{ r: 6, fill: '#1447E6' }} />
-              </AreaChart>
-            </ResponsiveContainer>
+      <div className="grid gap-6 lg:grid-cols-2 items-stretch">
+        {/* Cột trái: Biểu đồ Doanh thu */}
+        <Panel
+          title="Báo cáo Doanh thu"
+          action={<span className="text-[var(--muted)] text-xs flex items-center gap-1"><CalendarIcon className="w-3 h-3" /> {periods.find(p => p.id === period)?.label}</span>}
+          className="flex flex-col h-full"
+        >
+          <div className="flex-1 min-h-[400px] w-full mt-4">
+            {seriesStatus === "pending" ? (
+              <div className="h-full w-full flex items-center justify-center">
+                <LoadingState />
+              </div>
+            ) : (
+              <div className="h-[400px] w-full mt-4">
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart
+                    data={revenueChartData}
+                    margin={{ top: 20, right: 30, left: 10, bottom: 20 }}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={gridStroke} />
+                    <XAxis
+                      dataKey="name"
+                      axisLine={false}
+                      tickLine={false}
+                      tick={{ fontSize: 11, fill: textFill }}
+                      dy={10}
+                    />
+                    <YAxis
+                      axisLine={false}
+                      tickLine={false}
+                      tick={{ fontSize: 11, fill: textFill }}
+                      tickFormatter={(val) => formatVNCurrency(val).replace('đ', '')}
+                    />
+                    <Tooltip
+                      content={({ active, payload }) => {
+                        if (active && payload && payload.length) {
+                          return (
+                            <div className="rounded-xl bg-white p-3 shadow-2xl border border-slate-100 dark:bg-slate-900 border-l-4 border-l-[#10B981]">
+                              <p className="text-[10px] text-slate-400 font-bold mb-1 uppercase tracking-wider">{payload[0].payload.name}</p>
+                              <p className="text-sm font-black text-[#10B981]">Doanh thu: {formatNumber(payload[0].payload.revenue)}đ</p>
+                            </div>
+                          );
+                        }
+                        return null;
+                      }}
+                    />
+                    <Area
+                      type="monotone"
+                      dataKey="value"
+                      stroke="#10B981"
+                      strokeWidth={4}
+                      fill="#10B981"
+                      fillOpacity={0.15}
+                      dot={{ r: 4, fill: '#10B981', strokeWidth: 2, stroke: '#fff' }}
+                      isAnimationActive={false}
+                    />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </div>
+            )}
+          </div>
+          <div className="mt-8 pt-6 border-t border-slate-100 grid grid-cols-3 gap-4 dark:border-slate-800">
+            <div className="flex flex-col">
+              <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">Tổng doanh thu</span>
+              <span className="text-lg font-black text-[#10B981]">{formatNumber(revenueSummary.total)}đ</span>
+            </div>
+            <div className="flex flex-col">
+              <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">T.Bình/Ngày</span>
+              <span className="text-lg font-black text-slate-700 dark:text-slate-200">{formatNumber(revenueSummary.avg)}đ</span>
+            </div>
+            <div className="flex flex-col">
+              <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">Cao nhất</span>
+              <span className="text-lg font-black text-slate-700 dark:text-slate-200">{formatNumber(revenueSummary.max)}đ</span>
+            </div>
           </div>
         </Panel>
-
-        <Panel title="Analytics" action={<span className="text-[var(--muted)] underline cursor-pointer">...</span>}>
-          <div className="flex h-[300px] flex-col items-center justify-center">
-            <div className="relative flex h-48 w-48 items-center justify-center">
-              {/* Simplified Donut Chart via SVG */}
-              <svg viewBox="0 0 100 100" className="h-full w-full -rotate-90">
-                <circle cx="50" cy="50" r="40" fill="transparent" stroke="#f1f4f9" strokeWidth="12" />
-                <circle cx="50" cy="50" r="40" fill="transparent" stroke="#1447E6" strokeWidth="12" strokeDasharray="251.2" strokeDashoffset="50" />
-                <circle cx="50" cy="50" r="40" fill="transparent" stroke="#ff8a00" strokeWidth="12" strokeDasharray="251.2" strokeDashoffset="180" />
-                <circle cx="50" cy="50" r="40" fill="transparent" stroke="#ffc107" strokeWidth="12" strokeDasharray="251.2" strokeDashoffset="220" />
-              </svg>
-              <div className="absolute flex flex-col items-center text-center">
-                <span className="text-3xl font-bold text-[var(--foreground)]">80%</span>
-                <span className="text-[10px] font-medium text-[var(--muted)]">Transactions</span>
+        <div className="flex flex-col gap-6">
+          {/* Biểu đồ Đơn hàng */}
+          <Panel title="Theo dõi Đơn hàng" className="flex-1">
+            <div className="h-[200px] w-full mt-4">
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={ordersChartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={gridStroke} />
+                  <XAxis
+                    dataKey="name"
+                    hide={ordersChartData.length === 0}
+                    axisLine={false}
+                    tickLine={false}
+                    tick={{ fontSize: 10, fill: textFill }}
+                  />
+                  <YAxis
+                    axisLine={false}
+                    tickLine={false}
+                    tick={{ fontSize: 10, fill: textFill }}
+                    width={40}
+                  />
+                  <Tooltip
+                    content={({ active, payload }) => {
+                      if (active && payload && payload.length) {
+                        return (
+                          <div className="rounded-xl bg-white p-2 shadow-xl border border-slate-100 dark:bg-slate-900 border-l-4 border-l-[#1447E6]">
+                            <p className="text-[10px] text-slate-400 mb-0.5 font-bold uppercase">{payload[0].payload.name}</p>
+                            <p className="text-sm font-black text-[#1447E6]">Đơn hàng: {payload[0].value}</p>
+                          </div>
+                        );
+                      }
+                      return null;
+                    }}
+                  />
+                  <Area
+                    type="monotone"
+                    dataKey="value"
+                    stroke="#1447E6"
+                    strokeWidth={3}
+                    fill="#1447E6"
+                    fillOpacity={0.1}
+                    dot={{ r: 3, fill: '#1447E6', strokeWidth: 1.5, stroke: '#fff' }}
+                    isAnimationActive={false}
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+            <div className="mt-4 flex gap-6 text-sm border-t border-slate-100 pt-4 px-2 dark:border-slate-800">
+              <div>
+                <span className="text-[10px] text-slate-400 block uppercase font-bold tracking-tighter">Tổng đơn</span>
+                <span className="text-lg font-bold text-[#1447E6]">{ordersSummary.total}</span>
+              </div>
+              <div>
+                <span className="text-[10px] text-slate-400 block uppercase font-bold tracking-tighter">Ngày cao nhất</span>
+                <span className="text-lg font-bold text-slate-700 dark:text-slate-200">{ordersSummary.max}</span>
               </div>
             </div>
-            <div className="mt-6 flex flex-wrap justify-center gap-4 text-[10px] font-semibold">
-              <div className="flex items-center gap-2 text-[var(--foreground)]"><span className="h-2 w-2 rounded-full bg-[#1447E6]"></span> Sale</div>
-              <div className="flex items-center gap-2 text-[var(--foreground)]"><span className="h-2 w-2 rounded-full bg-[#ffc107]"></span> Distribute</div>
-              <div className="flex items-center gap-2 text-[var(--foreground)]"><span className="h-2 w-2 rounded-full bg-[#ff8a00]"></span> Return</div>
+          </Panel>
+
+          {/* Biểu đồ Bình luận */}
+          <Panel title="Tương tác Bình luận" className="flex-1">
+            <div className="h-[200px] w-full mt-4">
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={commentsChartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={gridStroke} />
+                  <XAxis
+                    dataKey="name"
+                    hide={commentsChartData.length === 0}
+                    axisLine={false}
+                    tickLine={false}
+                    tick={{ fontSize: 10, fill: textFill }}
+                  />
+                  <YAxis
+                    axisLine={false}
+                    tickLine={false}
+                    tick={{ fontSize: 10, fill: textFill }}
+                    width={40}
+                  />
+                  <Tooltip
+                    content={({ active, payload }) => {
+                      if (active && payload && payload.length) {
+                        return (
+                          <div className="rounded-xl bg-white p-2 shadow-xl border border-slate-100 dark:bg-slate-900 border-l-4 border-l-[#8B5CF6]">
+                            <p className="text-[10px] text-slate-400 mb-0.5 font-bold uppercase">{payload[0].payload.name}</p>
+                            <p className="text-sm font-black text-[#8B5CF6]">Bình luận: {payload[0].value}</p>
+                          </div>
+                        );
+                      }
+                      return null;
+                    }}
+                  />
+                  <Area
+                    type="monotone"
+                    dataKey="value"
+                    stroke="#8B5CF6"
+                    strokeWidth={3}
+                    fill="#8B5CF6"
+                    fillOpacity={0.1}
+                    dot={{ r: 3, fill: '#8B5CF6', strokeWidth: 1.5, stroke: '#fff' }}
+                    isAnimationActive={false}
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
             </div>
-          </div>
-        </Panel>
+            <div className="mt-4 flex gap-6 text-sm border-t border-slate-100 pt-4 px-2 dark:border-slate-800">
+              <div>
+                <span className="text-[10px] text-slate-400 block uppercase font-bold tracking-tighter">Tổng CMT</span>
+                <span className="text-lg font-bold text-[#8B5CF6]">{commentsSummary.total}</span>
+              </div>
+              <div>
+                <span className="text-[10px] text-slate-400 block uppercase font-bold tracking-tighter">Tỷ lệ chốt</span>
+                <span className="text-lg font-bold text-slate-700 dark:text-slate-200">
+                  {totalCommentsFromMetrics ? ((totalOrdersFromMetrics / totalCommentsFromMetrics) * 100).toFixed(1) : 0}%
+                </span>
+              </div>
+            </div>
+          </Panel>
+        </div>
       </div>
 
-      <div className="grid gap-6 xl:grid-cols-[7fr_3fr]">
-        <Panel title="Recent Orders" action={<span className="text-[var(--muted)] underline cursor-pointer">...</span>} className="h-full">
+      <div className="grid gap-6">
+        <Panel
+          title="Đơn hàng gần đây"
+          action={<button className="text-[var(--muted)] text-xs font-semibold hover:text-[#1447E6] transition-colors flex items-center gap-1">Xem tất cả <TrendingUpIcon className="w-3 h-3 rotate-90" /></button>}
+          className="h-full overflow-hidden"
+        >
           {state.status === "loading" ? <LoadingState /> : null}
           {state.status === "error" ? <ErrorState message={state.error} /> : null}
 
           <div className="-mx-5 -mb-5 mt-2 overflow-x-auto">
             <table className="w-full text-left text-xs whitespace-nowrap">
-              <thead className="text-[var(--muted)]">
+              <thead className="text-[var(--muted)] bg-[var(--background)]">
                 <tr>
-                  <th className="px-5 py-4 font-semibold uppercase tracking-wider">Tracking no</th>
-                  <th className="px-5 py-4 font-semibold uppercase tracking-wider">Product Name</th>
-                  <th className="px-5 py-4 font-semibold uppercase tracking-wider">Price</th>
-                  <th className="px-5 py-4 font-semibold uppercase tracking-wider text-center">Total Order</th>
-                  <th className="px-5 py-4 font-semibold uppercase tracking-wider">Total Amount</th>
+                  <th className="px-5 py-4 font-semibold uppercase tracking-wider">Mã đơn</th>
+                  <th className="px-5 py-4 font-semibold uppercase tracking-wider">Khách hàng</th>
+                  <th className="px-5 py-4 font-semibold uppercase tracking-wider">Đơn giá</th>
+                  <th className="px-5 py-4 font-semibold uppercase tracking-wider text-center">Số lượng</th>
+                  <th className="px-5 py-4 font-semibold uppercase tracking-wider">Tổng tiền</th>
                 </tr>
               </thead>
-              <tbody className="">
+              <tbody className="divide-y divide-[var(--border)]">
                 {recentOrders.map((order, index) => (
-                  <tr key={`${pickString(order, ["id", "_id", "orderCode"]) || index}`} className="transition border-t border-[var(--border)]">
-                    <td className="px-5 py-4 font-medium text-[var(--foreground)] opacity-70">#{pickString(order, ["orderCode", "code"])?.slice(-6) || "876364"}</td>
+                  <tr key={`${pickString(order, ["id", "_id", "orderCode"]) || index}`} className="transition hover:bg-[var(--hover)] group">
+                    <td className="px-5 py-4 font-medium text-[var(--foreground)] opacity-70 group-hover:opacity-100 italic">#{pickString(order, ["orderCode", "code"])?.slice(-8) || "ORD-0000"}</td>
                     <td className="px-5 py-4">
                       <div className="flex items-center gap-3">
-                        <div className="h-8 w-8 rounded-lg bg-[var(--background)] flex items-center justify-center p-1.5">
-                          <img src="/favicon.png" className="h-full w-auto object-contain opacity-40grayscale" />
+                        <div className="h-8 w-8 rounded-full bg-blue-50 dark:bg-blue-900/20 flex items-center justify-center border border-blue-100 dark:border-blue-800">
+                          <UsersIcon className="w-4 h-4 text-blue-600 dark:text-blue-400" />
                         </div>
-                        <span className="font-semibold text-[var(--foreground)]">{pickString(order, ["igName", "customerName"]) || "Product"}</span>
+                        <span className="font-bold text-[var(--foreground)]">{pickString(order, ["igName", "customerName"]) || "Khách hàng"}</span>
                       </div>
                     </td>
-                    <td className="px-5 py-4 text-[var(--foreground)] font-medium opacity-80">${pickNumber(order, ["price"]) || "178"}</td>
+                    <td className="px-5 py-4 text-[var(--foreground)] font-medium opacity-80">{formatNumber(pickNumber(order, ["price"]) || 0)}đ</td>
                     <td className="px-5 py-4 text-center">
-                      <span className="inline-block px-4 py-1.5 bg-[#e1f9fe] text-[#00c2e0] font-bold rounded-md">
-                        {pickNumber(order, ["quantity"]) || 325}
+                      <span className="inline-block px-3 py-1 bg-slate-100 dark:bg-slate-800 text-[var(--foreground)] font-bold rounded-lg text-[10px]">
+                        {pickNumber(order, ["quantity"]) || 0}
                       </span>
                     </td>
-                    <td className="px-5 py-4 font-bold text-[var(--foreground)]">${formatNumber(pickNumber(order, ["totalPrice", "amount"]) || 146660)}</td>
+                    <td className="px-5 py-4 font-black text-[#1447E6]">{formatNumber(pickNumber(order, ["totalPrice", "amount"]) || 0)}đ</td>
                   </tr>
                 ))}
               </tbody>
             </table>
-          </div>
-        </Panel>
-
-        <Panel title="Revenue Summary" action={<span className="text-[var(--muted)] underline cursor-pointer">...</span>}>
-          <div className="space-y-6">
-            {[
-              { name: "NIKE Shoes Black Pattern", price: 87, img: "https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=100&h=100&fit=crop" },
-              { name: "iPhone 12", price: 987, img: "https://images.unsplash.com/photo-1511707171634-5f897ff02aa9?w=100&h=100&fit=crop" }
-            ].map((product, idx) => (
-              <div key={idx} className="flex items-center gap-4">
-                <div className="h-16 w-16 overflow-hidden rounded-xl bg-[var(--background)]">
-                  <img src={product.img} alt={product.name} className="h-full w-full object-cover" />
-                </div>
-                <div className="flex-1">
-                  <h4 className="text-sm font-bold text-[var(--foreground)]">{product.name}</h4>
-                  <div className="flex items-center gap-1 mt-1">
-                    {[1, 2, 3, 4, 5].map(s => <svg key={s} className="h-3 w-3 text-yellow-400 fill-current" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" /></svg>)}
-                  </div>
-                  <p className="mt-1 text-sm font-bold text-[var(--foreground)]">${product.price}</p>
-                </div>
-              </div>
-            ))}
           </div>
         </Panel>
       </div>

@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@tanstack/react-query": "^5.96.1",
+    "antigravity-ide": "^4.3.3",
     "framer-motion": "^12.38.0",
     "html2canvas": "^1.4.1",
     "i18next": "^26.0.3",

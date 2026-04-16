@@ -21,9 +21,10 @@ type Props = {
   onSelect: (mode: PrintMode) => void;
   disabled?: boolean;
   size?: "sm" | "md";
+  className?: string;
 };
 
-export function PrintModeDropdown({ onSelect, disabled, size = "sm" }: Props) {
+export function PrintModeDropdown({ onSelect, disabled, size = "sm", className }: Props) {
   const [isOpen, setIsOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -43,7 +44,7 @@ export function PrintModeDropdown({ onSelect, disabled, size = "sm" }: Props) {
       : "flex items-center gap-1.5 rounded-md bg-[var(--primary)] px-2.5 py-1 text-xs font-bold text-white shadow-sm hover:bg-[var(--primary-strong)] transition active:scale-95 disabled:opacity-50";
 
   return (
-    <div className="relative inline-block" ref={ref}>
+    <div className={`relative inline-block ${className || ""}`} ref={ref}>
       <div className="flex">
         {/* Main print button — default action */}
         <button

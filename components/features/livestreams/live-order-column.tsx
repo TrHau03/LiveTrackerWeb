@@ -25,6 +25,7 @@ import {
   formatNumber,
   compactAddress,
 } from "@/components/ui/workspace-shared";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 
 function Toast({ message, type = "success" }: { message: string; type?: "success" | "error" }) {
   return (
@@ -54,6 +55,11 @@ export function LiveOrderColumn({
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
   const toastTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const { getPrintSettings } = usePrintSettings();
+
+  // Confirmation States
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
+  const [confirmRemoveOpen, setConfirmRemoveOpen] = useState(false);
+  const [commentToRemove, setCommentToRemove] = useState<Record<string, unknown> | null>(null);
 
   const showToast = useCallback((message: string, type: "success" | "error" = "success") => {
     setToast({ message, type });
@@ -98,6 +104,7 @@ export function LiveOrderColumn({
       const res = await deleteOrder(session, orderId);
       if (res.ok) {
         setSelectedOrderId(null);
+        setConfirmDeleteOpen(false);
         queryClient.invalidateQueries({ queryKey: ["live_orders"] });
         showToast("Đã xoá đơn hàng");
       } else {
@@ -109,18 +116,21 @@ export function LiveOrderColumn({
     setDeleteLoading(false);
   };
 
-  const handleRemoveComment = async (commentId: string) => {
+  const handleRemoveComment = async (comment: Record<string, unknown>) => {
+    const commentId = pickString(comment, ["id", "_id", "commentId"]);
     if (!commentId || !session.accessToken) return;
     try {
       const res = await removeCommentFromOrder(session, commentId);
       if (res.ok) {
-        showToast("Đã gỡ comment khỏi đơn");
+        setConfirmRemoveOpen(false);
+        setCommentToRemove(null);
+        showToast("Đã gỡ món khỏi đơn");
         queryClient.invalidateQueries({ queryKey: ["live_orders"] });
       } else {
-        showToast("Không thể gỡ comment", "error");
+        showToast("Không thể gỡ món", "error");
       }
     } catch { 
-      showToast("Lỗi kết nối khi gỡ comment", "error");
+      showToast("Lỗi kết nối khi gỡ món", "error");
     }
   };
 
@@ -177,7 +187,7 @@ export function LiveOrderColumn({
 
         <div className="space-y-2.5">
           {filteredOrders.map((order, i) => {
-            const id = pickString(order, ["id", "_id", "orderCode"]);
+            const id = pickString(order, ["_id", "id", "orderCode"]);
             const isActive = selectedOrderId === id;
             return (
               <button
@@ -235,12 +245,12 @@ export function LiveOrderColumn({
                 <div className="rounded-xl border border-[var(--border)] bg-[var(--surface-subdued)] p-3.5 space-y-2.5">
                   <button
                     onClick={() => {
-                      const custId = pickString(asRecord(selectedOrder.customerId), ["id", "_id"]) || pickString(selectedOrder, ["customerId"]);
+                      const custId = pickString(asRecord(selectedOrder?.customerId), ["id", "_id"]) || pickString(selectedOrder, ["customerId"]);
                       setCustomerPopupId(customerPopupId === custId ? null : custId);
                     }}
                     className="font-semibold text-[var(--primary)] text-sm hover:underline transition-colors text-left w-full flex items-center gap-1.5"
                   >
-                    {pickString(asRecord(selectedOrder.customerId), ["igName"]) || pickString(selectedOrder, ["igName", "customerName"]) || "Người mua"}
+                    {pickString(asRecord(selectedOrder?.customerId), ["igName"]) || pickString(selectedOrder, ["igName", "customerName"]) || "Người mua"}
                     <svg className={`h-3 w-3 text-[var(--muted)] transition-transform ${customerPopupId ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" /></svg>
                   </button>
                   <p className="text-xs text-[var(--foreground-soft)] flex items-center gap-1.5 font-medium">
@@ -308,27 +318,50 @@ export function LiveOrderColumn({
               </div>
 
               {(() => {
-                const orderComments = extractCollection(selectedOrder.comments);
+                const orderComments = extractCollection(selectedOrder?.commentIds || selectedOrder?.comments);
                 if (orderComments.length === 0) return null;
                 return (
                   <div className="space-y-3">
-                    <h5 className="text-[10px] font-bold uppercase tracking-[0.1em] text-[var(--muted)]">Bình luận trong đơn ({orderComments.length})</h5>
+                    <h5 className="text-[10px] font-bold uppercase tracking-[0.1em] text-[var(--muted)]">Danh sách món hàng ({orderComments.length})</h5>
                     <div className="space-y-2">
-                      {orderComments.map((c, idx) => (
-                        <div key={pickString(c, ["id", "_id"]) || idx} className="flex items-center justify-between rounded-lg border border-[var(--border)] bg-[var(--surface-subdued)] px-3 py-2">
-                          <div className="min-w-0">
-                            <p className="text-xs font-semibold text-[var(--foreground)] truncate">{pickString(c, ["igUsername", "username"])}</p>
-                            <p className="text-[10px] text-[var(--foreground-soft)] truncate">{pickString(c, ["text", "content"])}</p>
+                      {orderComments.map((c, idx) => {
+                        const cid = pickString(c, ["id", "_id", "commentId"]) || `ord-item-${idx}`;
+                        const quantity = pickNumber(c, ["quantity"]) ?? 1;
+                        const price = pickNumber(c, ["price"]) ?? 0;
+                        const status = pickString(c, ["status"]);
+
+                        return (
+                          <div key={cid} className="flex flex-col gap-1.5 rounded-lg border border-[var(--border)] bg-[var(--surface-subdued)] px-3 py-2.5">
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="flex-1 space-y-1">
+                                <p className="text-xs font-semibold text-[var(--foreground)] leading-tight">{pickString(c, ["text", "content"])}</p>
+                                <div className="flex flex-wrap gap-1">
+                                  {status === "BACKUP" && (
+                                    <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-gray-100 text-gray-600 border border-gray-200 uppercase tracking-wider">Dự bị</span>
+                                  )}
+                                  {status === "CONFIRMED_ERROR" && (
+                                    <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-red-100 text-red-600 border border-red-200 uppercase tracking-wider">Đã báo lỗi</span>
+                                  )}
+                                </div>
+                              </div>
+                              <button
+                                onClick={() => { setCommentToRemove(c); setConfirmRemoveOpen(true); }}
+                                className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[var(--muted)] hover:bg-red-50 hover:text-red-500 transition-colors -mt-1 -mr-1"
+                                title="Gỡ khỏi đơn"
+                              >
+                                <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12" /></svg>
+                              </button>
+                            </div>
+                            <div className="flex justify-between items-center mt-1">
+                               <div className="flex items-center gap-2">
+                                  <span className="text-[10px] font-bold bg-[var(--surface-muted)] px-1.5 py-0.5 rounded text-[var(--muted)] border border-[var(--border)]">SL: {quantity}</span>
+                                  <span className="text-[10px] text-[var(--muted)] truncate max-w-[100px]">@{pickString(c, ["igUsername", "username"])}</span>
+                               </div>
+                               {price > 0 && <span className="text-xs font-black text-[var(--primary)]">{formatCurrency(price)}</span>}
+                            </div>
                           </div>
-                          <button
-                            onClick={() => handleRemoveComment(pickString(c, ["id", "_id"]))}
-                            className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[var(--muted)] hover:bg-red-50 hover:text-red-500 transition-colors ml-2"
-                            title="Gỡ comment khỏi đơn"
-                          >
-                            <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
-                          </button>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   </div>
                 );
@@ -345,16 +378,14 @@ export function LiveOrderColumn({
 
             <div className="p-4 border-t border-[var(--border)] bg-[var(--surface-subdued)] shrink-0 flex gap-3">
               <button
-                onClick={handleDeleteOrder}
+                onClick={() => setConfirmDeleteOpen(true)}
                 disabled={deleteLoading}
                 className="rounded-xl bg-red-50 px-4 py-2.5 text-xs font-bold text-red-600 shadow-[var(--shadow-soft)] hover:bg-red-100 transition-colors border border-red-200 disabled:opacity-50 dark:bg-red-900/20 dark:text-red-400 dark:border-red-800"
               >
                 {deleteLoading ? "Đang xoá..." : "Xoá đơn"}
               </button>
-              <button className="flex-1 rounded-xl bg-[var(--surface)] border border-[var(--border)] px-4 py-2.5 text-xs font-bold text-[var(--foreground)] shadow-sm hover:bg-[var(--surface-muted)] transition-colors">
-                Phát link Pay
-              </button>
               <PrintModeDropdown
+                className="flex-1"
                 size="md"
                 disabled={isPrinting}
                 onSelect={async (mode: PrintMode) => {
@@ -388,7 +419,7 @@ export function LiveOrderColumn({
                     }
 
                     if (mode === "send_only" || mode === "print_and_send") {
-                      const igUserId = pickString(asRecord(selectedOrder.customerId), ["igId"]) || pickString(selectedOrder, ["igId", "customerId"]);
+                      const igUserId = pickString(asRecord(selectedOrder?.customerId), ["igId"]) || pickString(selectedOrder, ["igId", "customerId"]);
                       const orderId = pickString(selectedOrder, ["id", "_id"]);
                       
                       if (igUserId && orderId) {
@@ -434,6 +465,49 @@ export function LiveOrderColumn({
                 }}
               />
             </div>
+
+            <ConfirmDialog
+              isOpen={confirmDeleteOpen}
+              title="Xác nhận xoá đơn hàng"
+              message={
+                  <div className="space-y-3">
+                      <p>Bạn có chắc chắn muốn xoá toàn bộ đơn hàng này không? Hành động này sẽ giải phóng tất cả các bình luận trong đơn về trạng thái chưa chốt.</p>
+                      <div className="rounded-xl bg-red-50 p-3 border border-red-100 flex items-center justify-between">
+                          <div>
+                              <span className="text-[10px] font-bold uppercase tracking-wider text-red-400 block">Đơn hàng của</span>
+                              <span className="text-sm font-bold text-red-700">{pickString(asRecord(selectedOrder?.customerId), ["igName"]) || pickString(selectedOrder, ["igName", "customerName"]) || "Khách hàng"}</span>
+                          </div>
+                          <span className="text-base font-black text-red-700">{formatCurrency(pickNumber(selectedOrder, ["totalPrice", "amount"]) ?? 0)}</span>
+                      </div>
+                  </div>
+              }
+              confirmLabel="Xoá đơn ngay"
+              cancelLabel="Quay lại"
+              isDanger={true}
+              onConfirm={handleDeleteOrder}
+              onCancel={() => setConfirmDeleteOpen(false)}
+            />
+
+            <ConfirmDialog
+              isOpen={confirmRemoveOpen}
+              title="Xác nhận gỡ món"
+              message={
+                  <div className="space-y-3">
+                      <p>Bạn có chắc chắn muốn gỡ sản phẩm này khỏi đơn hàng không?</p>
+                      <div className="rounded-xl bg-[var(--surface-muted)]/50 p-3 border border-[var(--border)] space-y-2">
+                          <div className="flex justify-between items-center">
+                              <span className="text-xs font-bold text-[var(--primary)]">@{pickString(commentToRemove, ["igUsername", "username"])}</span>
+                          </div>
+                          <p className="text-xs text-[var(--foreground-soft)] italic">"{pickString(commentToRemove, ["text", "content"])}"</p>
+                      </div>
+                  </div>
+              }
+              confirmLabel="Gỡ khỏi đơn"
+              cancelLabel="Quay lại"
+              isDanger={true}
+              onConfirm={() => commentToRemove && handleRemoveComment(commentToRemove)}
+              onCancel={() => { setConfirmRemoveOpen(false); setCommentToRemove(null); }}
+            />
           </>
         )}
       </div>

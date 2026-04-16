@@ -25,7 +25,21 @@ async function executeWithRefresh(
   session: SessionSettings,
   headers: Headers
 ): Promise<Response> {
-  let response = await fetch(targetUrl, options);
+  let response: Response;
+  try {
+    response = await fetch(targetUrl, options);
+  } catch (err: any) {
+    if (err.name === 'AbortError') {
+      console.log(`[PROXY] Fetch aborted: ${targetUrl}`);
+    } else {
+      console.error(`[PROXY] Failed to fetch URL: ${targetUrl}`, {
+        method: options.method,
+        error: err.message,
+        cause: err.cause
+      });
+    }
+    throw err;
+  }
 
   console.log(`[PROXY] Request to ${targetUrl} returned ${response.status}. session.refreshToken:`, session.refreshToken ? "PRESENT" : "MISSING");
 
@@ -136,6 +150,8 @@ const PREFERRED_COLLECTION_KEYS = [
   "items",
   "docs",
   "results",
+  "chartData",
+  "series",
   "data",
   "lives",
   "comments",

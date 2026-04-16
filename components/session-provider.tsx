@@ -320,6 +320,8 @@ async function fetchUserProfile(
       email: pickString(record, ["email"]),
       role: pickString(record, ["role"]) || "user",
       avatar: pickString(record, ["avatar"]),
+      phone: pickString(record, ["phone", "mobile"]),
+      address: pickString(record, ["address", "street"]),
       shops: (() => {
         if (Array.isArray(record.shops) && record.shops.length > 0) {
           return record.shops.map((s: any) => ({

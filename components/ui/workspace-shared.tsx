@@ -82,25 +82,35 @@ export function StatCard({
   icon,
   iconBg,
   iconColor,
-  trend,
+  change,
+  extra,
 }: {
   label: string;
   value: Primitive;
   icon?: React.ReactNode;
   iconBg?: string;
   iconColor?: string;
-  trend?: string;
+  change?: number | null;
+  extra?: string | null;
 }) {
   return (
-    <article className="flex items-center gap-4 sm:gap-6 rounded-2xl bg-[var(--surface)] p-5 sm:p-8 shadow-[var(--shadow-soft)] transition-all hover:shadow-md">
-      <div className={`flex h-12 w-12 sm:h-16 sm:w-16 shrink-0 items-center justify-center rounded-full ${iconBg} ${iconColor}`}>
-        {React.isValidElement(icon) ? React.cloneElement(icon as React.ReactElement<any>, { className: "h-6 w-6 sm:h-8 sm:w-8" }) : icon}
+    <article className="flex items-center gap-4 rounded-2xl bg-[var(--surface)] p-5 shadow-[var(--shadow-soft)] transition-all hover:shadow-md border border-[var(--border)]">
+      <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl ${iconBg} ${iconColor}`}>
+        {icon}
       </div>
-      <div className="min-w-0">
-        <h3 className="text-2xl sm:text-3xl font-bold tracking-tight text-[var(--foreground)]">
-          {typeof value === "number" ? formatNumber(value) : String(value)}+
-        </h3>
-        <p className="mt-0.5 text-xs sm:text-sm font-medium text-[var(--muted)] truncate">{label}</p>
+      <div className="min-w-0 flex-1">
+        <p className="text-xs font-medium text-[var(--muted)] truncate mb-1">{label}</p>
+        <div className="flex items-baseline gap-2">
+          <h3 className="text-xl font-bold tracking-tight text-[var(--foreground)]">
+            {typeof value === "number" ? formatNumber(value) : String(value)}
+          </h3>
+          {change !== undefined && change !== null && (
+            <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-md ${change >= 0 ? "text-green-600 bg-green-50 dark:bg-green-900/20" : "text-red-600 bg-red-50 dark:bg-red-900/20"}`}>
+              {change >= 0 ? "+" : ""}{change}%
+            </span>
+          )}
+        </div>
+        {extra && <p className="text-[10px] text-[var(--muted)] mt-1 font-medium">{extra}</p>}
       </div>
     </article>
   );

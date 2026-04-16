@@ -8,16 +8,18 @@ import { useSession } from "@/components/session-provider";
 import { fetchMyOrders, fetchLiveOrders, exportOrdersExcel } from "@/lib/services/orders-service";
 import { applyAuthResponses } from "@/hooks/use-auth-sync";
 
-export function useOrders(search?: string) {
+export function useOrders(queryMeta?: { page?: number; limit?: number; search?: string; startDate?: string; endDate?: string }) {
   const { logout, patchSession, session } = useSession();
 
   return useQuery({
-    queryKey: ["orders", session.user?.id, search],
+    queryKey: ["orders", session.user?.id, queryMeta?.page, queryMeta?.limit, queryMeta?.search, queryMeta?.startDate, queryMeta?.endDate],
     queryFn: async () => {
       const response = await fetchMyOrders(session, {
-        page: 1,
-        limit: 20,
-        search: search || undefined,
+        page: queryMeta?.page || 1,
+        limit: queryMeta?.limit || 20,
+        search: queryMeta?.search || undefined,
+        startDate: queryMeta?.startDate,
+        endDate: queryMeta?.endDate,
       });
       applyAuthResponses([response.response], patchSession, logout);
       return response.data;
