@@ -30,7 +30,16 @@ function middleware(context) {
 
     // Rule 1: pay.livetracker.vn
     if (host === 'pay.livetracker.vn') {
-        // Chỉ cho phép path /order (hoặc /order/) và phải có id tham số
+        // Bỏ qua kiểm tra cho các file tĩnh và hệ thống của Next.js
+        const isNextAsset = pathname.startsWith('/_next/') || pathname.startsWith('/static/');
+        const isStaticFile = pathname.match(/\.(png|jpg|jpeg|gif|svg|ico|css|js|woff2?|webp)$/i);
+        const isPublicAsset = pathname.startsWith('/favicon') || pathname.startsWith('/logo');
+
+        if (isNextAsset || isStaticFile || isPublicAsset) {
+            return context.next();
+        }
+
+        // Chỉ áp dụng logic chuyển hướng cho các đường dẫn trang (Pages)
         const isOrderPath = pathname === '/order' || pathname === '/order/';
         const hasOrderId = url.searchParams.has('id');
 
