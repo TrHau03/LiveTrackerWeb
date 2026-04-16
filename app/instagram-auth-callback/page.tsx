@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 
+import { Suspense } from "react";
+
 import { InstagramAuthCallbackScreen } from "@/components/instagram-auth-callback-screen";
 import { absoluteUrl } from "@/lib/site";
 
@@ -17,5 +19,9 @@ export const metadata: Metadata = {
 };
 
 export default function InstagramAuthCallbackPage() {
-  return <InstagramAuthCallbackScreen />;
+  return (
+    <Suspense fallback={null}>
+      <InstagramAuthCallbackScreen />
+    </Suspense>
+  );
 }
