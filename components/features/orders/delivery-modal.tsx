@@ -131,48 +131,26 @@ export function DeliveryModal({ isOpen, onClose, order }: DeliveryModalProps) {
   };
 
   const handleCalculateFee = async () => {
-    if (!form.senderProv || !form.receiverProv) {
-      alert("Vui lòng nhập đầy đủ tỉnh thành gửi/nhận");
-      return;
-    }
     try {
       const result = await calculateFees.mutateAsync({
         senderProv: form.senderProv,
         senderArea: form.senderArea,
         receiverProv: form.receiverProv,
         receiverArea: form.receiverArea,
-        weight: String(form.weight || "0"),
+        weight: form.weight,
       });
-      alert(`Phí dự tính: ${formatCurrency(result?.fee)}`);
+      alert(`Phí dự tính: ${formatCurrency(result.fee)}`);
     } catch (err: any) {
       alert(err.message);
     }
   };
 
   const handleSubmit = async () => {
-    const items = extractCollection(order.items).map(item => ({
-      itemName: pickString(item, ["name", "text"]) || "Sản phẩm",
-      number: pickNumber(item, ["quantity"]) || 1,
-      itemValue: pickNumber(item, ["price"]) || 0,
-    }));
-
     try {
       const bizContent = {
-        txlogisticId: `LT${Date.now()}`,
+        txlogisticId: `LT${Date.now()}`, // Simple generation logic
         expressType: "EZ",
-        orderType: String(form.orderType),
-        serviceType: String(form.serviceType),
-        deliveryType: String(form.deliveryType),
-        goodsType: form.goodsType,
-        productType: form.productType,
-        partSign: String(form.partSign || "0"),
-        weight: String(form.weight || "0"),
-        totalQuantity: String(form.totalQuantity || "1"),
-        goodsValue: String(form.goodsValue || "0"),
-        codMoney: String(form.codMoney || "0"),
-        remark: form.remark,
-        payType: form.payType,
-        items,
+        ...form,
         sender: {
           name: form.senderName,
           mobile: form.senderMobile,
