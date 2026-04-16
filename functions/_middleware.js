@@ -17,10 +17,13 @@ function middleware(context) {
     const orderMatch = pathname.match(/^\/order\/([^/]+)$/);
     if (orderMatch && host === 'pay.livetracker.vn') {
         const orderCode = orderMatch[1];
+        // Xử lý search: nếu có query params (như ?token=...) thì phải nối bằng & thay vì nối trực tiếp ? vào sau ?id=
+        const extraParams = search ? (search.startsWith('?') ? `&${search.substring(1)}` : `&${search}`) : '';
+
         return new Response(null, {
             status: 301,
             headers: {
-                Location: `https://pay.livetracker.vn/order?id=${encodeURIComponent(orderCode)}${search}`
+                Location: `https://pay.livetracker.vn/order?id=${encodeURIComponent(orderCode)}${extraParams}`
             }
         });
     }
