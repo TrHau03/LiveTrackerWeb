@@ -41,16 +41,6 @@ function middleware(context) {
         }
     }
 
-    // Rule 2: app.livetracker.vn mà path BẮT ĐẦU bằng /order -> redirect về pay.livetracker.vn
-    if (host === 'app.livetracker.vn' && pathname.startsWith('/order')) {
-        return new Response(null, {
-            status: 301,
-            headers: {
-                Location: `https://pay.livetracker.vn${pathname}${search}`
-            }
-        });
-    }
-
     // Nếu không match rules -> tiếp tục xử lý request bình thường
     return context.next();
 }
