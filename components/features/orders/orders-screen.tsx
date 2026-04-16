@@ -33,7 +33,7 @@ export function OrdersScreen() {
   const [printProgress, setPrintProgress] = useState<{ current: number; total: number } | null>(null);
   const { getPrintSettings } = usePrintSettings();
 
-  const { data, status, error: queryError } = useOrders(search);
+  const { data, status, error: queryError } = useOrders({ search });
 
   const state = {
     status: status === "pending" ? "loading" : status === "success" ? "ready" : "error",
