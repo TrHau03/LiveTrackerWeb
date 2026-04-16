@@ -4,7 +4,7 @@
 
 - **Type**: Agent Execution Error / Process Failure
 - **Severity**: High
-- **Fix Applied**: Wrapped `InstagramAuthCallbackScreen` component in a `<Suspense fallback={null}>` boundary.
+- **Fix Applied**: Wrapped components using `useSearchParams()` in a `<Suspense>` boundary.
 - **Status**: Fixed
 
 ---
@@ -13,9 +13,8 @@
 
 - **Type**: Logic Error / Infrastructure
 - **Severity**: Critical
-- **File**: `functions/_middleware.js`
-- **Root Cause**: Middleware for `pay.livetracker.vn` was redirecting everything that wasn't `/order` to `https://livetracker.vn`, including system assets (`/_next/`, `.css`, `.js`). This caused the page to appear unstyled and prevented JS hydration.
-- **Status**: Improved (Transitioned to Whitelist)
+- **Fix Applied**: Added Whitelist for `_next`, `static`, `.css`, `.js`, etc.
+- **Status**: Fixed
 
 ---
 
@@ -23,18 +22,25 @@
 
 - **Type**: Infrastructure / Static Export Compatibility
 - **Severity**: Critical
+- **Fix Applied**: Implemented robust Whitelist and `try-catch` fail-safe.
+- **Status**: Fixed
+
+---
+
+## [2026-04-16 23:43] - Redirect: "No content available because this request was redirected"
+
+- **Type**: Logic Error / Browser Compatibility (Safari/iOS)
+- **Severity**: High
 - **File**: `functions/_middleware.js`
 - **Agent**: Jarvis
 - **Root Cause**: 
-  1. The aggressive negative conditions (`!isOrderPath`) were causing crashes or missing file errors during Cloudflare's static file resolution.
-  2. Static Export results in `/order.html` but browser requests `/order`. Middleware wasn't explicitly allowing the underlying `.html` file flow in some cases.
-  3. Clicking "Reload" on Cloudflare error pages triggered the catch-all redirect because parameters were handled inconsistently during the error state.
+  1. `Response.redirect` helper sometimes creates redirects that browsers like Safari dislike if they are empty or lack specific cache headers.
+  2. "Double Redirection": Requests were hitting multiple 301 rules in sequence (e.g., Domain Redirect -> Path Format Redirect).
 - **Fix Applied**: 
-  - **Whitelist Strategy**: Explicitly permit `_next`, `static`, `.html`, `.css`, `.js`, `.png` etc. first.
-  - **Support /order.html**: Explicitly whitelisted `.html` and `/order.html` paths.
-  - **Try-Catch Block**: Added `try-catch` to the entire middleware to ensure that any runtime error (like `new URL()` failures) doesn't crash the request and instead falls back to `context.next()`.
-  - **Response.redirect**: Used standard `Response.redirect` instead of manual `new Response` for cleaner headers.
-- **Prevention**: Use whitelist-first logic for middleware on Cloudflare Pages to avoid interfering with the platform's static routing and asset serving.
-- **Status**: Fixed (Awaiting verification)
+  - **Raw Redirect Response**: Replaced `Response.redirect` with `new Response(null, { status: 301, headers: { 'Location': url, 'Cache-Control': 'no-cache' } })`.
+  - **Single-Pass Routing**: Unified the redirect logic so that a request from the wrong domain or format is sent directly to the final destination in ONE step.
+  - **Cache Control**: Added `no-cache` to ensure browsers always check the latest routing rules.
+- **Prevention**: Use raw `Response` objects for redirects in Cloudflare Middleware to maximize compatibility and avoid multiple redirect hops.
+- **Status**: Fixed
 
 ---
