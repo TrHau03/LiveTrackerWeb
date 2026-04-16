@@ -48,7 +48,7 @@ export async function getPublicOrderDetails(
     token?: string,
 ): Promise<GetOrderResponse> {
     try {
-        const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
+        const apiBase = process.env.NEXT_PUBLIC_API_URL || "https://admin.livetracker.vn/api/v1";
         // If apiBase already includes /api/v1, don't add it again
         const basePath = apiBase.endsWith("/api/v1") ? apiBase : `${apiBase}/api/v1`;
 
@@ -58,12 +58,21 @@ export async function getPublicOrderDetails(
             url += `?token=${encodeURIComponent(token)}`;
         }
 
+        console.log(`[ORDER-CLIENT] Fetching public order from: ${url}`);
+
+        // Set timeout for fetch
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 10000);
+
         const response = await fetch(url, {
             method: "GET",
             headers: {
                 "Content-Type": "application/json",
             },
+            signal: controller.signal
         });
+
+        clearTimeout(timeoutId);
 
         // Handle token validation errors (400 or 403)
         if (response.status === 400 || response.status === 403) {

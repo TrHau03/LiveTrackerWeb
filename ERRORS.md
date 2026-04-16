@@ -27,3 +27,22 @@
 - **Status**: Fixed
 
 ---
+
+## [2026-04-16 23:23] - Hang/Loop: Infinite Loading on Public Order Page
+
+- **Type**: Configuration / Logic Error
+- **Severity**: Critical
+- **File**: `lib/order-client.ts`
+- **Agent**: Jarvis
+- **Root Cause**: 
+  1. Inconsistent default API URL (`localhost:3001` vs `admin.livetracker.vn`). Missing environment variables caused the client to hit an unreachable localhost endpoint in production.
+  2. Lack of fetch timeout allowed requests to hang indefinitely.
+- **Error Message**: Giao diện kẹt ở "Đang tải thông tin đơn hàng..." mà không bao giờ chuyển tiếp.
+- **Fix Applied**: 
+  - Aligned default API URL with production endpoint to ensure consistency if `.env` fails.
+  - Implemented `AbortController` with a 10-second timeout for public API calls.
+  - Added debug logging to track the actual URL being fetched.
+- **Prevention**: Use centralized configuration for API endpoints instead of hardcoding defaults in multiple files. Always implement global or per-request timeouts for data fetching.
+- **Status**: Fixed
+
+---
