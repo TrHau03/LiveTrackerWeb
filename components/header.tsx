@@ -3,6 +3,7 @@
 import React from "react";
 import { useConfigHeader } from "@/hooks/use-config-header";
 import { useTheme } from "@/components/theme-provider";
+import { useHeaderStore } from "@/lib/store/header-store";
 
 const SunIcon = () => (
     <svg fill="currentColor" viewBox="0 0 24 24" className="h-5 w-5">
@@ -18,69 +19,50 @@ const MoonIcon = () => (
 
 export function Header() {
     const config = useConfigHeader();
+    const dynamicHeader = useHeaderStore();
     const { theme, toggleTheme } = useTheme();
-    const [startDate, setStartDate] = React.useState("10-06-2021");
-    const [endDate, setEndDate] = React.useState("10-10-2021");
+
+    const title = dynamicHeader.title || config.title;
+    const subtitle = dynamicHeader.subtitle || config.subtitle;
+    const showDateRange = dynamicHeader.showDateRange !== undefined ? dynamicHeader.showDateRange : config.showDateRange;
+    const actions = dynamicHeader.actions.length > 0 ? dynamicHeader.actions : (config.actions || []);
 
     return (
-        <header className="bg-transparent px-4 sm:px-8 py-2 border-b border-[var(--border)]">
-            <div className="flex flex-col gap-2">
-                {/* Title Section */}
-                <div className="flex items-center justify-between gap-2">
+        <header className="bg-transparent px-4 sm:px-8 py-3 border-b border-[var(--border)]">
+            <div className="flex flex-col gap-3">
+                {/* Top Row: Title & Right Side Controls */}
+                <div className="flex items-center justify-between gap-4">
                     <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-3">
-                            {/* Mobile menu trigger placeholder */}
-                            <div className="flex-1 min-w-0">
-                                <h1 className="text-lg sm:text-xl font-bold text-[var(--foreground)] truncate">
-                                    {config.title}
-                                </h1>
-                                {config.subtitle && (
-                                    <p className="text-sm text-[var(--muted)] mt-1 truncate">
-                                        {config.subtitle}
-                                    </p>
-                                )}
-                            </div>
-                        </div>
+                        <h1 className="text-lg sm:text-xl font-bold text-[var(--foreground)] truncate transition-all duration-300">
+                            {title}
+                        </h1>
+                        {subtitle && (
+                            <p className="text-xs sm:text-sm text-[var(--muted)] mt-0.5 truncate uppercase tracking-wider font-medium opacity-70">
+                                {subtitle}
+                            </p>
+                        )}
                     </div>
 
-                    {/* Right side controls */}
                     <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
-                        {/* Date Range - Hidden on mobile */}
-                        {config.showDateRange && (
-                            <>
-                                <div className="hidden md:flex items-center gap-2 rounded-lg bg-[var(--surface)] px-3 py-2 text-xs font-semibold text-[var(--muted)] shadow-sm border border-[var(--border)] hover:border-[var(--primary)] transition cursor-pointer">
-                                    <span>{startDate}</span>
-                                    <svg
-                                        className="h-3 w-3"
-                                        fill="none"
-                                        viewBox="0 0 24 24"
-                                        stroke="currentColor"
-                                    >
-                                        <path
-                                            strokeLinecap="round"
-                                            strokeLinejoin="round"
-                                            strokeWidth="2"
-                                            d="M19 9l-7 7-7-7"
-                                        />
-                                    </svg>
+                        {/* Custom Content Area (e.g., Period Selectors) */}
+                        {dynamicHeader.customContent && (
+                            <div className="hidden lg:flex items-center mr-2">
+                                {dynamicHeader.customContent}
+                            </div>
+                        )}
+
+                        {/* Date Range Controls */}
+                        {showDateRange && (
+                            <div className="hidden md:flex items-center gap-2">
+                                <div className="flex items-center gap-2 rounded-xl bg-[var(--surface)] px-3 py-2 text-xs font-bold text-[var(--muted)] shadow-sm border border-[var(--border)] hover:border-[var(--primary)] transition cursor-pointer">
+                                    <span>{dynamicHeader.startDate || "10-06-2021"}</span>
+                                    <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" /></svg>
                                 </div>
-                                <div className="hidden md:flex items-center gap-2 rounded-lg bg-[var(--surface)] px-3 py-2 text-xs font-semibold text-[var(--muted)] shadow-sm border border-[var(--border)] hover:border-[var(--primary)] transition cursor-pointer">
-                                    <span>{endDate}</span>
-                                    <svg
-                                        className="h-3 w-3"
-                                        fill="none"
-                                        viewBox="0 0 24 24"
-                                        stroke="currentColor"
-                                    >
-                                        <path
-                                            strokeLinecap="round"
-                                            strokeLinejoin="round"
-                                            strokeWidth="2"
-                                            d="M19 9l-7 7-7-7"
-                                        />
-                                    </svg>
+                                <div className="flex items-center gap-2 rounded-xl bg-[var(--surface)] px-3 py-2 text-xs font-bold text-[var(--muted)] shadow-sm border border-[var(--border)] hover:border-[var(--primary)] transition cursor-pointer">
+                                    <span>{dynamicHeader.endDate || "10-10-2021"}</span>
+                                    <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" /></svg>
                                 </div>
-                            </>
+                            </div>
                         )}
 
                         {/* Theme Toggle */}
@@ -88,39 +70,53 @@ export function Header() {
                             <button
                                 type="button"
                                 onClick={toggleTheme}
-                                className="h-10 w-10 flex items-center justify-center rounded-lg bg-[var(--surface)] text-[var(--muted)] hover:text-[var(--foreground)] hover:bg-[var(--surface-muted)] shadow-sm border border-[var(--border)] transition"
+                                className="h-10 w-10 flex items-center justify-center rounded-xl bg-[var(--surface)] text-[var(--muted)] hover:text-[var(--foreground)] hover:bg-[var(--surface-muted)] shadow-sm border border-[var(--border)] transition"
                                 aria-label="Toggle theme"
                             >
                                 {theme === "dark" ? <SunIcon /> : <MoonIcon />}
                             </button>
                         )}
+
+                        {/* Desktop Actions */}
+                        {actions.length > 0 && (
+                            <div className="hidden lg:flex items-center gap-2 ml-2">
+                                {actions.map((action, idx) => {
+                                    if (action.hidden) return null;
+                                    const buttonClasses = {
+                                        primary: "inline-flex h-10 items-center justify-center rounded-xl bg-[var(--primary)] px-4 text-xs font-bold text-white shadow-sm transition hover:bg-[var(--primary-strong)]",
+                                        secondary: "inline-flex h-10 items-center justify-center rounded-xl border border-[var(--border)] bg-[var(--surface)] px-4 text-xs font-bold text-[var(--foreground)] shadow-sm transition hover:bg-[var(--surface-muted)]",
+                                        danger: "inline-flex h-10 items-center justify-center rounded-xl border border-red-200 bg-red-50 px-4 text-xs font-bold text-red-600 shadow-sm transition hover:bg-red-100",
+                                    };
+                                    return (
+                                        <button 
+                                            key={action.id || action.label || `action-${idx}`} 
+                                            onClick={action.onClick} 
+                                            className={`${buttonClasses[action.variant || "secondary"]} ${action.className || ""}`}
+                                        >
+                                          {action.icon && <span className="mr-2">{action.icon}</span>}
+                                          {action.label}
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        )}
                     </div>
                 </div>
 
-                {/* Action Buttons - Visible on mobile if needed */}
-                {config.actions && config.actions.length > 0 && (
-                    <div className="flex flex-wrap gap-2">
-                        {config.actions.map((action) => {
+                {/* Bottom Row: Mobile Custom Content or Actions */}
+                {(dynamicHeader.customContent || actions.length > 0) && (
+                    <div className="flex lg:hidden flex-wrap gap-2 items-center">
+                        {dynamicHeader.customContent}
+                        {actions.map((action, idx) => {
                             if (action.hidden) return null;
-
                             const buttonClasses = {
-                                primary:
-                                    "inline-flex h-10 items-center justify-center rounded-lg bg-[var(--primary)] px-4 text-sm font-medium text-white shadow-sm transition hover:bg-[var(--primary-strong)] disabled:opacity-50",
-                                secondary:
-                                    "inline-flex h-10 items-center justify-center rounded-lg border border-[var(--border)] bg-[var(--surface)] px-4 text-sm font-medium text-[var(--foreground)] shadow-sm transition hover:bg-[var(--surface-muted)] disabled:opacity-50",
-                                danger:
-                                    "inline-flex h-10 items-center justify-center rounded-lg border border-red-200 bg-red-50 px-4 text-sm font-medium text-red-600 shadow-sm transition hover:bg-red-100 disabled:opacity-50",
+                                primary: "inline-flex h-9 items-center justify-center rounded-lg bg-[var(--primary)] px-3 text-xs font-bold text-white shadow-sm transition hover:bg-[var(--primary-strong)]",
+                                secondary: "inline-flex h-9 items-center justify-center rounded-lg border border-[var(--border)] bg-[var(--surface)] px-3 text-xs font-bold text-[var(--foreground)] shadow-sm transition hover:bg-[var(--surface-muted)]",
+                                danger: "inline-flex h-9 items-center justify-center rounded-lg border border-red-200 bg-red-50 px-3 text-xs font-bold text-red-600 shadow-sm transition hover:bg-red-100",
                             };
-
-                            const className = buttonClasses[action.variant || "secondary"];
-
                             return (
-                                <button
-                                    key={action.id}
-                                    onClick={action.onClick}
-                                    className={className}
-                                >
-                                    {action.icon && <span className="mr-2">{action.icon}</span>}
+                                <button key={action.id || action.label || `btn-${idx}`} onClick={action.onClick} className={`${buttonClasses[action.variant || "secondary"]} ${action.className || ""}`}>
+                                    {action.icon && <span className="mr-1.5">{action.icon}</span>}
                                     {action.label}
                                 </button>
                             );

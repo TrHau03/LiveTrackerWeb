@@ -2,6 +2,7 @@
 
 import React, { useState } from "react";
 import { useSettingsStore } from "@/stores/settings-store";
+import { useHeaderStore } from "@/lib/store/header-store";
 import type { LiveStats } from "@/hooks/use-comments";
 
 import { LiveListColumn } from "./live-list-column";
@@ -14,6 +15,18 @@ export function LivestreamsScreen() {
   const [mobileView, setMobileView] = useState<"list" | "detail">("list");
   const [liveStats, setLiveStats] = useState<LiveStats>({ totalOrder: 0, totalComment: 0, totalItems: 0 });
   const [filterQuery, setFilterQuery] = useState("");
+
+  const setHeader = useHeaderStore(state => state.setHeader);
+  const resetHeader = useHeaderStore(state => state.resetHeader);
+
+  React.useEffect(() => {
+    setHeader({
+      title: "Phiên Live",
+      subtitle: "Theo dõi và chốt đơn thời gian thực",
+      showDateRange: false,
+    });
+    return () => resetHeader();
+  }, [setHeader, resetHeader]);
 
   const handleSelectLive = (id: string) => {
     setActiveLiveId(id);

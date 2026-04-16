@@ -5,6 +5,7 @@ export type HeaderAction = {
     onClick?: () => void;
     variant?: "primary" | "secondary" | "danger";
     hidden?: boolean;
+    className?: string;
 };
 
 export type HeaderConfig = {

@@ -117,22 +117,105 @@ function CustomerTagDropdown({ tags, customerId, customerName, isNewCustomer, on
 function CustomerClosedItemsDropdown({
   customerId,
   igUserId,
+  igUsername,
   customerClosedCount,
   allComments,
   onCancelOrder,
   onFilterCustomer,
-  loadingComments
+  loadingComments,
+  liveId
 }: {
   customerId?: string;
   igUserId: string;
+  igUsername: string;
   customerClosedCount: number;
   allComments: Record<string, unknown>[];
   onCancelOrder: (comment: Record<string, unknown>) => Promise<void>;
   onFilterCustomer?: (query: string) => void;
   loadingComments: Set<string>;
+  liveId: string;
 }) {
+  const { session, patchSession, logout } = useSession();
   const [isOpen, setIsOpen] = useState(false);
+  const [items, setItems] = useState<Record<string, unknown>[]>([]);
+  const [isFetching, setIsFetching] = useState(false);
+  const [popoverDirection, setPopoverDirection] = useState<'down' | 'up'>('down');
   const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // Fetch items from API when opened
+  useEffect(() => {
+    if (!isOpen) return;
+
+    if (dropdownRef.current) {
+      const rect = dropdownRef.current.getBoundingClientRect();
+      const spaceBelow = window.innerHeight - rect.bottom;
+      // Nếu không gian bên dưới ít hơn 360px (chiều cao tối đa popover + margin)
+      setPopoverDirection(spaceBelow < 360 ? 'up' : 'down');
+    }
+
+    async function fetchItems() {
+      if (!session.accessToken) return;
+      setIsFetching(true);
+      try {
+        const { fetchMyOrders } = await import("@/lib/services/orders-service");
+        
+        const res = await fetchMyOrders(session, {
+          liveId,
+          search: igUsername || igUserId,
+          limit: 100,
+          sortBy: "createdAt",
+          sortOrder: "desc"
+        });
+        
+        applyAuthResponses([res.response], patchSession, logout);
+        if (res.ok && res.data) {
+          const orders = extractCollection(res.data);
+          
+          // Trích xuất tất cả bình luận từ các đơn hàng thuộc liveId này
+          const allCommentsFromOrders: Record<string, unknown>[] = [];
+          
+          if (Array.isArray(orders)) {
+            orders.forEach(order => {
+              const oRecord = asRecord(order);
+              const oLiveId = pickString(asRecord(oRecord.liveId) || oRecord, ["_id", "liveId"]);
+              
+              // Kiểm tra xem đơn hàng có thuộc livestream hiện tại không
+              if (oLiveId === liveId || !liveId) {
+                const commentList = oRecord.commentIds;
+                if (Array.isArray(commentList)) {
+                  allCommentsFromOrders.push(...commentList.filter(c => typeof c === "object" && c !== null) as Record<string, unknown>[]);
+                }
+              }
+            });
+          }
+          
+          // Sắp xếp lại tất cả bình luận theo thời gian mới nhất ở trên
+          allCommentsFromOrders.sort((a, b) => {
+            const dateA = new Date(pickString(a, ["createdAt", "created_at"]) || 0).getTime();
+            const dateB = new Date(pickString(b, ["createdAt", "created_at"]) || 0).getTime();
+            return dateB - dateA;
+          });
+          
+          setItems(allCommentsFromOrders);
+        } else {
+          // Fallback to offline filter if API fails or returns no data
+          const filtered = allComments.filter(c => {
+            const uid = pickString(c, ["igUserId", "ig_user_id"]);
+            const status = pickString(c, ["status"]);
+            return uid === igUserId && (status === "NORMAL" || status === "SUCCESS");
+          });
+          setItems(filtered);
+        }
+      } catch (err) {
+        console.error("Fetch orders error", err);
+        setItems([]);
+      } finally {
+        setIsFetching(false);
+      }
+    }
+
+    fetchItems();
+  }, [isOpen, liveId, igUserId, igUsername, session, patchSession, logout, allComments]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -146,28 +229,16 @@ function CustomerClosedItemsDropdown({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [isOpen]);
 
-  const closedItems = allComments.filter(c => {
-    const cid = pickString(c, ["customerId", "customer_id"]);
-    const uid = pickString(c, ["igUserId", "ig_user_id"]);
-    const status = pickString(c, ["status"]);
-    // Ưu tiên khớp theo igUserId vì nó là định danh duy nhất của Instagram
-    const isSameCustomer = (igUserId && uid === igUserId) || (customerId && cid === customerId);
-    return isSameCustomer && (status === "NORMAL" || status === "SUCCESS");
-  });
-
   const handleClick = (e: React.MouseEvent) => {
     e.stopPropagation();
     setIsOpen(!isOpen);
-    if (onFilterCustomer) {
-      const firstC = allComments.find(c => {
-        const uid = pickString(c, ["igUserId", "ig_user_id"]);
-        return uid === igUserId;
-      });
-      onFilterCustomer(pickString(firstC, ["igUsername", "username"]) || "");
+    if (!isOpen && onFilterCustomer) {
+      onFilterCustomer(igUsername);
     }
   };
 
-  if (customerClosedCount <= 0 && closedItems.length === 0) return null;
+  const hasItems = Array.isArray(items) && items.length > 0;
+  if (customerClosedCount <= 0 && !hasItems && !isFetching) return null;
 
   return (
     <div className="relative mt-1 flex justify-center w-full" ref={dropdownRef}>
@@ -185,25 +256,50 @@ function CustomerClosedItemsDropdown({
       </button>
 
       {isOpen && (
-        <div className="absolute left-0 top-full mt-1.5 w-60 rounded-xl border border-[var(--border)] bg-[var(--surface)] p-2 shadow-xl z-[100] animate-in fade-in slide-in-from-top-2">
+        <div className={`absolute left-0 w-72 rounded-xl border border-[var(--border)] bg-[var(--surface)] p-2 shadow-xl z-[100] animate-in fade-in transition-all duration-200 ${
+          popoverDirection === 'up' 
+            ? 'bottom-full mb-2 slide-in-from-bottom-2' 
+            : 'top-full mt-1.5 slide-in-from-top-2'
+        }`}>
           <div className="mb-2 px-1 pb-2 border-b border-[var(--border)]">
-            <span className="text-xs font-semibold text-[var(--foreground)] w-full block">Các món đã chốt hiện tại</span>
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold text-[var(--foreground)]">Các món đã chốt hiện tại</span>
+              <span className="text-[10px] bg-[var(--surface-muted)] px-1.5 py-0.5 rounded-full text-[var(--muted)]">
+                {isFetching ? "Đang tải..." : `${items.length} món`}
+              </span>
+            </div>
           </div>
-          <div className="max-h-48 overflow-y-auto space-y-1.5 custom-scrollbar">
-            {closedItems.length === 0 ? (
-              <div className="text-xs text-[var(--muted)] px-2 py-1 italic text-center">Chưa tải đủ lịch sử trên trang.</div>
+          <div className="max-h-[340px] overflow-y-auto space-y-1.5 custom-scrollbar pr-1 min-h-[50px]">
+            {isFetching ? (
+              <div className="flex flex-col items-center justify-center py-6 gap-2">
+                <svg className="h-5 w-5 animate-spin text-[var(--primary)]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+                <span className="text-[10px] text-[var(--muted)] font-medium">Đang lấy dữ liệu...</span>
+              </div>
+            ) : items.length === 0 ? (
+              <div className="text-xs text-[var(--muted)] px-2 py-4 italic text-center">Không tìm thấy đơn hàng nào.</div>
             ) : (
-              closedItems.map((item, index) => {
+              items.map((item, index) => {
                 const cid = pickString(item, ["id", "_id", "commentId"]) || `item-${index}`;
                 const text = pickString(item, ["text", "content"]);
                 const quantity = pickNumber(item, ["quantity"]) ?? 1;
                 const price = pickNumber(item, ["price"]) ?? 0;
+                const status = pickString(item, ["status"]);
                 const isLoading = loadingComments.has(cid);
 
                 return (
-                  <div key={cid} className="flex flex-col gap-1 rounded-lg px-2 py-2 border border-dashed border-[var(--border)] hover:bg-[var(--surface-muted)] transition-colors text-left bg-[var(--surface-subtle)]">
+                  <div key={cid} className="flex flex-col gap-1 rounded-lg px-2.5 py-1.5 border border-dashed border-[var(--border)] hover:border-[var(--primary)] hover:bg-[var(--surface-muted)] transition-all text-left bg-[var(--surface-subtle)]/50">
                     <div className="flex items-start justify-between gap-2">
-                      <span className="text-[11px] font-medium text-[var(--foreground)] line-clamp-2 leading-tight">{text}</span>
+                      <div className="flex-1 space-y-1">
+                        <span className="text-[11px] font-medium text-[var(--foreground)] line-clamp-2 leading-tight block">{text}</span>
+                        <div className="flex flex-wrap gap-1">
+                          {status === "BACKUP" && (
+                            <span className="inline-flex items-center px-1 py-0.5 rounded text-[8px] font-bold bg-gray-100 text-gray-500 border border-gray-200 uppercase tracking-wider">Dự bị</span>
+                          )}
+                          {status === "CONFIRMED_ERROR" && (
+                            <span className="inline-flex items-center px-1 py-0.5 rounded text-[8px] font-bold bg-red-100 text-red-500 border border-red-200 uppercase tracking-wider">Đã báo lỗi</span>
+                          )}
+                        </div>
+                      </div>
                       <button
                         onClick={(e) => { e.stopPropagation(); onCancelOrder(item); }}
                         disabled={isLoading}
@@ -213,13 +309,13 @@ function CustomerClosedItemsDropdown({
                         {isLoading ? (
                           <svg className="h-3 w-3 animate-spin" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
                         ) : (
-                          <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12" /></svg>
+                          <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12" /></svg>
                         )}
                       </button>
                     </div>
                     <div className="flex justify-between items-center mt-0.5">
-                      <span className="text-[10px] text-[var(--muted)] font-medium bg-[var(--border)] px-1 rounded">SL: {quantity}</span>
-                      {price > 0 && <span className="text-[10px] text-[var(--primary)] font-bold">{formatNumber(price)}đ</span>}
+                      <span className="text-[10px] text-[var(--muted)] font-bold bg-[var(--surface-muted)] px-1.5 py-0.5 rounded border border-[var(--border)]">SL: {quantity}</span>
+                      {price > 0 && <span className="text-[11px] text-[var(--primary)] font-black">{formatNumber(price)}đ</span>}
                     </div>
                   </div>
                 );
@@ -805,11 +901,13 @@ export function LiveCommentColumn({
                 <CustomerClosedItemsDropdown
                   customerId={customerId}
                   igUserId={pickString(comment, ["igUserId", "ig_user_id"])!}
+                  igUsername={pickString(comment, ["igUsername", "username"])!}
                   customerClosedCount={pickNumber(comment, ["customerClosedCount", "customer_closed_count"]) || 0}
                   allComments={allComments}
                   onCancelOrder={handleCancelOrder}
                   loadingComments={loadingComments}
                   onFilterCustomer={onFilterCustomer}
+                  liveId={liveId}
                 />
               )}
             </div>
@@ -916,8 +1014,42 @@ export function LiveCommentColumn({
     );
   };
 
+  const [firstItemIndex, setFirstItemIndex] = useState(1000000);
+  const prevCommentsLengthRef = useRef(0);
+  const prevFirstIdRef = useRef<string | null>(null);
+
+  // Reset indices when mode or live changes
+  useEffect(() => {
+    setFirstItemIndex(1000000);
+    prevCommentsLengthRef.current = historyComments.length;
+    prevFirstIdRef.current = historyComments.length > 0 
+      ? pickString(historyComments[0], ["id", "_id", "commentId"]) || null 
+      : null;
+  }, [commentDisplayOrder, liveId]);
+
+  // Adjust firstItemIndex when prepending history comments (oldest at top)
+  useEffect(() => {
+    if (isNewestAtBottom && historyComments.length > 0) {
+      const currentFirstId = pickString(historyComments[0], ["id", "_id", "commentId"]) || null;
+      const currentLength = historyComments.length;
+
+      // Nếu ID của phần tử đầu tiên thay đổi và chiều dài tăng lên -> có prepend
+      if (prevFirstIdRef.current && currentFirstId !== prevFirstIdRef.current) {
+        const addedCount = currentLength - prevCommentsLengthRef.current;
+        if (addedCount > 0) {
+          setFirstItemIndex(prev => prev - addedCount);
+        }
+      }
+      
+      prevFirstIdRef.current = currentFirstId;
+      prevCommentsLengthRef.current = currentLength;
+    } else if (historyComments.length === 0) {
+      prevFirstIdRef.current = null;
+      prevCommentsLengthRef.current = 0;
+    }
+  }, [historyComments, isNewestAtBottom]);
+
   const fetchMoreCommentsHandler = () => { fetchMoreComments() };
-  const firstItemIndex = 1000000;
 
   return (
     <div className="flex h-full flex-col relative bg-[var(--surface)] w-full overflow-hidden">

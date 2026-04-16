@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef, startTransition } from "react";
 import Link from "next/link";
 import { useSession } from "@/components/session-provider";
 import { useQuery } from "@tanstack/react-query";
+import { useHeaderStore } from "@/lib/store/header-store";
 import { streamProxyRequest, proxyRequest } from "@/lib/proxy-client";
 import { applyAuthResponses } from "@/hooks/use-auth-sync";
 import { asRecord, extractApiData, extractCollection, pickString, pickNumber, pickBoolean } from "@/lib/proxy-client";
@@ -66,6 +67,9 @@ export function LiveDetailScreen({ liveId }: { liveId: string }) {
   const [streamState, setStreamState] = useState<"connecting" | "live" | "stopped" | "error">("connecting");
   const abortRef = useRef<AbortController | null>(null);
 
+  const setHeader = useHeaderStore(state => state.setHeader);
+  const resetHeader = useHeaderStore(state => state.resetHeader);
+
   useEffect(() => {
     const controller = new AbortController();
     abortRef.current = controller;
@@ -125,9 +129,17 @@ export function LiveDetailScreen({ liveId }: { liveId: string }) {
   const liveTitle =
     pickString(shop, ["name"]) || pickString(live, ["igLiveId"]) || "Livestream";
 
+  useEffect(() => {
+    setHeader({
+      title: liveTitle,
+      subtitle: `Phiên live từ ${pickString(shop, ["name"]) || "Instagram"}`,
+      showDateRange: false,
+    });
+    return () => resetHeader();
+  }, [liveTitle, shop.name]);
+
   return (
     <div className="space-y-8 pb-28 lg:pb-6">
-      <Hero title={liveTitle} />
 
       <div className="grid gap-6 xl:grid-cols-[1.12fr_0.88fr]">
         <Panel

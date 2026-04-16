@@ -4,6 +4,8 @@ export type AuthUser = {
   email: string;
   role: string;
   avatar?: string;
+  phone?: string;
+  address?: string;
   shops?: Array<{ id: string; name: string; avatar?: string; phone?: string; address?: string }>;
 };
 

@@ -3,6 +3,7 @@
 import React, { useState, useDeferredValue } from "react";
 import Link from "next/link";
 import { useCustomers, useCustomerDetail } from "@/hooks/use-customers";
+import { useHeaderStore } from "@/lib/store/header-store";
 import { asRecord, extractApiData, extractCollection, pickString } from "@/lib/proxy-client";
 
 import {
@@ -22,6 +23,8 @@ export function CustomersScreen() {
   const [query, setQuery] = useState("");
   const search = useDeferredValue(query);
   const [selectedCustomerId, setSelectedCustomerId] = useState("");
+  const setHeader = useHeaderStore((state) => state.setHeader);
+  const resetHeader = useHeaderStore((state) => state.resetHeader);
 
   const { data: listData, status: listStatus, error: listQueryError } = useCustomers(search);
 
@@ -47,9 +50,18 @@ export function CustomersScreen() {
   const tags = extractCollection(detail.tags);
   const histories = extractCollection(detail.histories);
 
+  React.useEffect(() => {
+    setHeader({
+      title: "Khách hàng",
+      subtitle: `Quản lý ${customers.length} hồ sơ khách hàng`,
+      showDateRange: false,
+      actions: []
+    });
+    return () => resetHeader();
+  }, [customers.length]);
+
   return (
     <div className="space-y-8 pb-28 lg:pb-6">
-      <Hero title="Hồ sơ Khách hàng" />
 
       <Panel
         title="Customer base"

@@ -3,7 +3,9 @@
 import { useState } from "react";
 import { useSettingsStore } from "@/stores/settings-store";
 import { useSession } from "@/components/session-provider";
+import { useHeaderStore } from "@/lib/store/header-store";
 import { PrintSettingsPanel } from "@/components/print/PrintSettingsPanel";
+import React from "react";
 
 export function SettingsScreen() {
   const { session } = useSession();
@@ -12,21 +14,26 @@ export function SettingsScreen() {
     setTheme, setLanguage, setAutoReconnectSSE, setPaperSize, setCommentDisplayOrder 
   } = useSettingsStore();
 
+  const setHeader = useHeaderStore(state => state.setHeader);
+  const resetHeader = useHeaderStore(state => state.resetHeader);
+
+  React.useEffect(() => {
+    setHeader({
+      title: "Cài đặt hệ thống",
+      subtitle: "Quản lý tài khoản, cấu hình phần cứng và giao diện",
+      showDateRange: false,
+      actions: []
+    });
+    return () => resetHeader();
+  }, [setHeader, resetHeader]);
+
   const [printerConfig, setPrinterConfig] = useState({
     enabled: true,
     autoPrint: true,
   });
 
   return (
-    <div className="space-y-6 pb-28 lg:pb-6 max-w-4xl">
-      <section className="mb-6 flex flex-col gap-1">
-        <h1 className="text-2xl font-bold tracking-tight text-[var(--foreground)] md:text-3xl">
-          Cài đặt hệ thống
-        </h1>
-        <p className="text-sm text-[var(--muted)]">
-          Quản lý tài khoản, cấu hình phần cứng và giao diện.
-        </p>
-      </section>
+    <div className="space-y-6 pb-28 lg:pb-6 max-w-4xl pt-4">
 
       <div className="grid gap-6">
         <section className="rounded-xl border border-[var(--border)] bg-[var(--surface)] shadow-sm">
