@@ -31,16 +31,17 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     const isLocal = hostname === "localhost" || hostname === "127.0.0.1" || hostname.includes("192.168.");
     if (isLocal) return;
 
-    const urlParams = new URLSearchParams(window.location.search);
-    const orderId = urlParams.get("id");
-
     // 1. Xử lý logic pay.livetracker.vn
     if (hostname === "pay.livetracker.vn") {
-      // Chỉ cho phép đường dẫn /order và PHẢI có tham số id
-      const isValidPaymentPath = pathname.startsWith("/order") && orderId;
+      // Valid pattern: /order/{orderId}?token={token}
+      // Parse orderId from path: /order/260417-TcFF → "260417-TcFF"
+      const pathSegments = window.location.pathname.split("/").filter(Boolean);
+      const hasOrderPath = pathSegments.length >= 2 && pathSegments[0] === "order" && pathSegments[1];
+      const hasToken = new URLSearchParams(window.location.search).has("token");
+
+      const isValidPaymentPath = hasOrderPath && hasToken;
 
       if (!isValidPaymentPath) {
-        // Nếu sai: trả về livetracker.vn (không có path hay dấu / đằng sau)
         window.location.replace("https://livetracker.vn");
         return;
       }
