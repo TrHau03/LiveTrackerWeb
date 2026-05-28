@@ -65,9 +65,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     }
 
     return (
-      <div className="flex min-h-screen items-center justify-center px-6">
-        <div className="flex items-center gap-3 rounded-full border border-[var(--border)] bg-[var(--surface)] px-5 py-3 text-sm font-medium text-[var(--muted)] shadow-[var(--shadow-soft)] backdrop-blur-2xl">
-          <span className="h-2.5 w-2.5 animate-pulse rounded-full bg-[var(--primary)]" />
+      <div className="flex min-h-screen items-center justify-center px-6 bg-[var(--background)]">
+        <div className="flex items-center gap-3 rounded-lg border border-[var(--border)] bg-[var(--surface)] px-5 py-3 text-sm font-medium text-[var(--muted)] shadow-[var(--shadow-soft)]">
+          <span className="h-2 w-2 animate-pulse rounded-full bg-[var(--primary)]" />
           Đang chuẩn bị không gian làm việc
         </div>
       </div>
@@ -96,51 +96,62 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       : activeItem.label;
 
   return (
-    <div className="min-h-screen">
-      <div className={`mx-auto flex gap-0 bg-[var(--background)] ${pathname === "/livestreams" ? "h-screen overflow-hidden" : "min-h-screen"}`}>
+    <div className="min-h-screen bg-[var(--background)]">
+      <div className={`flex gap-0 ${pathname === "/livestreams" ? "h-screen overflow-hidden" : "min-h-screen"}`}>
         {/* Backdrop for mobile */}
         {isMobileMenuOpen && (
           <div
-            className="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm lg:hidden"
+            className="fixed inset-0 z-40 bg-black/30 lg:hidden"
             onClick={() => setIsMobileMenuOpen(false)}
           />
         )}
 
+        {/* Sidebar — Clean white */}
         <aside
-          className={`fixed inset-y-0 left-0 z-50 flex h-screen shrink-0 flex-col border-r border-white/10 bg-[#007fff] transition-all duration-300 lg:sticky lg:flex ${isMobileMenuOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
-            } ${isCollapsed ? "w-[var(--sidebar-width-icon)] px-2 py-6" : "w-[var(--sidebar-width)] pt-5 pb-5 pl-3 pr-1"
+          className={`fixed inset-y-0 left-0 z-50 flex h-screen shrink-0 flex-col border-r border-[var(--sidebar-border)] bg-[var(--sidebar-bg)] transition-all duration-200 lg:sticky lg:flex ${isMobileMenuOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
+            } ${isCollapsed ? "w-[var(--sidebar-width-icon)] px-2 py-5" : "w-[var(--sidebar-width)] py-5 pl-4 pr-2"
             }`}
         >
-          <div className={`mb-10 flex items-center ${isCollapsed ? "justify-center" : "justify-between px-2"}`}>
+          {/* Logo */}
+          <div className={`mb-8 flex items-center ${isCollapsed ? "justify-center" : "justify-between px-1"}`}>
             <Link
               href="/"
-              className="flex items-center gap-3 transition duration-300"
+              className="flex items-center gap-3 transition duration-200"
             >
               <img
                 src={isCollapsed ? "/logoicon.png" : "/logo.png"}
                 alt="LiveTracker Logo"
-                className={`${isCollapsed ? "h-11 w-11" : "h-9 w-auto"} object-contain`}
+                className={`${isCollapsed ? "h-9 w-9" : "h-8 w-auto"} object-contain`}
+                style={{ filter: "var(--sidebar-logo-filter)" }}
               />
             </Link>
             {!isCollapsed && (
               <button
                 onClick={() => setIsCollapsed(true)}
-                className="hidden lg:flex h-8 w-8 items-center justify-center rounded-lg text-white/70 hover:bg-white/10 hover:text-white"
+                className="hidden lg:flex h-7 w-7 items-center justify-center rounded-md text-[var(--sidebar-fg)] hover:bg-[var(--hover)] hover:text-[var(--sidebar-fg-hover)] transition-colors"
               >
-                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 19l-7-7 7-7m8 14l-7-7 7-7" /></svg>
+                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 19l-7-7 7-7m8 14l-7-7 7-7" /></svg>
               </button>
             )}
             {isCollapsed && (
               <button
                 onClick={() => setIsCollapsed(false)}
-                className="absolute -right-3 top-20 flex h-6 w-6 items-center justify-center rounded-full border border-white/10 bg-[#007fff] text-white/70 hover:text-white shadow-sm"
+                className="absolute -right-3 top-16 flex h-6 w-6 items-center justify-center rounded-full border border-[var(--border)] bg-[var(--surface)] text-[var(--muted)] hover:text-[var(--foreground)] shadow-sm transition-colors"
               >
-                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" /></svg>
+                <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" /></svg>
               </button>
             )}
           </div>
 
-          <nav className="flex-1 space-y-2 overflow-y-auto pr-0 custom-scrollbar">
+          {/* Navigation Group Label */}
+          {!isCollapsed && (
+            <p className="px-3 mb-2 text-[10px] font-semibold uppercase tracking-widest text-[var(--muted)]">
+              Main Menu
+            </p>
+          )}
+
+          {/* Navigation Items */}
+          <nav className="flex-1 space-y-0.5 overflow-y-auto custom-scrollbar-premium">
             {appNavigation.map((item) => {
               const active =
                 item.href === "/"
@@ -152,12 +163,16 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   key={item.href}
                   href={item.href}
                   title={isCollapsed ? item.label : ""}
-                  className={`group flex items-center rounded-xl p-3 text-sm font-semibold transition-all duration-200 ${isCollapsed ? "justify-center" : "gap-4 px-4"
+                  className={`group relative flex items-center rounded-lg py-2.5 text-[13px] font-medium transition-colors duration-150 ${isCollapsed ? "justify-center px-2" : "gap-3 px-3"
                     } ${active
-                      ? "bg-white/20 text-white"
-                      : "text-white/70 hover:text-white hover:bg-white/10"
+                      ? "bg-[var(--sidebar-active-bg)] text-[var(--sidebar-active-fg)] font-semibold"
+                      : "text-[var(--sidebar-fg)] hover:text-[var(--sidebar-fg-hover)] hover:bg-[var(--hover)]"
                     }`}
                 >
+                  {/* Active indicator bar */}
+                  {active && !isCollapsed && (
+                    <span className="absolute left-0 top-1/2 -translate-y-1/2 h-6 w-[3px] rounded-r-full bg-[var(--sidebar-active-fg)]" />
+                  )}
                   <NavIcon href={item.href} active={active} />
                   {!isCollapsed && <span>{item.label}</span>}
                 </Link>
@@ -165,48 +180,47 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             })}
           </nav>
 
-          <div className="mt-auto space-y-6">
-
-
-            {/* Profile Section */}
-            <div className={`flex items-center border-t border-white/10 pt-6 ${isCollapsed ? "justify-center" : "justify-between"}`}>
+          {/* Profile Section */}
+          <div className="mt-auto space-y-4">
+            <div className={`flex items-center border-t border-[var(--sidebar-border)] pt-4 ${isCollapsed ? "justify-center" : "justify-between px-1"}`}>
               <div className="flex items-center gap-3">
-                <div className="h-10 w-10 shrink-0 overflow-hidden rounded-full bg-white/20">
-                  <button className="flex h-full w-full items-center justify-center text-xs font-bold text-white uppercase">
+                <div className="h-9 w-9 shrink-0 overflow-hidden rounded-full bg-[var(--sidebar-active-bg)] flex items-center justify-center border border-[var(--border)]">
+                  <span className="text-xs font-semibold text-[var(--sidebar-active-fg)] uppercase">
                     {getInitials(session.user?.fullName)}
-                  </button>
+                  </span>
                 </div>
                 {!isCollapsed && (
                   <div className="min-w-0">
-                    <p className="truncate text-sm font-bold text-white">{session.user?.fullName || "Easin Arafat"}</p>
-                    <p className="truncate text-xs text-white/70">Free Account</p>
+                    <p className="truncate text-sm font-semibold text-[var(--foreground)]">{session.user?.fullName || "User"}</p>
+                    <p className="truncate text-[11px] text-[var(--muted)]">Free Account</p>
                   </div>
                 )}
               </div>
               {!isCollapsed && (
-                <button onClick={() => void logout()} className="text-white/70 hover:text-red-300 transition-colors">
-                  <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
+                <button onClick={() => void logout()} className="text-[var(--muted)] hover:text-red-500 transition-colors p-1 rounded-md hover:bg-red-50">
+                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
                 </button>
               )}
             </div>
           </div>
         </aside>
 
+        {/* Main Content Area */}
         <div className={`flex min-w-0 flex-1 flex-col ${pathname === "/livestreams" ? "h-screen overflow-hidden" : "min-h-screen"}`}>
           <Header />
 
-          <main className={`min-w-0 flex-1 ${pathname === "/livestreams" ? "px-2 sm:px-3 pb-0 flex flex-col overflow-hidden" : "px-4 sm:px-8 pb-24 lg:pb-8"}`}>
-            <div className={`w-full h-full ${pathname === "/livestreams" ? "flex flex-col flex-1 overflow-hidden" : "block"}`}>{children}</div>
+          <main className={`min-w-0 flex-1 ${pathname === "/livestreams" ? "px-2 sm:px-3 pb-0 flex flex-col overflow-hidden" : "px-4 sm:px-6 lg:px-8 pt-6 pb-24 lg:pb-8"}`}>
+            <div className={`w-full h-full ${pathname === "/livestreams" ? "flex flex-col flex-1 overflow-hidden" : "block max-w-[1400px] mx-auto"}`}>{children}</div>
           </main>
 
           {pathname !== "/livestreams" && (
-            <footer className="mt-auto hidden border-t border-[var(--border)] bg-[var(--surface)] px-6 py-4 lg:block shrink-0">
-              <div className="mx-auto flex max-w-[1200px] items-center justify-between text-xs text-[var(--muted)]">
+            <footer className="mt-auto hidden border-t border-[var(--border)] bg-[var(--surface)] px-6 py-3 lg:block shrink-0">
+              <div className="mx-auto flex max-w-[1400px] items-center justify-between text-xs text-[var(--muted)]">
                 <p>© {new Date().getFullYear()} LiveTracker. All rights reserved.</p>
                 <div className="flex gap-4">
-                  <a href="#" className="hover:text-[var(--foreground)]">Hỗ trợ</a>
-                  <a href="#" className="hover:text-[var(--foreground)]">Bảo mật</a>
-                  <a href="#" className="hover:text-[var(--foreground)]">Điều khoản</a>
+                  <a href="#" className="hover:text-[var(--foreground)] transition-colors">Hỗ trợ</a>
+                  <a href="#" className="hover:text-[var(--foreground)] transition-colors">Bảo mật</a>
+                  <a href="#" className="hover:text-[var(--foreground)] transition-colors">Điều khoản</a>
                 </div>
               </div>
             </footer>
@@ -214,8 +228,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </div>
       </div>
 
-      <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-[var(--border)] bg-[var(--surface)]/90 backdrop-blur-md lg:hidden">
-        <div className="mx-auto w-full px-2 py-2">
+      {/* Mobile Bottom Nav */}
+      <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-[var(--border)] bg-[var(--surface)]/95 backdrop-blur-sm lg:hidden">
+        <div className="mx-auto w-full px-2 py-1.5">
           <div className="flex items-center justify-around gap-1">
             {appNavigation.map((item) => {
               const active =
@@ -227,7 +242,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 <Link
                   key={item.href}
                   href={item.href}
-                  className={`flex flex-1 flex-col items-center gap-1 rounded-md px-1 py-2 transition-colors ${active ? "text-[color:var(--primary)]" : "text-[var(--muted)] hover:text-[var(--foreground)]"
+                  className={`flex flex-1 flex-col items-center gap-0.5 rounded-md px-1 py-1.5 transition-colors ${active ? "text-[color:var(--primary)]" : "text-[var(--muted)] hover:text-[var(--foreground)]"
                     }`}
                 >
                   <NavIcon href={item.href} active={active} />
@@ -243,8 +258,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 }
 
 function NavIcon({ href, active }: { href: string; active: boolean }) {
-  const className = `h-5 w-5 transition-transform duration-300 ${active ? "scale-110" : "group-hover:scale-110"
-    }`;
+  const className = `h-[18px] w-[18px] transition-colors duration-150`;
 
   if (href === "/") {
     return (

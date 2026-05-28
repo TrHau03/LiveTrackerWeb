@@ -152,3 +152,66 @@ export async function renderReceiptToImage(
     );
   });
 }
+
+// ═══════════════════════════════════════════
+// PRINT VIA GOLANG LOCAL BRIDGE
+// ═══════════════════════════════════════════
+
+export async function printReceipt(
+  receiptElement: HTMLElement,
+): Promise<{ success: boolean; error?: string; isOffline?: boolean }> {
+  try {
+    // 1. Ping thử xem Local Bridge có đang online hay không (Timeout 500ms)
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 500);
+    const statusResp = await fetch("http://localhost:13579/status", {
+      signal: controller.signal,
+    }).catch(() => null);
+    clearTimeout(timeoutId);
+
+    if (statusResp && statusResp.ok) {
+      // 2. Bridge hoạt động -> Render HTML sang tệp ảnh JPEG chất lượng cao
+      const imageBlob = await renderReceiptToImage(receiptElement);
+
+      // 3. Gửi tệp ảnh in trực tiếp qua cổng POST /print của Bridge
+      const formData = new FormData();
+      formData.append("image", imageBlob, "receipt.jpg");
+
+      const printResp = await fetch("http://localhost:13579/print", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!printResp.ok) {
+        const errJson = await printResp.json().catch(() => ({}));
+        return {
+          success: false,
+          error: errJson.message || `Lỗi máy in: HTTP ${printResp.status}`,
+        };
+      }
+
+      const printResult = await printResp.json();
+      if (printResult.success) {
+        return { success: true };
+      } else {
+        return {
+          success: false,
+          error: printResult.message || "Lỗi gửi lệnh in thô.",
+        };
+      }
+    }
+  } catch (e) {
+    return {
+      success: false,
+      isOffline: true,
+      error: "Không tìm thấy chương trình Local Bridge đang chạy ngầm.",
+    };
+  }
+
+  return {
+    success: false,
+    isOffline: true,
+    error: "Chương trình Local Bridge máy in đang ngoại tuyến (Offline).",
+  };
+}
+

@@ -63,6 +63,8 @@ export type Comment = {
   customerClosedCount?: number;
   customerTag?: Tag | null;
   backupOf?: string | { _id: string; igUsername?: string; text?: string } | null;
+  customerAvatar?: string | null;
+  avatar?: string;
 };
 
 // ─── Order ───────────────────────────────────────────────────────────────────
@@ -119,6 +121,7 @@ export type Customer = {
   street?: string;
   note?: string;
   userId?: string;
+  avatar?: string | null;
   tags?: Tag[];
   histories?: CustomerHistory[];
   createdAt?: string;

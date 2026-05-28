@@ -6,7 +6,7 @@ import { asRecord, pickNumber, pickString } from "@/lib/proxy-client";
 
 type Primitive = string | number | boolean | null | undefined;
 export const SECONDARY_BUTTON_CLASS =
-  "inline-flex h-10 items-center justify-center rounded-lg border border-[var(--border)] bg-[var(--surface)] px-4 text-sm font-medium text-[var(--foreground)] shadow-sm transition hover:bg-[var(--surface-muted)] disabled:opacity-50";
+  "inline-flex h-9 items-center justify-center rounded-lg border border-[var(--border)] bg-[var(--surface)] px-4 text-sm font-medium text-[var(--foreground)] transition hover:bg-[var(--hover)] disabled:opacity-50";
 
 export function Hero({
   title,
@@ -17,7 +17,7 @@ export function Hero({
 }) {
   return (
     <section className="mb-6 flex flex-col gap-1">
-      <h1 className="text-2xl font-bold tracking-tight text-[var(--foreground)] md:text-3xl">
+      <h1 className="text-xl font-semibold tracking-tight text-[var(--foreground)] md:text-2xl">
         {title}
       </h1>
       {description && (
@@ -41,10 +41,10 @@ export function Panel({
   className?: string;
 }) {
   return (
-    <section className={`rounded-xl border border-[var(--border)] bg-[var(--surface)] shadow-sm ${className}`}>
-      <div className="border-b border-[var(--border)] px-5 py-4">
+    <section className={`rounded-lg border border-[var(--border)] bg-[var(--surface)] shadow-[var(--shadow-soft)] ${className}`}>
+      <div className="border-b border-[var(--border)] px-5 py-3.5">
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-          <h2 className="text-base font-semibold text-[var(--foreground)]">
+          <h2 className="text-sm font-semibold text-[var(--foreground)]">
             {title}
           </h2>
           {action}
@@ -63,9 +63,9 @@ export function PanelInset({
   children: React.ReactNode;
 }) {
   return (
-    <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] shadow-sm">
-      <div className="border-b border-[var(--border)] px-5 py-4">
-        <h3 className="text-base font-semibold text-[var(--foreground)]">{title}</h3>
+    <div className="rounded-lg border border-[var(--border)] bg-[var(--surface)] shadow-[var(--shadow-soft)]">
+      <div className="border-b border-[var(--border)] px-5 py-3.5">
+        <h3 className="text-sm font-semibold text-[var(--foreground)]">{title}</h3>
       </div>
       <div className="p-5">{children}</div>
     </div>
@@ -94,23 +94,23 @@ export function StatCard({
   extra?: string | null;
 }) {
   return (
-    <article className="flex items-center gap-4 rounded-2xl bg-[var(--surface)] p-5 shadow-[var(--shadow-soft)] transition-all hover:shadow-md border border-[var(--border)]">
-      <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl ${iconBg} ${iconColor}`}>
+    <article className="flex items-center gap-4 rounded-lg bg-[var(--surface)] p-4 shadow-[var(--shadow-soft)] transition-shadow duration-200 hover:shadow-[var(--shadow-strong)] border border-[var(--border)]">
+      <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${iconBg} ${iconColor}`}>
         {icon}
       </div>
       <div className="min-w-0 flex-1">
-        <p className="text-xs font-medium text-[var(--muted)] truncate mb-1">{label}</p>
+        <p className="text-xs font-medium text-[var(--muted)] truncate mb-0.5">{label}</p>
         <div className="flex items-baseline gap-2">
-          <h3 className="text-xl font-bold tracking-tight text-[var(--foreground)]">
+          <h3 className="text-lg font-bold tracking-tight text-[var(--foreground)]">
             {typeof value === "number" ? formatNumber(value) : String(value)}
           </h3>
           {change !== undefined && change !== null && (
-            <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-md ${change >= 0 ? "text-green-600 bg-green-50 dark:bg-green-900/20" : "text-red-600 bg-red-50 dark:bg-red-900/20"}`}>
+            <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${change >= 0 ? "text-green-600 bg-green-50" : "text-red-600 bg-red-50"}`}>
               {change >= 0 ? "+" : ""}{change}%
             </span>
           )}
         </div>
-        {extra && <p className="text-[10px] text-[var(--muted)] mt-1 font-medium">{extra}</p>}
+        {extra && <p className="text-[10px] text-[var(--muted)] mt-0.5 font-medium">{extra}</p>}
       </div>
     </article>
   );
@@ -134,11 +134,11 @@ export function BriefcaseIcon() {
 
 export function MiniMetric({ label, value }: { label: string; value: Primitive }) {
   return (
-    <div className="rounded-[22px] border border-[var(--border)] bg-[var(--surface-muted)] px-4 py-4">
-      <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[var(--muted)]">
+    <div className="rounded-lg border border-[var(--border)] bg-[var(--surface-muted)] px-4 py-3">
+      <p className="text-[11px] font-semibold uppercase tracking-wider text-[var(--muted)]">
         {label}
       </p>
-      <p className="mt-2 text-sm font-semibold leading-7 text-[var(--foreground)]">
+      <p className="mt-1.5 text-sm font-semibold text-[var(--foreground)]">
         {String(value)}
       </p>
     </div>
@@ -150,16 +150,18 @@ export function Tag({
   tone,
 }: {
   children: React.ReactNode;
-  tone: "blue" | "muted" | "danger";
+  tone: "blue" | "muted" | "danger" | "green" | "orange";
 }) {
   const tones = {
-    blue: "bg-[var(--primary-soft)] text-[var(--primary)]",
+    blue: "bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400",
+    green: "bg-green-50 text-green-600 dark:bg-green-900/20 dark:text-green-400",
+    orange: "bg-orange-50 text-orange-600 dark:bg-orange-900/20 dark:text-orange-400",
     muted: "bg-[var(--surface-muted)] text-[var(--muted)]",
-    danger: "bg-[rgba(255,69,58,0.14)] text-[rgb(255,69,58)]",
+    danger: "bg-red-50 text-red-600 dark:bg-red-900/20 dark:text-red-400",
   }[tone];
 
   return (
-    <span className={`inline-flex rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] ${tones}`}>
+    <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-medium ${tones}`}>
       {children}
     </span>
   );
@@ -178,8 +180,11 @@ export function LinkPill({ href, label }: { href: string; label: string }) {
 
 export function LoadingState({ compact = false }: { compact?: boolean }) {
   return (
-    <div className={`rounded-[24px] border border-[var(--border)] bg-[var(--surface-muted)] text-[var(--muted)] ${compact ? "px-4 py-4 text-sm" : "mb-4 px-4 py-5 text-sm"}`}>
-      Loading...
+    <div className={`rounded-lg border border-[var(--border)] bg-[var(--surface-muted)] text-[var(--muted)] ${compact ? "px-4 py-3 text-sm" : "mb-4 px-4 py-4 text-sm"}`}>
+      <div className="flex items-center gap-2">
+        <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[var(--primary)]" />
+        Loading...
+      </div>
     </div>
   );
 }
@@ -192,7 +197,7 @@ export function ErrorState({
   compact?: boolean;
 }) {
   return (
-    <div className={`rounded-[24px] border border-[rgba(255,69,58,0.24)] bg-[rgba(255,69,58,0.08)] text-[rgb(255,69,58)] ${compact ? "px-4 py-4 text-sm" : "mb-4 px-4 py-5 text-sm"}`}>
+    <div className={`rounded-lg border border-red-200 bg-red-50 text-red-600 dark:border-red-800/30 dark:bg-red-900/10 dark:text-red-400 ${compact ? "px-4 py-3 text-sm" : "mb-4 px-4 py-4 text-sm"}`}>
       {message}
     </div>
   );
@@ -206,7 +211,7 @@ export function EmptyState({
   compact?: boolean;
 }) {
   return (
-    <div className={`rounded-[24px] border border-dashed border-[var(--border)] bg-[var(--surface-muted)] text-[var(--muted)] ${compact ? "px-4 py-4 text-sm" : "px-4 py-5 text-sm"}`}>
+    <div className={`rounded-lg border border-dashed border-[var(--border)] bg-[var(--surface-muted)] text-[var(--muted)] ${compact ? "px-4 py-3 text-sm" : "px-4 py-4 text-sm"}`}>
       {message}
     </div>
   );
@@ -220,11 +225,11 @@ export function CompanionMetric({
   value: Primitive;
 }) {
   return (
-    <div className="rounded-[20px] border border-white/10 bg-white/5 px-4 py-3">
-      <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-white/52">
+    <div className="rounded-lg border border-[var(--border)] bg-[var(--surface-muted)] px-4 py-3">
+      <p className="text-[10px] font-semibold uppercase tracking-wider text-[var(--muted)]">
         {label}
       </p>
-      <p className="mt-2 text-sm font-semibold text-white">{String(value)}</p>
+      <p className="mt-1.5 text-sm font-semibold text-[var(--foreground)]">{String(value)}</p>
     </div>
   );
 }
@@ -333,9 +338,9 @@ export function formatStreamState(value: "connecting" | "live" | "stopped" | "er
 }
 
 export const CONTROL_CLASS =
-  "h-10 rounded-lg border border-[var(--border)] bg-[var(--surface)] px-3 text-sm text-[var(--foreground)] outline-none transition focus:border-[var(--primary)] focus:ring-1 focus:ring-[var(--primary)]";
+  "h-9 rounded-lg border border-[var(--border)] bg-[var(--surface)] px-3 text-sm text-[var(--foreground)] outline-none transition focus:border-[var(--primary)] focus:ring-2 focus:ring-blue-100 dark:focus:ring-blue-900/30";
 export const PRIMARY_BUTTON_CLASS =
-  "inline-flex h-10 items-center justify-center rounded-lg bg-[var(--primary)] px-4 text-sm font-medium text-white shadow-sm transition hover:bg-[var(--primary-strong)] disabled:opacity-50";
+  "inline-flex h-9 items-center justify-center rounded-lg bg-[var(--accent-green)] px-4 text-sm font-medium text-white shadow-sm transition hover:bg-[var(--accent-green-strong)] disabled:opacity-50";
 
 export function formatDateTime(value: string | undefined | null) {
   if (!value) return "No data";
@@ -373,5 +378,3 @@ export function formatLiveDateTime(value: string | undefined | null) {
 export function formatCurrency(value: number) {
   return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(value);
 }
-
-

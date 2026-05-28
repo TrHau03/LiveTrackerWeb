@@ -27,18 +27,8 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [isReady, setIsReady] = useState(false);
 
   useEffect(() => {
-    const storedTheme = window.localStorage.getItem(THEME_STORAGE_KEY);
-    const preferredDark =
-      window.matchMedia("(prefers-color-scheme: dark)").matches;
-    const nextTheme =
-      storedTheme === "light" || storedTheme === "dark"
-        ? storedTheme
-        : preferredDark
-          ? "dark"
-          : "light";
-
     startTransition(() => {
-      setThemeState(nextTheme);
+      setThemeState("light");
       setIsReady(true);
     });
   }, []);
@@ -48,21 +38,19 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       return;
     }
 
-    window.localStorage.setItem(THEME_STORAGE_KEY, theme);
-    document.documentElement.classList.toggle("dark", theme === "dark");
-    document.documentElement.dataset.theme = theme;
-  }, [isReady, theme]);
+    window.localStorage.setItem(THEME_STORAGE_KEY, "light");
+    document.documentElement.classList.remove("dark");
+    document.documentElement.dataset.theme = "light";
+  }, [isReady]);
 
   const value = useMemo<ThemeContextValue>(
     () => ({
       isReady,
-      theme,
-      setTheme: (nextTheme) => setThemeState(nextTheme),
-      toggleTheme: () => {
-        setThemeState((current) => (current === "dark" ? "light" : "dark"));
-      },
+      theme: "light",
+      setTheme: () => {},
+      toggleTheme: () => {},
     }),
-    [isReady, theme],
+    [isReady],
   );
 
   return (

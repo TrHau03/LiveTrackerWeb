@@ -11,6 +11,8 @@ export async function fetchMyOrders(
     limit?: number;
     startDate?: string;
     endDate?: string;
+    fromDate?: string;
+    toDate?: string;
     search?: string;
     liveId?: string;
     sortBy?: string;
@@ -23,8 +25,8 @@ export async function fetchMyOrders(
       page: query?.page ?? 1,
       limit: query?.limit ?? 20,
       search: query?.search || undefined,
-      startDate: query?.startDate || undefined,
-      endDate: query?.endDate || undefined,
+      fromDate: query?.fromDate || query?.startDate || undefined,
+      toDate: query?.toDate || query?.endDate || undefined,
       liveId: query?.liveId || undefined,
       sortBy: query?.sortBy ?? "createdAt",
       sortOrder: query?.sortOrder ?? "desc",

@@ -30,6 +30,7 @@ import {
   ShoppingCartIcon,
   MessageSquareIcon,
   UsersIcon,
+  DollarSign,
 } from "lucide-react";
 import { useHeaderStore } from "@/lib/store/header-store";
 
@@ -87,41 +88,114 @@ export function DashboardScreen() {
   // Chuyển đổi dữ liệu từ API sang định dạng hiển thị
   const metrics = asRecord(extractApiData(dashboardData));
 
-  // Helper để map dữ liệu biểu đồ
+  // Helper để map dữ liệu biểu đồ với điền ngày trung gian (date interpolation)
   const mapSeriesData = (payload: unknown, valueKey: string) => {
     const collection = extractCollection(payload);
-    if (!collection || collection.length === 0) return [];
-
-    const mapped = collection.map((item) => {
-      const val = Number(item[valueKey] ?? item.revenue ?? item.value ?? item.count ?? item.total ?? 0);
-
-      let name = 'N/A';
-      const rawDate = item.date || item.label || item.name;
-
-      if (rawDate && typeof rawDate === 'string') {
-        const dateObj = new Date(rawDate);
-        if (!isNaN(dateObj.getTime())) {
-          name = dateObj.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' });
-        } else {
-          name = rawDate;
-        }
+    
+    // Khởi tạo map chứa tất cả ngày/tháng trong khoảng
+    const dateMap = new Map<string, any>();
+    const start = new Date(dateRange.startDate);
+    const end = new Date(dateRange.endDate);
+    
+    if (period === "year") {
+      // Điền theo tháng
+      const current = new Date(start.getFullYear(), start.getMonth(), 1);
+      const targetEnd = new Date(end.getFullYear(), end.getMonth(), 1);
+      while (current <= targetEnd) {
+        const year = current.getFullYear();
+        const month = String(current.getMonth() + 1).padStart(2, '0');
+        const key = `${year}-${month}`; // "YYYY-MM"
+        const name = `Thg ${current.getMonth() + 1}`;
+        dateMap.set(key, {
+          name,
+          value: 0,
+          fullDate: key,
+          count: 0,
+          total: 0,
+          revenue: 0
+        });
+        current.setMonth(current.getMonth() + 1);
       }
+    } else {
+      // Điền theo ngày cho các period: day, week, month
+      const current = new Date(start);
+      current.setHours(0, 0, 0, 0);
+      const targetEnd = new Date(end);
+      targetEnd.setHours(0, 0, 0, 0);
+      
+      // Giới hạn an toàn tối đa 366 ngày
+      let safetyCounter = 0;
+      while (current <= targetEnd && safetyCounter < 400) {
+        safetyCounter++;
+        const key = current.toISOString().split('T')[0]; // "YYYY-MM-DD"
+        const name = current.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' });
+        dateMap.set(key, {
+          name,
+          value: 0,
+          fullDate: key,
+          count: 0,
+          total: 0,
+          revenue: 0
+        });
+        current.setDate(current.getDate() + 1);
+      }
+    }
 
-      return {
-        name,
-        value: val,
-        fullDate: String(rawDate || ''),
-        count: Number(item.count ?? item.value ?? 0),
-        total: Number(item.total ?? item.count ?? item.value ?? 0),
-        revenue: Number(item.revenue ?? item.value ?? 0)
-      };
-    });
+    if (collection && collection.length > 0) {
+      collection.forEach((item) => {
+        const val = Number(item[valueKey] ?? item.revenue ?? item.value ?? item.count ?? item.total ?? 0);
+        const rawDate = item.date || item.label || item.name;
+        if (!rawDate) return;
 
-    // Nếu chỉ có 1 điểm, nhân bản để Recharts vẽ được vùng Area
-    if (mapped.length === 1) {
+        const dateObj = new Date(rawDate as any);
+        if (isNaN(dateObj.getTime())) {
+          // Fallback nếu không parse được date nhưng có label dạng chuỗi
+          const labelStr = String(rawDate);
+          if (dateMap.has(labelStr)) {
+            const existing = dateMap.get(labelStr);
+            existing.value = val;
+            existing.count = Number(item.count ?? item.value ?? val);
+            existing.total = Number(item.total ?? item.count ?? item.value ?? val);
+            existing.revenue = Number(item.revenue ?? item.value ?? val);
+          }
+          return;
+        }
+
+        const key = period === "year"
+          ? `${dateObj.getFullYear()}-${String(dateObj.getMonth() + 1).padStart(2, '0')}`
+          : dateObj.toISOString().split('T')[0];
+
+        if (dateMap.has(key)) {
+          const existing = dateMap.get(key);
+          existing.value = val;
+          existing.count = Number(item.count ?? item.value ?? val);
+          existing.total = Number(item.total ?? item.count ?? item.value ?? val);
+          existing.revenue = Number(item.revenue ?? item.value ?? val);
+        } else {
+          // Nếu key nằm ngoài khoảng (do lệch múi giờ), tự động thêm vào
+          const name = period === "year"
+            ? `Thg ${dateObj.getMonth() + 1}`
+            : dateObj.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' });
+          dateMap.set(key, {
+            name,
+            value: val,
+            fullDate: key,
+            count: Number(item.count ?? item.value ?? val),
+            total: Number(item.total ?? item.count ?? item.value ?? val),
+            revenue: Number(item.revenue ?? item.value ?? val)
+          });
+        }
+      });
+    }
+
+    const mapped = Array.from(dateMap.values());
+
+    // Nếu chỉ có 1 điểm hoặc trống, tạo 2 điểm để Recharts vẽ vùng đẹp hơn
+    if (mapped.length <= 1) {
+      const single = mapped[0] || { name: '', value: 0, revenue: 0, count: 0, total: 0 };
       return [
-        { ...mapped[0], name: '', value: 0, revenue: 0, count: 0, total: 0 },
-        mapped[0]
+        { ...single, name: '', value: 0, revenue: 0, count: 0, total: 0 },
+        single
       ];
     }
 
@@ -171,8 +245,8 @@ export function DashboardScreen() {
   const resetHeader = useHeaderStore((state) => state.resetHeader);
 
   // Chart styles based on theme
-  const gridStroke = theme === "dark" ? "rgba(255, 255, 255, 0.08)" : "rgba(0, 0, 0, 0.08)";
-  const textFill = theme === "dark" ? "#94A3B8" : "#64748B";
+  const gridStroke = theme === "dark" ? "rgba(255, 255, 255, 0.06)" : "rgba(0, 0, 0, 0.06)";
+  const textFill = theme === "dark" ? "#9CA3AF" : "#9CA3AF";
 
   // Cập nhật Header chung
   React.useEffect(() => {
@@ -185,14 +259,14 @@ export function DashboardScreen() {
       startDate: startStr,
       endDate: endStr,
       customContent: (
-        <div className="flex items-center gap-1 bg-[var(--surface-muted)] p-1 rounded-xl border border-[var(--border)]">
+        <div className="flex items-center gap-0.5 bg-[var(--surface-muted)] p-0.5 rounded-lg border border-[var(--border)]">
           {periods.map((p) => (
             <button
               key={p.id}
               onClick={() => setPeriod(p.id)}
-              className={`px-3 py-1.5 text-[10px] font-bold rounded-lg transition-all ${period === p.id
-                ? "bg-[#1447E6] text-white shadow-sm"
-                : "text-[var(--muted)] hover:text-[var(--foreground)] hover:bg-[var(--hover)]"
+              className={`px-3 py-1.5 text-[11px] font-medium rounded-md transition-all ${period === p.id
+                ? "bg-[var(--surface)] text-[var(--foreground)] shadow-sm"
+                : "text-[var(--muted)] hover:text-[var(--foreground)]"
                 }`}
             >
               {p.label}
@@ -206,47 +280,47 @@ export function DashboardScreen() {
   }, [period, dateRange, session.user, setHeader, resetHeader]);
 
   return (
-    <div className="space-y-8 pb-28 lg:pb-6 pt-4">
+    <div className="space-y-6 pb-28 lg:pb-6 pt-2">
 
-      <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard
           label="Doanh thu ước tính"
           value={formatVNCurrency(revenueSummary.total)}
           change={pickNumber(metrics.revenue, ["change"])}
-          icon={<TrendingUpIcon className="w-5 h-5" />}
-          iconBg="bg-blue-50 dark:bg-blue-900/20"
-          iconColor="text-blue-600 dark:text-blue-400"
+          icon={<DollarSign className="w-4 h-4" />}
+          iconBg="bg-emerald-50"
+          iconColor="text-emerald-600"
         />
         <StatCard
           label="Tổng Đơn hàng"
           value={ordersSummary.total}
           change={pickNumber(metrics.orders, ["change"])}
-          icon={<ShoppingCartIcon className="w-5 h-5" />}
-          iconBg="bg-orange-50 dark:bg-orange-900/20"
-          iconColor="text-orange-600 dark:text-orange-400"
+          icon={<ShoppingCartIcon className="w-4 h-4" />}
+          iconBg="bg-blue-50"
+          iconColor="text-blue-600"
         />
         <StatCard
           label="Bình luận"
           value={commentsSummary.total}
-          icon={<MessageSquareIcon className="w-5 h-5" />}
-          iconBg="bg-green-50 dark:bg-green-900/20"
-          iconColor="text-green-600 dark:text-green-400"
+          icon={<MessageSquareIcon className="w-4 h-4" />}
+          iconBg="bg-purple-50"
+          iconColor="text-purple-600"
         />
         <StatCard
           label="Khách hàng"
           value={pickNumber(metrics.customers, ["total", "count"]) || 0}
           extra={pickNumber(metrics.customers, ["newCount", "newCustomers"]) ? `+${pickNumber(metrics.customers, ["newCount", "newCustomers"])} mới` : null}
-          icon={<UsersIcon className="w-5 h-5" />}
-          iconBg="bg-purple-50 dark:bg-purple-900/20"
-          iconColor="text-purple-600 dark:text-purple-400"
+          icon={<UsersIcon className="w-4 h-4" />}
+          iconBg="bg-rose-50"
+          iconColor="text-rose-600"
         />
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-2 items-stretch">
+      <div className="grid gap-4 lg:grid-cols-2 items-stretch">
         {/* Cột trái: Biểu đồ Doanh thu */}
         <Panel
           title="Báo cáo Doanh thu"
-          action={<span className="text-[var(--muted)] text-xs flex items-center gap-1"><CalendarIcon className="w-3 h-3" /> {periods.find(p => p.id === period)?.label}</span>}
+          action={<span className="text-[var(--muted)] text-xs font-medium flex items-center gap-1"><CalendarIcon className="w-3 h-3" /> {periods.find(p => p.id === period)?.label}</span>}
           className="flex flex-col h-full"
         >
           <div className="flex-1 min-h-[400px] w-full mt-4">
@@ -261,6 +335,12 @@ export function DashboardScreen() {
                     data={revenueChartData}
                     margin={{ top: 20, right: 30, left: 10, bottom: 20 }}
                   >
+                    <defs>
+                      <linearGradient id="revenueGrad" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#10B981" stopOpacity={0.25} />
+                        <stop offset="95%" stopColor="#10B981" stopOpacity={0.01} />
+                      </linearGradient>
+                    </defs>
                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={gridStroke} />
                     <XAxis
                       dataKey="name"
@@ -279,9 +359,9 @@ export function DashboardScreen() {
                       content={({ active, payload }) => {
                         if (active && payload && payload.length) {
                           return (
-                            <div className="rounded-xl bg-white p-3 shadow-2xl border border-slate-100 dark:bg-slate-900 border-l-4 border-l-[#10B981]">
-                              <p className="text-[10px] text-slate-400 font-bold mb-1 uppercase tracking-wider">{payload[0].payload.name}</p>
-                              <p className="text-sm font-black text-[#10B981]">Doanh thu: {formatNumber(payload[0].payload.revenue)}đ</p>
+                            <div className="rounded-lg border border-[var(--border)] bg-[var(--surface)] p-3 shadow-[var(--shadow-strong)]">
+                              <p className="text-[10px] text-[var(--muted)] font-medium mb-1">{payload[0].payload.name}</p>
+                              <p className="text-sm font-semibold text-[#10B981]">Doanh thu: {formatNumber(payload[0].payload.revenue)}đ</p>
                             </div>
                           );
                         }
@@ -292,9 +372,9 @@ export function DashboardScreen() {
                       type="monotone"
                       dataKey="value"
                       stroke="#10B981"
-                      strokeWidth={4}
-                      fill="#10B981"
-                      fillOpacity={0.15}
+                      strokeWidth={3}
+                      fill="url(#revenueGrad)"
+                      fillOpacity={1}
                       dot={{ r: 4, fill: '#10B981', strokeWidth: 2, stroke: '#fff' }}
                       isAnimationActive={false}
                     />
@@ -303,27 +383,33 @@ export function DashboardScreen() {
               </div>
             )}
           </div>
-          <div className="mt-8 pt-6 border-t border-slate-100 grid grid-cols-3 gap-4 dark:border-slate-800">
+          <div className="mt-6 pt-4 border-t border-[var(--border)] grid grid-cols-3 gap-4">
             <div className="flex flex-col">
-              <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">Tổng doanh thu</span>
-              <span className="text-lg font-black text-[#10B981]">{formatNumber(revenueSummary.total)}đ</span>
+              <span className="text-[11px] font-medium text-[var(--muted)] uppercase tracking-wider mb-1">Tổng doanh thu</span>
+              <span className="text-base font-bold text-[#10B981]">{formatNumber(revenueSummary.total)}đ</span>
             </div>
             <div className="flex flex-col">
-              <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">T.Bình/Ngày</span>
-              <span className="text-lg font-black text-slate-700 dark:text-slate-200">{formatNumber(revenueSummary.avg)}đ</span>
+              <span className="text-[11px] font-medium text-[var(--muted)] uppercase tracking-wider mb-1">T.Bình/Ngày</span>
+              <span className="text-base font-bold text-[var(--foreground)]">{formatNumber(revenueSummary.avg)}đ</span>
             </div>
             <div className="flex flex-col">
-              <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">Cao nhất</span>
-              <span className="text-lg font-black text-slate-700 dark:text-slate-200">{formatNumber(revenueSummary.max)}đ</span>
+              <span className="text-[11px] font-medium text-[var(--muted)] uppercase tracking-wider mb-1">Cao nhất</span>
+              <span className="text-base font-bold text-[var(--foreground)]">{formatNumber(revenueSummary.max)}đ</span>
             </div>
           </div>
         </Panel>
-        <div className="flex flex-col gap-6">
+        <div className="flex flex-col gap-4">
           {/* Biểu đồ Đơn hàng */}
           <Panel title="Theo dõi Đơn hàng" className="flex-1">
             <div className="h-[200px] w-full mt-4">
               <ResponsiveContainer width="100%" height="100%">
                 <AreaChart data={ordersChartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="ordersGrad" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="var(--primary)" stopOpacity={0.25} />
+                      <stop offset="95%" stopColor="var(--primary)" stopOpacity={0.01} />
+                    </linearGradient>
+                  </defs>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={gridStroke} />
                   <XAxis
                     dataKey="name"
@@ -342,9 +428,9 @@ export function DashboardScreen() {
                     content={({ active, payload }) => {
                       if (active && payload && payload.length) {
                         return (
-                          <div className="rounded-xl bg-white p-2 shadow-xl border border-slate-100 dark:bg-slate-900 border-l-4 border-l-[#1447E6]">
-                            <p className="text-[10px] text-slate-400 mb-0.5 font-bold uppercase">{payload[0].payload.name}</p>
-                            <p className="text-sm font-black text-[#1447E6]">Đơn hàng: {payload[0].value}</p>
+                          <div className="rounded-lg border border-[var(--border)] bg-[var(--surface)] p-3 shadow-[var(--shadow-strong)]">
+                            <p className="text-[10px] text-[var(--muted)] mb-1 font-medium">{payload[0].payload.name}</p>
+                            <p className="text-sm font-semibold text-[var(--primary)]">Đơn hàng: {payload[0].value}</p>
                           </div>
                         );
                       }
@@ -354,24 +440,24 @@ export function DashboardScreen() {
                   <Area
                     type="monotone"
                     dataKey="value"
-                    stroke="#1447E6"
-                    strokeWidth={3}
-                    fill="#1447E6"
-                    fillOpacity={0.1}
-                    dot={{ r: 3, fill: '#1447E6', strokeWidth: 1.5, stroke: '#fff' }}
+                    stroke="var(--primary)"
+                    strokeWidth={2.5}
+                    fill="url(#ordersGrad)"
+                    fillOpacity={1}
+                    dot={{ r: 3, fill: 'var(--primary)', strokeWidth: 1.5, stroke: '#fff' }}
                     isAnimationActive={false}
                   />
                 </AreaChart>
               </ResponsiveContainer>
             </div>
-            <div className="mt-4 flex gap-6 text-sm border-t border-slate-100 pt-4 px-2 dark:border-slate-800">
+            <div className="mt-3 flex gap-6 text-sm border-t border-[var(--border)] pt-3 px-2">
               <div>
-                <span className="text-[10px] text-slate-400 block uppercase font-bold tracking-tighter">Tổng đơn</span>
-                <span className="text-lg font-bold text-[#1447E6]">{ordersSummary.total}</span>
+                <span className="text-[10px] text-[var(--muted)] block uppercase font-medium tracking-wider">Tổng đơn</span>
+                <span className="text-base font-bold text-[var(--primary)]">{ordersSummary.total}</span>
               </div>
               <div>
-                <span className="text-[10px] text-slate-400 block uppercase font-bold tracking-tighter">Ngày cao nhất</span>
-                <span className="text-lg font-bold text-slate-700 dark:text-slate-200">{ordersSummary.max}</span>
+                <span className="text-[10px] text-[var(--muted)] block uppercase font-medium tracking-wider">Ngày cao nhất</span>
+                <span className="text-base font-bold text-[var(--foreground)]">{ordersSummary.max}</span>
               </div>
             </div>
           </Panel>
@@ -381,6 +467,12 @@ export function DashboardScreen() {
             <div className="h-[200px] w-full mt-4">
               <ResponsiveContainer width="100%" height="100%">
                 <AreaChart data={commentsChartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="commentsGrad" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#8B5CF6" stopOpacity={0.25} />
+                      <stop offset="95%" stopColor="#8B5CF6" stopOpacity={0.01} />
+                    </linearGradient>
+                  </defs>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={gridStroke} />
                   <XAxis
                     dataKey="name"
@@ -399,9 +491,9 @@ export function DashboardScreen() {
                     content={({ active, payload }) => {
                       if (active && payload && payload.length) {
                         return (
-                          <div className="rounded-xl bg-white p-2 shadow-xl border border-slate-100 dark:bg-slate-900 border-l-4 border-l-[#8B5CF6]">
-                            <p className="text-[10px] text-slate-400 mb-0.5 font-bold uppercase">{payload[0].payload.name}</p>
-                            <p className="text-sm font-black text-[#8B5CF6]">Bình luận: {payload[0].value}</p>
+                          <div className="rounded-lg border border-[var(--border)] bg-[var(--surface)] p-3 shadow-[var(--shadow-strong)]">
+                            <p className="text-[10px] text-[var(--muted)] mb-1 font-medium">{payload[0].payload.name}</p>
+                            <p className="text-sm font-semibold text-[#8B5CF6]">Bình luận: {payload[0].value}</p>
                           </div>
                         );
                       }
@@ -412,23 +504,23 @@ export function DashboardScreen() {
                     type="monotone"
                     dataKey="value"
                     stroke="#8B5CF6"
-                    strokeWidth={3}
-                    fill="#8B5CF6"
-                    fillOpacity={0.1}
+                    strokeWidth={2.5}
+                    fill="url(#commentsGrad)"
+                    fillOpacity={1}
                     dot={{ r: 3, fill: '#8B5CF6', strokeWidth: 1.5, stroke: '#fff' }}
                     isAnimationActive={false}
                   />
                 </AreaChart>
               </ResponsiveContainer>
             </div>
-            <div className="mt-4 flex gap-6 text-sm border-t border-slate-100 pt-4 px-2 dark:border-slate-800">
+            <div className="mt-3 flex gap-6 text-sm border-t border-[var(--border)] pt-3 px-2">
               <div>
-                <span className="text-[10px] text-slate-400 block uppercase font-bold tracking-tighter">Tổng CMT</span>
-                <span className="text-lg font-bold text-[#8B5CF6]">{commentsSummary.total}</span>
+                <span className="text-[10px] text-[var(--muted)] block uppercase font-medium tracking-wider">Tổng CMT</span>
+                <span className="text-base font-bold text-[#8B5CF6]">{commentsSummary.total}</span>
               </div>
               <div>
-                <span className="text-[10px] text-slate-400 block uppercase font-bold tracking-tighter">Tỷ lệ chốt</span>
-                <span className="text-lg font-bold text-slate-700 dark:text-slate-200">
+                <span className="text-[10px] text-[var(--muted)] block uppercase font-medium tracking-wider">Tỷ lệ chốt</span>
+                <span className="text-base font-bold text-[var(--foreground)]">
                   {totalCommentsFromMetrics ? ((totalOrdersFromMetrics / totalCommentsFromMetrics) * 100).toFixed(1) : 0}%
                 </span>
               </div>
@@ -437,10 +529,10 @@ export function DashboardScreen() {
         </div>
       </div>
 
-      <div className="grid gap-6">
+      <div className="grid gap-4">
         <Panel
           title="Đơn hàng gần đây"
-          action={<button className="text-[var(--muted)] text-xs font-semibold hover:text-[#1447E6] transition-colors flex items-center gap-1">Xem tất cả <TrendingUpIcon className="w-3 h-3 rotate-90" /></button>}
+          action={<button className="text-[var(--muted)] text-xs font-medium hover:text-[var(--primary)] transition-colors flex items-center gap-1">Xem tất cả <TrendingUpIcon className="w-3 h-3 rotate-90" /></button>}
           className="h-full overflow-hidden"
         >
           {state.status === "loading" ? <LoadingState /> : null}
@@ -448,34 +540,34 @@ export function DashboardScreen() {
 
           <div className="-mx-5 -mb-5 mt-2 overflow-x-auto">
             <table className="w-full text-left text-xs whitespace-nowrap">
-              <thead className="text-[var(--muted)] bg-[var(--background)]">
+              <thead className="text-[var(--muted)] bg-[var(--surface-muted)]">
                 <tr>
-                  <th className="px-5 py-4 font-semibold uppercase tracking-wider">Mã đơn</th>
-                  <th className="px-5 py-4 font-semibold uppercase tracking-wider">Khách hàng</th>
-                  <th className="px-5 py-4 font-semibold uppercase tracking-wider">Đơn giá</th>
-                  <th className="px-5 py-4 font-semibold uppercase tracking-wider text-center">Số lượng</th>
-                  <th className="px-5 py-4 font-semibold uppercase tracking-wider">Tổng tiền</th>
+                  <th className="px-4 py-3 font-medium uppercase tracking-wider text-[11px]">Mã đơn</th>
+                  <th className="px-4 py-3 font-medium uppercase tracking-wider text-[11px]">Khách hàng</th>
+                  <th className="px-4 py-3 font-medium uppercase tracking-wider text-[11px]">Đơn giá</th>
+                  <th className="px-4 py-3 font-medium uppercase tracking-wider text-center text-[11px]">Số lượng</th>
+                  <th className="px-4 py-3 font-medium uppercase tracking-wider text-[11px]">Tổng tiền</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[var(--border)]">
                 {recentOrders.map((order, index) => (
-                  <tr key={`${pickString(order, ["id", "_id", "orderCode"]) || index}`} className="transition hover:bg-[var(--hover)] group">
-                    <td className="px-5 py-4 font-medium text-[var(--foreground)] opacity-70 group-hover:opacity-100 italic">#{pickString(order, ["orderCode", "code"])?.slice(-8) || "ORD-0000"}</td>
+                  <tr key={`${pickString(order, ["id", "_id", "orderCode"]) || index}`} className="transition-colors hover:bg-[var(--hover)] group">
+                    <td className="px-4 py-3 font-medium text-[var(--foreground-soft)] text-xs">#{pickString(order, ["orderCode", "code"])?.slice(-8) || "ORD-0000"}</td>
                     <td className="px-5 py-4">
-                      <div className="flex items-center gap-3">
-                        <div className="h-8 w-8 rounded-full bg-blue-50 dark:bg-blue-900/20 flex items-center justify-center border border-blue-100 dark:border-blue-800">
-                          <UsersIcon className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                      <div className="flex items-center gap-2.5">
+                        <div className="h-7 w-7 rounded-full bg-[var(--primary-soft)] flex items-center justify-center">
+                          <UsersIcon className="w-3.5 h-3.5 text-[var(--primary)]" />
                         </div>
-                        <span className="font-bold text-[var(--foreground)]">{pickString(order, ["igName", "customerName"]) || "Khách hàng"}</span>
+                        <span className="font-medium text-[var(--foreground)] text-xs">{pickString(order, ["igName", "customerName"]) || "Khách hàng"}</span>
                       </div>
                     </td>
-                    <td className="px-5 py-4 text-[var(--foreground)] font-medium opacity-80">{formatNumber(pickNumber(order, ["price"]) || 0)}đ</td>
+                    <td className="px-4 py-3 text-[var(--foreground-soft)] font-medium text-xs">{formatNumber(pickNumber(order, ["price"]) || 0)}đ</td>
                     <td className="px-5 py-4 text-center">
-                      <span className="inline-block px-3 py-1 bg-slate-100 dark:bg-slate-800 text-[var(--foreground)] font-bold rounded-lg text-[10px]">
-                        {pickNumber(order, ["quantity"]) || 0}
+                      <span className="inline-block px-2 py-0.5 bg-[var(--surface-muted)] text-[var(--foreground-soft)] font-medium rounded text-[11px]">
+                        {pickNumber(order, ["quantity", "count"]) || 1}
                       </span>
                     </td>
-                    <td className="px-5 py-4 font-black text-[#1447E6]">{formatNumber(pickNumber(order, ["totalPrice", "amount"]) || 0)}đ</td>
+                    <td className="px-4 py-3 font-semibold text-[var(--primary)] text-xs">{formatNumber(pickNumber(order, ["totalPrice", "amount"]) || 0)}đ</td>
                   </tr>
                 ))}
               </tbody>

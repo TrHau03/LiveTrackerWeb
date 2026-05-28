@@ -186,24 +186,36 @@ export function PrintSettingsPanel() {
         </div>
       </div>
 
-      {/* ── LIVE PREVIEW ── */}
-      <div className="w-full lg:w-[400px] flex-shrink-0 bg-gray-100 rounded-xl overflow-hidden border border-[var(--border)] relative flex flex-col">
-        <div className="bg-gray-800 text-white text-xs font-bold px-4 py-2 uppercase tracking-widest text-center">
+      {/* ── LIVE PREVIEW (3D PREMIUM) ── */}
+      <div className="w-full lg:w-[400px] flex-shrink-0 bg-slate-800 text-white rounded-xl overflow-hidden border border-slate-700 relative flex flex-col shadow-xl">
+        <div className="bg-slate-900 text-slate-300 text-xs font-bold px-4 py-3 uppercase tracking-widest text-center border-b border-slate-800 flex items-center justify-center gap-2">
+          <svg className="h-3.5 w-3.5 text-[var(--primary)] animate-pulse" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
           Bản in xem trước (80mm)
         </div>
         
         {/* Magic scale wrapper to fit 576px thermal receipt into 400px panel */}
-        <div className="relative flex-1 bg-gray-50 flex items-start justify-center overflow-auto p-4 custom-scrollbar">
-           <div style={{ transform: "scale(0.6)", transformOrigin: "top center", paddingBottom: "200px" }}>
-             {activeTab === "order" ? (
-               <div style={{ boxShadow: "0 10px 30px rgba(0,0,0,0.1)" }} className="bg-white">
-                 <OrderReceipt order={mockOrder} settings={currentSettings} shopInfo={mockShopInfo} />
+        <div className="relative flex-1 bg-gradient-to-tr from-slate-200 to-slate-100 dark:from-slate-950 dark:to-slate-900 flex items-start justify-center overflow-y-auto p-6 custom-scrollbar-premium min-h-[480px]">
+           <div style={{ transform: "scale(0.68)", transformOrigin: "top center", paddingBottom: "100px" }} className="transition-all duration-300">
+             <div className="relative flex flex-col bg-white shadow-[0_25px_60px_-15px_rgba(0,0,0,0.25)] hover:shadow-[0_30px_70px_-10px_rgba(0,0,0,0.35)] transition-all duration-500 rounded-[2px] transform hover:scale-[1.02] hover:-rotate-1 cursor-zoom-in group select-none">
+               {/* Ambient side highlights to give paper thickness */}
+               <div className="absolute inset-y-0 -left-[1px] w-[1px] bg-slate-200/50 dark:bg-white/10" />
+               <div className="absolute inset-y-0 -right-[1px] w-[1px] bg-slate-200/50 dark:bg-white/10" />
+               
+               {/* Top Zigzag paper edge */}
+               <div className="w-full h-[6px] shrink-0 fill-white" style={{ backgroundImage: "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 10' width='20' height='10' preserveAspectRatio='none'%3E%3Cpolygon points='0,10 10,0 20,10' fill='%23ffffff'/%3E%3C/svg%3E\")", backgroundSize: "12px 6px", backgroundRepeat: "repeat-x" }} />
+               
+               {/* Main receipt body */}
+               <div className="bg-white px-2">
+                 {activeTab === "order" ? (
+                   <OrderReceipt order={mockOrder} settings={currentSettings} shopInfo={mockShopInfo} />
+                 ) : (
+                   <CommentReceipt comment={mockComment} settings={currentSettings} shopInfo={mockShopInfo} />
+                 )}
                </div>
-             ) : (
-               <div style={{ boxShadow: "0 10px 30px rgba(0,0,0,0.1)" }} className="bg-white">
-                 <CommentReceipt comment={mockComment} settings={currentSettings} shopInfo={mockShopInfo} />
-               </div>
-             )}
+               
+               {/* Bottom Zigzag paper edge */}
+               <div className="w-full h-[6px] shrink-0 fill-white rotate-180" style={{ backgroundImage: "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 10' width='20' height='10' preserveAspectRatio='none'%3E%3Cpolygon points='0,10 10,0 20,10' fill='%23ffffff'/%3E%3C/svg%3E\")", backgroundSize: "12px 6px", backgroundRepeat: "repeat-x" }} />
+             </div>
            </div>
         </div>
       </div>

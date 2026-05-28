@@ -1,7 +1,7 @@
 "use client";
 
 import { FormEvent, useState } from "react";
-import { Eye, EyeOff, Printer, Layout, Zap, Users } from "lucide-react";
+import { Eye, EyeOff, Zap, Layout } from "lucide-react";
 
 import { useSession } from "@/components/session-provider";
 
@@ -17,102 +17,83 @@ export function AuthScreen() {
   }
 
   return (
-    <div className="flex h-screen w-full items-center justify-center bg-[linear-gradient(180deg,_#00449F_0%,_#3b82f6_50%,_#FFFFFF_100%)] p-4 sm:p-6 lg:p-8 font-sans overflow-hidden">
-      {/* Khung chung */}
-      <div className="relative w-full max-w-[1320px] h-full max-h-[800px] flex flex-col lg:flex-row overflow-hidden rounded-[40px] lg:rounded-[56px] bg-white/5 backdrop-blur-sm border border-white/10 shadow-2xl">
+    <div className="flex h-screen w-full items-center justify-center bg-[var(--background)] p-4 sm:p-6 lg:p-8 font-sans overflow-hidden">
+      {/* Main container */}
+      <div className="relative w-full max-w-[1100px] h-full max-h-[720px] flex flex-col lg:flex-row overflow-hidden rounded-2xl lg:rounded-3xl bg-[var(--surface)] border border-[var(--border)] shadow-[var(--shadow-strong)]">
 
-        {/* Background Decorative Elements */}
-        <div className="absolute top-[-10%] left-[-10%] w-[600px] h-[600px] bg-white/5 rounded-full blur-[100px] pointer-events-none" />
-
-        {/* 2/3 Left Section - Promo Area */}
-        <section className="hidden lg:flex w-full lg:w-2/3 flex-col items-start justify-center px-12 xl:px-20 relative z-10">
-          <div className="max-w-2xl py-10">
-            <h1 className="text-5xl xl:text-6xl font-bold text-white leading-tight tracking-tighter">
+        {/* Left Section - Promo Area */}
+        <section className="hidden lg:flex w-full lg:w-3/5 flex-col items-start justify-center px-12 xl:px-16 relative z-10 bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-950/20 dark:to-indigo-950/20">
+          <div className="max-w-lg py-8">
+            <h1 className="text-4xl xl:text-5xl font-bold text-[var(--foreground)] leading-tight tracking-tight">
               Live Tracker
             </h1>
-            <h2 className="mt-6 text-3xl xl:text-4xl font-medium text-white/90 leading-snug">
+            <h2 className="mt-4 text-xl xl:text-2xl font-semibold text-[var(--foreground-soft)] leading-snug">
               Control Room cho đội ngũ bán hàng Realtime
             </h2>
-            <p className="mt-8 text-lg xl:text-xl text-white/70 leading-relaxed font-light">
+            <p className="mt-6 text-sm text-[var(--muted)] leading-relaxed">
               Theo dõi livestream, tự động hoá chốt đơn, quản lý khách hàng và vận hành kho bãi chỉ trong một nền tảng duy nhất.
             </p>
 
-            <div className="mt-12 xl:mt-16 grid grid-cols-2 gap-8">
+            <div className="mt-10 grid grid-cols-2 gap-6">
               <PromoFeature
-                icon={<Zap className="w-5 h-5 text-yellow-300" />}
+                icon={<Zap className="w-4 h-4 text-[var(--primary)]" />}
                 title="Realtime Processing"
                 desc="Xử lý hàng ngàn bình luận mỗi giây"
               />
               <PromoFeature
-                icon={<Layout className="w-5 h-5 text-blue-300" />}
+                icon={<Layout className="w-4 h-4 text-[var(--primary)]" />}
                 title="Modern Dashboard"
                 desc="Giao diện sạch sẽ, tối ưu vận hành"
               />
             </div>
           </div>
-
-          {/* Mockup Element */}
-          <div className="absolute right-[-80px] bottom-[-40px] w-full max-w-[450px] pointer-events-none opacity-60">
-            <div className="bg-white/10 backdrop-blur-2xl rounded-3xl border border-white/20 p-6 shadow-2xl">
-              <div className="flex items-center gap-3 mb-6">
-                <div className="w-2 h-2 rounded-full bg-red-400/60" />
-                <div className="w-2 h-2 rounded-full bg-yellow-400/60" />
-                <div className="w-2 h-2 rounded-full bg-green-400/60" />
-              </div>
-              <div className="space-y-3">
-                <div className="h-3 w-2/3 bg-white/20 rounded" />
-                <div className="h-24 w-full bg-white/10 rounded-xl" />
-              </div>
-            </div>
-          </div>
         </section>
 
-        {/* 1/3 Right Section - Login Card area */}
-        <section className="flex-1 flex items-center justify-center p-4 sm:p-8 relative z-20 h-full overflow-hidden">
-          {/* Card đăng nhập nổi lên */}
-          <div className="w-full max-w-[420px] bg-white rounded-[32px] lg:rounded-[40px] shadow-[0_32px_64px_-12px_rgba(0,0,0,0.12)] p-6 sm:p-8 border border-white relative my-auto flex flex-col shrink-0">
-            <div className="lg:hidden absolute -top-10 left-0 right-0 flex justify-center">
-              <h1 className="text-2xl font-bold text-white tracking-tight">Live Tracker</h1>
+        {/* Right Section - Login Card */}
+        <section className="flex-1 flex items-center justify-center p-4 sm:p-8 relative z-20 h-full overflow-hidden bg-[var(--surface)]">
+          <div className="w-full max-w-[380px] my-auto flex flex-col">
+            <div className="lg:hidden mb-6 text-center">
+              <h1 className="text-xl font-bold text-[var(--foreground)] tracking-tight">Live Tracker</h1>
             </div>
 
             {/* Login Card Header */}
             <div className="flex flex-col items-center text-center">
-              <div className="mb-4 sm:mb-6 flex items-center justify-center">
-                <img src="/logoicon.png" alt="Logo" className="w-14 h-14 sm:w-20 sm:h-20 object-contain" />
+              <div className="mb-4 flex items-center justify-center">
+                <img src="/logoicon.png" alt="Logo" className="w-14 h-14 sm:w-16 sm:h-16 object-contain" />
               </div>
 
-              <h3 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">Đăng nhập</h3>
-              <p className="mt-1.5 sm:mt-2 text-slate-500 text-xs sm:text-sm font-medium">Nhập email và mật khẩu để đăng nhập</p>
+              <h3 className="text-xl font-bold text-[var(--foreground)] tracking-tight">Đăng nhập</h3>
+              <p className="mt-1.5 text-[var(--muted)] text-xs font-medium">Nhập email và mật khẩu để đăng nhập</p>
             </div>
 
             {/* Login Form */}
-            <form onSubmit={handleSubmit} className="mt-6 sm:mt-8 space-y-4 sm:space-y-5">
+            <form onSubmit={handleSubmit} className="mt-6 space-y-4">
               <div className="space-y-3">
-                <div className="relative group">
+                <div className="relative">
                   <input
                     type="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder="Email"
                     required
-                    className="w-full h-12 sm:h-14 px-4 sm:px-5 rounded-xl bg-slate-50 border border-slate-100 text-slate-900 placeholder:text-slate-400 focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-100 transition-all outline-none text-sm"
+                    className="w-full h-11 px-4 rounded-lg bg-[var(--surface-muted)] border border-[var(--border)] text-[var(--foreground)] placeholder:text-[var(--muted)] focus:bg-[var(--surface)] focus:border-[var(--primary)] focus:ring-2 focus:ring-blue-100 dark:focus:ring-blue-900/30 transition-all outline-none text-sm"
                   />
                 </div>
 
-                <div className="relative group">
+                <div className="relative">
                   <input
                     type={showPassword ? "text" : "password"}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    placeholder="Password"
+                    placeholder="Mật khẩu"
                     required
                     minLength={6}
-                    className="w-full h-12 sm:h-14 px-4 sm:px-5 rounded-xl bg-slate-50 border border-slate-100 text-slate-900 placeholder:text-slate-400 focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-100 transition-all outline-none text-sm"
+                    className="w-full h-11 px-4 rounded-lg bg-[var(--surface-muted)] border border-[var(--border)] text-[var(--foreground)] placeholder:text-[var(--muted)] focus:bg-[var(--surface)] focus:border-[var(--primary)] focus:ring-2 focus:ring-blue-100 dark:focus:ring-blue-900/30 transition-all outline-none text-sm"
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-4 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-blue-600 transition-colors"
+                    className="absolute right-3.5 top-1/2 -translate-y-1/2 p-1 text-[var(--muted)] hover:text-[var(--primary)] transition-colors"
                   >
                     {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                   </button>
@@ -120,7 +101,7 @@ export function AuthScreen() {
               </div>
 
               {loginError && (
-                <div className="p-2 sm:p-3 rounded-lg bg-red-50 border border-red-100 text-red-600 text-[10px] sm:text-xs font-medium">
+                <div className="p-2.5 rounded-lg bg-red-50 dark:bg-red-900/10 border border-red-200 dark:border-red-800/30 text-red-600 dark:text-red-400 text-xs font-medium">
                   {loginError}
                 </div>
               )}
@@ -129,21 +110,21 @@ export function AuthScreen() {
                 <button
                   type="submit"
                   disabled={isLoggingIn}
-                  className="w-full h-12 sm:h-14 flex items-center justify-center rounded-xl bg-blue-600 text-white font-bold text-sm sm:text-base shadow-lg shadow-blue-200 hover:bg-blue-700 hover:-translate-y-0.5 active:translate-y-0 transition-all disabled:opacity-70 disabled:cursor-not-allowed"
+                  className="w-full h-11 flex items-center justify-center rounded-lg bg-[var(--primary)] text-white font-semibold text-sm shadow-sm hover:bg-[var(--primary-strong)] transition-colors disabled:opacity-70 disabled:cursor-not-allowed"
                 >
                   {isLoggingIn ? "Đang đăng nhập..." : "Đăng nhập"}
                 </button>
 
                 <button
                   type="button"
-                  className="w-full h-12 sm:h-14 flex items-center justify-center rounded-xl bg-transparent border-2 border-blue-100 text-blue-600 font-bold text-sm sm:text-base hover:bg-blue-50 hover:border-blue-200 transition-all"
+                  className="w-full h-11 flex items-center justify-center rounded-lg bg-transparent border border-[var(--border)] text-[var(--foreground-soft)] font-medium text-sm hover:bg-[var(--hover)] hover:border-[var(--primary)] hover:text-[var(--primary)] transition-colors"
                 >
                   Đăng ký
                 </button>
               </div>
 
               <div className="flex justify-center">
-                <button type="button" className="text-[10px] sm:text-xs font-medium text-slate-400 hover:text-blue-600 transition-colors uppercase tracking-wider">
+                <button type="button" className="text-xs font-medium text-[var(--muted)] hover:text-[var(--primary)] transition-colors">
                   Quên mật khẩu?
                 </button>
               </div>
@@ -157,13 +138,13 @@ export function AuthScreen() {
 
 function PromoFeature({ icon, title, desc }: { icon: React.ReactNode; title: string; desc: string }) {
   return (
-    <div className="flex flex-col gap-3">
-      <div className="w-12 h-12 flex items-center justify-center rounded-2xl bg-white/10 backdrop-blur-md border border-white/10">
+    <div className="flex flex-col gap-2.5">
+      <div className="w-10 h-10 flex items-center justify-center rounded-lg bg-[var(--primary-soft)] border border-[var(--border)]">
         {icon}
       </div>
       <div>
-        <h4 className="text-white font-bold text-lg">{title}</h4>
-        <p className="text-white/60 text-sm">{desc}</p>
+        <h4 className="text-[var(--foreground)] font-semibold text-sm">{title}</h4>
+        <p className="text-[var(--muted)] text-xs mt-0.5">{desc}</p>
       </div>
     </div>
   );
