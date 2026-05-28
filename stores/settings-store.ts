@@ -28,7 +28,7 @@ export const useSettingsStore = create<SettingsState>()(
       commentDisplayOrder: "newest_at_top",
       activeLiveId: null,
 
-      setTheme: (theme) => set({ theme }),
+      setTheme: () => set({ theme: "light" }),
       setLanguage: (language) => set({ language }),
       setAutoReconnectSSE: (autoReconnectSSE) => set({ autoReconnectSSE }),
       setPaperSize: (paperSize) => set({ paperSize }),

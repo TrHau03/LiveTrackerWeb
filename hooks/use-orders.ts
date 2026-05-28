@@ -18,8 +18,8 @@ export function useOrders(queryMeta?: { page?: number; limit?: number; search?: 
         page: queryMeta?.page || 1,
         limit: queryMeta?.limit || 20,
         search: queryMeta?.search || undefined,
-        startDate: queryMeta?.startDate,
-        endDate: queryMeta?.endDate,
+        fromDate: queryMeta?.startDate,
+        toDate: queryMeta?.endDate,
       });
       applyAuthResponses([response.response], patchSession, logout);
       return response.data;

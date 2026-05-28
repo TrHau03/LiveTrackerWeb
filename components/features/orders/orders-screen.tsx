@@ -8,8 +8,9 @@ import { useHeaderStore } from "@/lib/store/header-store";
 import { useSettingsStore } from "@/stores/settings-store";
 import { usePrintSettings } from "@/hooks/usePrintSettings";
 import { asRecord, extractApiData, extractCollection, pickString, pickNumber, formatCurrency, formatDateTime } from "@/lib/proxy-client";
-import { printReceiptHtml } from "@/lib/printUtils";
+import { printReceiptHtml, printReceipt } from "@/lib/printUtils";
 import { OrderReceipt } from "@/components/print/OrderReceipt";
+import { BridgeSetupModal } from "@/components/print/BridgeSetupModal";
 import { 
   compactAddress,
   StatCard,
@@ -60,6 +61,14 @@ import {
 
 import { useRevenueStatistics } from "@/hooks/use-statistics";
 
+function Toast({ message, type = "success" }: { message: string; type?: "success" | "error" }) {
+  return (
+    <div className={`fixed bottom-6 left-1/2 -translate-x-1/2 z-[9999] px-4 py-2 rounded-lg text-xs font-medium shadow-lg ${type === "error" ? "bg-red-600 text-white" : "bg-green-600 text-white"}`}>
+      {message}
+    </div>
+  );
+}
+
 export function OrdersScreen() {
   const [query, setQuery] = useState("");
   const search = useDeferredValue(query);
@@ -71,13 +80,28 @@ export function OrdersScreen() {
   const setHeader = useHeaderStore((state) => state.setHeader);
   const [page, setPage] = useState(1);
 
-  const [period, setPeriod] = useState<"today" | "yesterday" | "recent">("today");
+  // Local Bridge offline modal state
+  const [isBridgeOfflineOpen, setIsBridgeOfflineOpen] = useState(false);
+  
+  // Toast state
+  const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
+  const toastTimeoutRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const showToast = React.useCallback((message: string, type: "success" | "error" = "success") => {
+    setToast({ message, type });
+    if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current);
+    toastTimeoutRef.current = setTimeout(() => setToast(null), 3000);
+  }, []);
+
+  const [period, setPeriod] = useState<"today" | "yesterday" | "recent" | "custom">("today");
+  const [customStartDate, setCustomStartDate] = useState("");
+  const [customEndDate, setCustomEndDate] = useState("");
   const [isDeliveryModalOpen, setIsDeliveryModalOpen] = useState(false);
 
   // Reset page when filter changes
   React.useEffect(() => {
     setPage(1);
-  }, [search, period]);
+  }, [search, period, customStartDate, customEndDate]);
 
   const dateRange = React.useMemo(() => {
     const now = new Date();
@@ -97,26 +121,21 @@ export function OrdersScreen() {
       end.setHours(23, 59, 59, 999);
       return { startDate: start.toISOString(), endDate: end.toISOString() };
     }
+    if (period === "custom") {
+      const isValidDate = (d: string) => d && !Number.isNaN(new Date(d).getTime());
+      return {
+        startDate: isValidDate(customStartDate) ? new Date(customStartDate).toISOString() : undefined,
+        endDate: isValidDate(customEndDate) ? new Date(customEndDate).toISOString() : undefined
+      };
+    }
     return { startDate: undefined, endDate: undefined };
-  }, [period]);
+  }, [period, customStartDate, customEndDate]);
 
   const { data, status, error: queryError } = useOrders({ 
     page, 
     search, 
     startDate: dateRange.startDate || undefined, 
     endDate: dateRange.endDate || undefined
-  });
-
-  const { data: metricsData } = useMetrics({
-    startDate: dateRange.startDate,
-    endDate: dateRange.endDate,
-    period: period === "today" ? "day" : period === "yesterday" ? "day" : "month"
-  });
-
-  const { data: revenueData } = useRevenueStatistics({
-    startDate: dateRange.startDate,
-    endDate: dateRange.endDate,
-    period: period === "today" ? "day" : period === "yesterday" ? "day" : "month"
   });
 
   const state = {
@@ -129,21 +148,13 @@ export function OrdersScreen() {
   const doExport = useExportOrders();
 
   const orders = extractCollection(state.data);
-  const totalCount = pickNumber(asRecord(state.data), ["total", "count", "totalCount"]) ?? 0;
-  
-  const metrics = asRecord(extractApiData(metricsData));
-  const revStats = asRecord(extractApiData(revenueData));
 
-  // Stat calculations from metrics & statistics services
-  const totalRevenue = pickNumber(revStats, ["totalRevenue", "total"]) ?? 
-                      pickNumber(metrics.revenue, ["total", "value"]) ?? 
-                      (typeof metrics.revenue === 'number' ? metrics.revenue : 0);
-                      
-  const totalOrdersCount = pickNumber(metrics.orders, ["total", "count"]) ?? 
-                          (typeof metrics.orders === 'number' ? metrics.orders : totalCount);
-                          
-  const totalDeposit = pickNumber(metrics.deposit, ["total", "value"]) ?? 
-                      pickNumber(revStats, ["totalDeposit"]) ?? 0;
+
+  const ordersData = asRecord(extractApiData(state.data));
+  const totalRevenue = pickNumber(ordersData, ["totalRevenue"]) ?? 0;
+  const totalDeposit = pickNumber(ordersData, ["totalDeposit"]) ?? 0;
+  const totalCount = pickNumber(asRecord(ordersData.pagination), ["total"]) ?? pickNumber(ordersData, ["total", "count", "totalCount"]) ?? 0;
+  const totalOrdersCount = totalCount;
 
   const selectedOrder =
     orders.find(
@@ -168,10 +179,10 @@ export function OrdersScreen() {
         {
           id: "export",
           label: "Xuất file Excel",
-          icon: <Truck className="w-4 h-4" />,
+          icon: <FileDown className="w-4 h-4" />,
           variant: "primary",
           onClick: handleExport,
-          className: "bg-[#28c840] hover:bg-[#23af37] border-none font-bold"
+          className: "bg-emerald-600 hover:bg-emerald-700 text-white font-bold border-none"
         }
       ]
     });
@@ -228,7 +239,18 @@ export function OrdersScreen() {
 
         const receiptEl = container.querySelector(".receipt") as HTMLElement;
         if (receiptEl) {
-          printReceiptHtml(receiptEl);
+          const result = await printReceipt(receiptEl);
+          if (!result.success) {
+            if (result.isOffline) {
+              setIsBridgeOfflineOpen(true);
+              showToast("⚠️ KHÔNG TÌM THẤY LOCAL BRIDGE! Dừng in hàng loạt.", "error");
+            } else {
+              showToast(`⚠️ Lỗi in đơn #${i + 1}: ${result.error}`, "error");
+            }
+            root.unmount();
+            if (container.parentNode) document.body.removeChild(container);
+            break;
+          }
         }
 
         setTimeout(() => {
@@ -268,7 +290,17 @@ export function OrdersScreen() {
 
       const receiptEl = container.querySelector(".receipt") as HTMLElement;
       if (receiptEl) {
-        printReceiptHtml(receiptEl);
+        const result = await printReceipt(receiptEl);
+        if (!result.success) {
+          if (result.isOffline) {
+            setIsBridgeOfflineOpen(true);
+            showToast("⚠️ KHÔNG TÌM THẤY LOCAL BRIDGE! Vui lòng khởi động ứng dụng hoặc cài đặt phần mềm máy in.", "error");
+          } else {
+            showToast(`⚠️ Lỗi máy in: ${result.error}`, "error");
+          }
+        } else {
+          showToast("Đã gửi lệnh in thành công qua Local Bridge.", "success");
+        }
       }
 
       setTimeout(() => {
@@ -289,58 +321,88 @@ export function OrdersScreen() {
         <StatCard
           label="Đơn cần xử lý"
           value={totalOrdersCount}
-          icon={<ShoppingBag className="w-5 h-5" />}
-          iconBg="bg-orange-50 dark:bg-orange-900/20"
-          iconColor="text-orange-600 dark:text-orange-400"
+          icon={<ShoppingBag className="w-4 h-4" />}
+          iconBg="bg-amber-50"
+          iconColor="text-amber-600"
         />
         <StatCard
           label="Tổng doanh thu"
           value={formatCurrency(totalRevenue)}
-          icon={<DollarSign className="w-5 h-5" />}
-          iconBg="bg-green-50 dark:bg-green-900/20"
-          iconColor="text-green-600 dark:text-green-400"
+          icon={<DollarSign className="w-4 h-4" />}
+          iconBg="bg-emerald-50"
+          iconColor="text-emerald-600"
         />
         <StatCard
           label="Tổng tiền cọc"
           value={formatCurrency(totalDeposit)}
-          icon={<CheckCircle2 className="w-5 h-5" />}
-          iconBg="bg-blue-50 dark:bg-blue-900/20"
-          iconColor="text-blue-600 dark:text-blue-400"
+          icon={<ClipboardCheck className="w-4 h-4" />}
+          iconBg="bg-indigo-50"
+          iconColor="text-indigo-600"
         />
       </div>
 
       <Panel title="Danh sách Đơn hàng" className="overflow-hidden relative">
-        <div className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between bg-[var(--surface-subdued)] p-4 rounded-2xl border border-[var(--border)]">
-          <div className="flex flex-col sm:flex-row flex-1 w-full max-w-4xl items-center gap-4">
-            <div className="flex bg-[var(--surface-strong)] rounded-xl p-1 border border-[var(--border)] shrink-0 w-full sm:w-auto overflow-x-auto no-scrollbar">
-              <button
-                onClick={() => setPeriod("today")}
-                className={`flex-1 sm:flex-none whitespace-nowrap rounded-lg px-5 py-2.5 text-xs font-bold transition-all ${period === "today" ? "bg-[#1447E6] text-white shadow-sm" : "text-[var(--muted)] hover:text-[var(--foreground)] hover:bg-[var(--hover)]"}`}
-              >
-                Hôm nay
-              </button>
-              <button
-                onClick={() => setPeriod("yesterday")}
-                className={`flex-1 sm:flex-none whitespace-nowrap rounded-lg px-5 py-2.5 text-xs font-bold transition-all ${period === "yesterday" ? "bg-[#1447E6] text-white shadow-sm" : "text-[var(--muted)] hover:text-[var(--foreground)] hover:bg-[var(--hover)]"}`}
-              >
-                Hôm qua
-              </button>
-              <button
-                onClick={() => setPeriod("recent")}
-                className={`flex-1 sm:flex-none whitespace-nowrap rounded-lg px-5 py-2.5 text-xs font-bold transition-all ${period === "recent" ? "bg-[#1447E6] text-white shadow-sm" : "text-[var(--muted)] hover:text-[var(--foreground)] hover:bg-[var(--hover)]"}`}
-              >
-                Tất cả
-              </button>
-            </div>
-
+        <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between p-3 rounded-lg border border-[var(--border)] bg-[var(--surface-muted)]">
+          <div className="flex flex-col sm:flex-row flex-1 w-full max-w-4xl items-center gap-3">
+            {/* Ô Search (Bên trái) */}
             <div className="relative flex-1 group w-full">
-              <SearchIcon className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--muted)] group-focus-within:text-[#1447E6] transition-colors" />
+              <SearchIcon className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--muted)] group-focus-within:text-[var(--primary)] transition-colors" />
               <input
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
                 placeholder="Tìm mã đơn, tên khách hoặc SĐT..."
-                className={`${CONTROL_CLASS} w-full pl-10 h-11 text-sm rounded-xl border-2 focus:border-[#1447E6] focus:ring-0 transition-all`}
+                className={`${CONTROL_CLASS} w-full pl-10 h-9 text-sm rounded-lg`}
               />
+            </div>
+
+            {/* Khối bộ lọc nhanh và khoảng thời gian (Bên phải) */}
+            <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto shrink-0">
+              <div className="flex bg-[var(--surface)] rounded-lg p-0.5 border border-[var(--border)] shrink-0 overflow-x-auto no-scrollbar w-full sm:w-auto">
+                <button
+                  onClick={() => setPeriod("today")}
+                  className={`flex-1 sm:flex-none whitespace-nowrap rounded-md px-4 py-2 text-xs font-medium transition-all ${period === "today" ? "bg-[var(--primary)] text-white shadow-sm" : "text-[var(--muted)] hover:text-[var(--foreground)]"}`}
+                >
+                  Hôm nay
+                </button>
+                <button
+                  onClick={() => setPeriod("yesterday")}
+                  className={`flex-1 sm:flex-none whitespace-nowrap rounded-md px-4 py-2 text-xs font-medium transition-all ${period === "yesterday" ? "bg-[var(--primary)] text-white shadow-sm" : "text-[var(--muted)] hover:text-[var(--foreground)]"}`}
+                >
+                  Hôm qua
+                </button>
+                <button
+                  onClick={() => setPeriod("recent")}
+                  className={`flex-1 sm:flex-none whitespace-nowrap rounded-md px-4 py-2 text-xs font-medium transition-all ${period === "recent" ? "bg-[var(--primary)] text-white shadow-sm" : "text-[var(--muted)] hover:text-[var(--foreground)]"}`}
+                >
+                  Tất cả
+                </button>
+                <button
+                  onClick={() => setPeriod("custom")}
+                  className={`flex-1 sm:flex-none whitespace-nowrap rounded-md px-4 py-2 text-xs font-medium transition-all flex items-center justify-center gap-1.5 ${period === "custom" ? "bg-[var(--primary)] text-white shadow-sm" : "text-[var(--muted)] hover:text-[var(--foreground)]"}`}
+                >
+                  <Calendar className="w-3.5 h-3.5" />
+                  Khoảng ngày
+                </button>
+              </div>
+
+              {/* Ô chọn ngày khi lọc tùy chọn */}
+              {period === "custom" && (
+                <div className="flex items-center gap-1.5 animate-in fade-in slide-in-from-left-2 duration-200 shrink-0 w-full sm:w-auto justify-between sm:justify-start">
+                  <input
+                    type="datetime-local"
+                    value={customStartDate}
+                    onChange={(e) => setCustomStartDate(e.target.value)}
+                    className="h-9 rounded-lg border border-[var(--border)] bg-[var(--surface)] px-2 text-xs text-[var(--foreground)] outline-none focus:border-[var(--primary)] w-[46%] sm:w-44"
+                  />
+                  <span className="text-[var(--muted)] text-[10px] font-bold uppercase tracking-wider shrink-0">đến</span>
+                  <input
+                    type="datetime-local"
+                    value={customEndDate}
+                    onChange={(e) => setCustomEndDate(e.target.value)}
+                    className="h-9 rounded-lg border border-[var(--border)] bg-[var(--surface)] px-2 text-xs text-[var(--foreground)] outline-none focus:border-[var(--primary)] w-[46%] sm:w-44"
+                  />
+                </div>
+              )}
             </div>
           </div>
 
@@ -350,7 +412,7 @@ export function OrdersScreen() {
                 type="button"
                 onClick={handleBatchPrint}
                 disabled={isPrinting}
-                className="h-11 px-6 rounded-xl bg-[#28c840] text-white hover:bg-[#23af37] font-bold text-sm flex items-center gap-2 shadow-lg shadow-green-500/20 transition-all active:scale-95 disabled:opacity-50"
+                className="h-9 px-4 rounded-lg bg-[var(--accent-green)] text-white hover:bg-[var(--accent-green-strong)] font-medium text-xs flex items-center gap-2 shadow-sm transition-all disabled:opacity-50"
               >
                 <Printer className="w-4 h-4" />
                 In {selectedBatchIds.size} đơn
@@ -360,7 +422,7 @@ export function OrdersScreen() {
         </div>
 
         {exportState ? (
-          <div className="mb-4 rounded-2xl border border-[var(--border)] bg-[var(--surface-strong)] px-4 py-3 text-sm text-[var(--muted)]">
+          <div className="mb-3 rounded-lg border border-[var(--border)] bg-[var(--surface)] px-4 py-2.5 text-sm text-[var(--muted)]">
             {exportState}
           </div>
         ) : null}
@@ -371,7 +433,7 @@ export function OrdersScreen() {
           <EmptyState message="Không có đơn hàng phù hợp." />
         ) : null}
 
-        <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] overflow-hidden relative shadow-sm">
+        <div className="rounded-lg border border-[var(--border)] bg-[var(--surface)] overflow-hidden relative">
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs whitespace-nowrap">
               <thead className="bg-[var(--surface-muted)] text-[var(--muted)] border-b border-[var(--border)]">
@@ -379,16 +441,16 @@ export function OrdersScreen() {
                   <th className="px-5 py-4 w-12 text-center">
                     <input
                       type="checkbox"
-                      className="w-4 h-4 rounded border-[var(--border)] text-[#1447E6] focus:ring-[#1447E6]"
+                      className="w-4 h-4 rounded border-[var(--border)] text-[var(--primary)] focus:ring-[var(--primary)]"
                       checked={orders.length > 0 && selectedBatchIds.size === orders.length}
                       onChange={handleToggleSelectAll}
                     />
                   </th>
-                  <th className="px-5 py-4 font-bold uppercase tracking-wider">Mã đơn hàng</th>
-                  <th className="px-5 py-4 font-bold uppercase tracking-wider">Khách hàng</th>
-                  <th className="px-5 py-4 font-bold uppercase tracking-wider">Số điện thoại</th>
-                  <th className="px-5 py-4 font-bold uppercase tracking-wider text-right">Tổng thanh toán</th>
-                  <th className="px-5 py-4 font-bold uppercase tracking-wider text-center">Trạng thái</th>
+                  <th className="px-4 py-3 font-medium uppercase tracking-wider text-[11px]">Mã đơn hàng</th>
+                  <th className="px-4 py-3 font-medium uppercase tracking-wider text-[11px]">Khách hàng</th>
+                  <th className="px-4 py-3 font-medium uppercase tracking-wider text-[11px]">Số điện thoại</th>
+                  <th className="px-4 py-3 font-medium uppercase tracking-wider text-right text-[11px]">Tổng thanh toán</th>
+                  <th className="px-4 py-3 font-medium uppercase tracking-wider text-center text-[11px]">Trạng thái</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[var(--border)]">
@@ -402,39 +464,60 @@ export function OrdersScreen() {
                     <tr
                       key={`${id || index}`}
                       onClick={() => setSelectedOrderId(id)}
-                      className={`cursor-pointer group transition-all hover:bg-[var(--hover)] ${isActive ? "bg-[#1447E6]/5" : ""}`}
+                      className={`cursor-pointer group transition-colors hover:bg-[var(--hover)] ${isActive ? "bg-blue-50 dark:bg-blue-900/10" : ""}`}
                     >
                       <td className="px-5 py-4 text-center" onClick={e => e.stopPropagation()}>
                         <input
                           type="checkbox"
-                          className="w-4 h-4 rounded border-[var(--border)] text-[#1447E6] focus:ring-[#1447E6]"
+                          className="w-4 h-4 rounded border-[var(--border)] text-[var(--primary)] focus:ring-[var(--primary)]"
                           checked={isChecked}
                           onChange={() => handleToggleSelect(id)}
                         />
                       </td>
-                      <td className="px-5 py-4">
-                        <span className="font-mono text-xs font-bold text-[#1447E6] bg-[#1447E6]/10 px-2 py-1 rounded-md">
+                      <td className="px-4 py-3">
+                        <span className="font-mono text-xs font-medium text-[var(--primary)] bg-[var(--primary-soft)] px-2 py-0.5 rounded">
                           #{pickString(order, ["orderCode", "code"]) || id?.substring(0, 8)}
                         </span>
                       </td>
-                      <td className="px-5 py-4">
-                        <div className="flex items-center gap-3">
-                          <div className="h-9 w-9 rounded-full bg-[#1447E6]/10 flex items-center justify-center border border-[#1447E6]/20 shadow-sm">
-                            <span className="text-[#1447E6] font-bold text-sm">{name.charAt(0).toUpperCase()}</span>
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-2.5">
+                          <div className="h-8 w-8 overflow-hidden rounded-full ring-1 ring-[var(--border)] bg-[color:var(--primary-soft)] flex items-center justify-center text-[var(--primary)] shrink-0 text-xs relative">
+                            {pickString(customerInfo, ["avatar"]) ? (
+                              <>
+                                <img 
+                                  src={pickString(customerInfo, ["avatar"])!} 
+                                  alt={name} 
+                                  className="h-full w-full object-cover" 
+                                  onError={(e) => {
+                                    (e.target as HTMLImageElement).style.display = 'none';
+                                    (e.target as HTMLImageElement).parentElement?.classList.add('fallback-active');
+                                  }} 
+                                />
+                                <div className="absolute inset-0 items-center justify-center bg-[color:var(--primary-soft)] text-[var(--primary)] font-bold hidden [.fallback-active_&]:flex uppercase">
+                                  {name.charAt(0).toUpperCase()}
+                                </div>
+                              </>
+                            ) : (
+                              <span className="font-bold uppercase">
+                                {name.charAt(0).toUpperCase()}
+                              </span>
+                            )}
                           </div>
-                          <span className="font-bold text-[var(--foreground)] text-sm group-hover:text-[#1447E6] transition-colors">{name}</span>
+                          <span className="font-medium text-[var(--foreground)] text-sm group-hover:text-[var(--primary)] transition-colors">{name}</span>
                         </div>
                       </td>
-                      <td className="px-5 py-4 text-[var(--muted)] font-semibold flex items-center gap-1.5">
-                        <Phone className="w-3 h-3" />
-                        {pickString(order, ["phone"]) || "—"}
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-1.5 text-[var(--muted)] font-medium text-xs">
+                          <Phone className="w-3.5 h-3.5 shrink-0" />
+                          <span>{pickString(order, ["phone"]) || "—"}</span>
+                        </div>
                       </td>
-                      <td className="px-5 py-4 font-black text-right text-[var(--foreground)] text-sm">
+                      <td className="px-4 py-3 font-semibold text-right text-[var(--foreground)] text-sm">
                         {formatCurrency(pickNumber(order, ["totalPrice", "amount"]) ?? 0)}
                       </td>
-                      <td className="px-5 py-4 text-center">
-                        <span className="relative inline-flex items-center gap-1.5 rounded-full bg-orange-50 dark:bg-orange-900/20 px-3 py-1.5 text-[10px] font-black uppercase tracking-wider text-orange-600 dark:text-orange-400 border border-orange-100 dark:border-orange-800/30">
-                          <span className="flex h-1.5 w-1.5 rounded-full bg-orange-500 animate-pulse"></span>
+                      <td className="px-4 py-3 text-center">
+                        <span className="relative inline-flex items-center gap-1.5 rounded-full bg-amber-50 dark:bg-amber-950/30 px-2.5 py-0.5 text-[11px] font-medium text-amber-700 dark:text-amber-400">
+                          <span className="flex h-1.5 w-1.5 rounded-full bg-amber-500 animate-pulse"></span>
                           Chờ xử lý
                         </span>
                       </td>
@@ -445,14 +528,14 @@ export function OrdersScreen() {
             </table>
           </div>
 
-          <div className="flex flex-col sm:flex-row items-center justify-between border-t border-[var(--border)] bg-[var(--surface-subdued)]/30 px-6 py-4 gap-4">
-            <div className="text-xs font-semibold text-[var(--muted)] flex items-center gap-2">
+          <div className="flex flex-col sm:flex-row items-center justify-between border-t border-[var(--border)] px-4 py-3 gap-3">
+            <div className="text-xs font-medium text-[var(--muted)] flex items-center gap-2">
                 <span className="flex items-center gap-1">
-                  Đang xem <span className="text-[var(--foreground)] font-black">{orders.length}</span>
+                  Đang xem <span className="text-[var(--foreground)] font-semibold">{orders.length}</span>
                 </span>
                 <span className="text-[var(--border)]">|</span>
                 <span className="flex items-center gap-1">
-                  Tổng cộng <span className="text-[var(--foreground)] font-black">{totalCount || orders.length}</span> đơn hàng
+                  Tổng cộng <span className="text-[var(--foreground)] font-semibold">{totalCount || orders.length}</span> đơn hàng
                 </span>
             </div>
             
@@ -463,17 +546,17 @@ export function OrdersScreen() {
                       window.scrollTo({ top: 0, behavior: 'smooth' });
                     }}
                     disabled={page === 1}
-                    className="flex h-10 w-10 items-center justify-center rounded-xl bg-[var(--surface)] border border-[var(--border)] text-[var(--muted)] hover:text-[#1447E6] hover:border-[#1447E6] hover:shadow-md transition-all disabled:opacity-30 disabled:hover:border-[var(--border)] disabled:hover:text-[var(--muted)]"
+                    className="flex h-8 w-8 items-center justify-center rounded-lg bg-[var(--surface)] border border-[var(--border)] text-[var(--muted)] hover:text-[var(--primary)] hover:border-[var(--primary)] transition-colors disabled:opacity-30"
                 >
                     <ChevronLeft className="w-5 h-5" />
                 </button>
                 
-                <div className="flex items-center bg-[var(--surface-strong)] p-1 rounded-xl border border-[var(--border)]">
-                     <span className="flex h-8 min-w-[32px] px-2 items-center justify-center rounded-lg bg-[#1447E6] text-white text-xs font-black shadow-sm">
+                <div className="flex items-center bg-[var(--surface)] p-0.5 rounded border border-[var(--border)]">
+                     <span className="flex h-7 min-w-[28px] px-2 items-center justify-center rounded bg-[var(--primary)] text-white text-xs font-normal">
                         {page}
                      </span>
                      {totalCount > 0 && Math.ceil(totalCount / 20) > 1 && (
-                       <span className="text-[var(--muted)] text-[10px] font-bold px-3">
+                       <span className="text-[var(--muted)] text-[10px] font-normal px-2">
                           trên {Math.ceil(totalCount / 20)}
                        </span>
                      )}
@@ -485,7 +568,7 @@ export function OrdersScreen() {
                       window.scrollTo({ top: 0, behavior: 'smooth' });
                     }}
                     disabled={orders.length < 20 || (totalCount > 0 && page >= Math.ceil(totalCount / 20))}
-                    className="flex h-10 w-10 items-center justify-center rounded-xl bg-[var(--surface)] border border-[var(--border)] text-[var(--muted)] hover:text-[#1447E6] hover:border-[#1447E6] hover:shadow-md transition-all disabled:opacity-30 disabled:hover:border-[var(--border)] disabled:hover:text-[var(--muted)]"
+                    className="flex h-8 w-8 items-center justify-center rounded-lg bg-[var(--surface)] border border-[var(--border)] text-[var(--muted)] hover:text-[var(--primary)] hover:border-[var(--primary)] transition-colors disabled:opacity-30"
                 >
                     <ChevronRight className="w-5 h-5" />
                 </button>
@@ -496,99 +579,125 @@ export function OrdersScreen() {
       </Panel>
 
       {selectedOrderId && selectedOrder && typeof document !== "undefined" && createPortal(
-        <div className="fixed inset-0 z-[9990] flex items-center justify-center bg-black/40 backdrop-blur-md p-4 transition-all duration-300 animate-in fade-in">
+        <div className="fixed inset-0 z-[9990] flex items-center justify-center bg-black/30 p-4">
           <div 
             className="absolute inset-0 z-0" 
             onClick={() => setSelectedOrderId("")}
           />
-          <div className="relative z-10 flex w-full max-w-2xl max-h-[90vh] flex-col bg-[var(--surface)] shadow-2xl rounded-[2.5rem] border border-[var(--border)] overflow-hidden animate-in zoom-in-95 duration-300">
-                <div className="flex items-center justify-between border-b border-[var(--border)] p-6 shrink-0 bg-[var(--surface-subdued)]">
-                  <div className="flex items-center gap-4">
-                    <div className="h-12 w-12 rounded-2xl bg-gradient-to-br from-[#1447E6] to-[#0E3BBF] flex items-center justify-center text-white shadow-lg shadow-blue-500/30">
-                      <ShoppingBag className="w-6 h-6" />
+          <div className="relative z-10 flex w-full max-w-2xl max-h-[90vh] flex-col bg-[var(--surface)] shadow-xl rounded-2xl border border-[var(--border)] overflow-hidden">
+                <div className="flex items-center justify-between border-b border-[var(--border)] p-5 shrink-0">
+                  <div className="flex items-center gap-3">
+                    <div className="h-10 w-10 rounded-xl bg-[var(--primary)] flex items-center justify-center text-white">
+                      <ShoppingBag className="w-5 h-5" />
                     </div>
                     <div>
-                      <h4 className="text-xl font-black text-[var(--foreground)] flex items-center gap-2">
+                      <h4 className="text-lg font-semibold text-[var(--foreground)]">
                         Chi tiết đơn hàng
                       </h4>
-                      <div className="flex items-center gap-3">
-                        <span className="font-mono text-xs bg-[#1447E6]/10 text-[#1447E6] px-2.5 py-1 rounded-lg font-bold uppercase tracking-tight">
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono text-xs bg-[var(--primary-soft)] text-[var(--primary)] px-2 py-0.5 rounded font-medium">
                           #{pickString(selectedOrder, ["orderCode", "code"]) || "Order"}
                         </span>
-                        <span className="text-xs text-[var(--muted)] font-bold uppercase tracking-wider">• {formatDateTime(pickString(selectedOrder, ["createdAt", "updatedAt"]))}</span>
+                        <span className="text-xs text-[var(--muted)] font-medium">• {formatDateTime(pickString(selectedOrder, ["createdAt", "updatedAt"]))}</span>
                       </div>
                     </div>
                   </div>
                   <button
                     onClick={() => setSelectedOrderId("")}
-                    className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[var(--surface-strong)] text-[var(--muted)] hover:bg-orange-50 hover:text-orange-600 dark:hover:bg-orange-900/20 transition-all active:scale-90 shadow-sm border border-[var(--border)]"
+                    className="flex h-9 w-9 items-center justify-center rounded-lg text-[var(--muted)] hover:bg-red-50 hover:text-red-500 transition-colors"
                   >
                     <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12" /></svg>
                   </button>
                 </div>
 
-                <div className="flex-1 overflow-y-auto p-6 space-y-6 no-scrollbar">
+                <div className="flex-1 overflow-y-auto p-5 space-y-5 no-scrollbar">
                   {/* Summary Grid */}
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface-muted)] p-4 shadow-sm">
-                      <p className="text-[10px] font-black uppercase tracking-wider text-[var(--muted)] mb-1">Số tiền cần thu</p>
-                      <h3 className="text-xl font-black text-[#1447E6]">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="rounded-lg border border-[var(--border)] bg-[var(--surface-muted)] p-3">
+                      <p className="text-[10px] font-medium uppercase tracking-wider text-[var(--muted)] mb-1">Số tiền cần thu</p>
+                      <h3 className="text-lg font-bold text-[var(--primary)]">
                         {formatCurrency(pickNumber(selectedOrder, ["totalPrice", "amount"]) ?? 0)}
                       </h3>
                     </div>
-                    <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface-muted)] p-4 shadow-sm">
-                      <p className="text-[10px] font-black uppercase tracking-wider text-[var(--muted)] mb-1">Tiền cọc</p>
-                      <h3 className="text-xl font-black text-[#16a34a]">
+                    <div className="rounded-lg border border-[var(--border)] bg-[var(--surface-muted)] p-3">
+                      <p className="text-[10px] font-medium uppercase tracking-wider text-[var(--muted)] mb-1">Tiền cọc</p>
+                      <h3 className="text-lg font-bold text-[#16a34a]">
                         {formatCurrency(pickNumber(selectedOrder, ["deposit"]) ?? 0)}
                       </h3>
                     </div>
                   </div>
 
                   {/* Customer Info Section Group */}
-                  <div className="space-y-4">
-                    <h5 className="text-[10px] font-black uppercase tracking-widest text-[var(--muted)] flex items-center gap-2 px-1">
+                  <div className="space-y-3">
+                    <h5 className="text-[10px] font-medium uppercase tracking-widest text-[var(--muted)] flex items-center gap-2 px-1">
                        <User className="w-3.5 h-3.5" /> Thông tin khách hàng
                     </h5>
-                    <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] divide-y divide-[var(--border)] shadow-sm">
-                      <div className="p-4 flex justify-between items-center">
-                        <span className="text-xs font-bold text-[var(--muted)]">Tên khách</span>
-                        <span className="text-xs font-black text-[var(--foreground)]">{pickString(asRecord(selectedOrder.customerId), ["igName", "fullName", "fbName"]) || pickString(selectedOrder, ["igName", "customerName"]) || "Khách hàng"}</span>
+                    <div className="rounded-lg border border-[var(--border)] bg-[var(--surface)] divide-y divide-[var(--border)]">
+                      <div className="p-3 flex justify-between items-center">
+                        <span className="text-xs font-medium text-[var(--muted)]">Khách hàng</span>
+                        <div className="flex items-center gap-2">
+                          <div className="h-7 w-7 overflow-hidden rounded-full ring-1 ring-[var(--border)] shadow-sm bg-[color:var(--primary-soft)] flex items-center justify-center text-[var(--primary)] shrink-0 text-xs relative">
+                            {pickString(asRecord(selectedOrder.customerId), ["avatar"]) ? (
+                              <>
+                                <img 
+                                  src={pickString(asRecord(selectedOrder.customerId), ["avatar"])!} 
+                                  alt="Avatar" 
+                                  className="h-full w-full object-cover" 
+                                  onError={(e) => {
+                                    (e.target as HTMLImageElement).style.display = 'none';
+                                    (e.target as HTMLImageElement).parentElement?.classList.add('fallback-active');
+                                  }} 
+                                />
+                                <div className="absolute inset-0 items-center justify-center bg-[color:var(--primary-soft)] text-[var(--primary)] font-bold hidden [.fallback-active_&]:flex uppercase">
+                                  {(pickString(asRecord(selectedOrder.customerId), ["igName", "fullName", "fbName"]) || pickString(selectedOrder, ["igName", "customerName"]) || "K").charAt(0).toUpperCase()}
+                                </div>
+                              </>
+                            ) : (
+                              <span className="font-bold uppercase">
+                                {(pickString(asRecord(selectedOrder.customerId), ["igName", "fullName", "fbName"]) || pickString(selectedOrder, ["igName", "customerName"]) || "K").charAt(0).toUpperCase()}
+                              </span>
+                            )}
+                          </div>
+                          <span className="text-xs font-semibold text-[var(--foreground)]">
+                            {pickString(asRecord(selectedOrder.customerId), ["igName", "fullName", "fbName"]) || pickString(selectedOrder, ["igName", "customerName"]) || "Khách hàng"}
+                          </span>
+                        </div>
                       </div>
-                      <div className="p-4 flex justify-between items-center">
-                        <span className="text-xs font-bold text-[var(--muted)]">Điện thoại</span>
-                        <span className="text-xs font-black text-[#1447E6]">{pickString(selectedOrder, ["phone"]) || "Chưa cập nhật"}</span>
+                      <div className="p-3 flex justify-between items-center">
+                        <span className="text-xs font-medium text-[var(--muted)]">Điện thoại</span>
+                        <span className="text-xs font-semibold text-[var(--primary)]">{pickString(selectedOrder, ["phone"]) || "Chưa cập nhật"}</span>
                       </div>
-                      <div className="p-4">
-                        <span className="text-xs font-bold text-[var(--muted)] block mb-1">Địa chỉ giao hàng</span>
-                        <span className="text-xs font-bold text-[var(--foreground)] leading-relaxed">{compactAddress(asRecord(selectedOrder.shippingAddress || selectedOrder)) || "Chưa cập nhật địa chỉ"}</span>
+                      <div className="p-3">
+                        <span className="text-xs font-medium text-[var(--muted)] block mb-1">Địa chỉ giao hàng</span>
+                        <span className="text-xs font-medium text-[var(--foreground)] leading-relaxed">{compactAddress(asRecord(selectedOrder.shippingAddress || selectedOrder)) || "Chưa cập nhật địa chỉ"}</span>
                       </div>
                     </div>
                   </div>
 
                   {/* Order Items Section */}
-                  <div className="space-y-4">
-                    <h5 className="text-[10px] font-black uppercase tracking-widest text-[var(--muted)] flex items-center gap-2 px-1">
+                  <div className="space-y-3">
+                    <h5 className="text-[10px] font-medium uppercase tracking-widest text-[var(--muted)] flex items-center gap-2 px-1">
                        <ShoppingBag className="w-3.5 h-3.5" /> Sản phẩm trong đơn ({extractCollection(selectedOrder.items).length})
                     </h5>
-                    <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] overflow-hidden shadow-sm">
+                    <div className="rounded-lg border border-[var(--border)] bg-[var(--surface)] overflow-hidden">
                       <table className="w-full text-left text-xs">
                         <thead className="bg-[var(--surface-muted)] text-[var(--muted)] border-b border-[var(--border)]">
                           <tr>
-                            <th className="px-4 py-3 font-bold uppercase tracking-wider">Mặt hàng</th>
-                            <th className="px-4 py-3 font-bold uppercase tracking-wider text-center">SL</th>
-                            <th className="px-4 py-3 font-bold uppercase tracking-wider text-right">Giá</th>
+                            <th className="px-4 py-2.5 font-medium uppercase tracking-wider text-[11px]">Mặt hàng</th>
+                            <th className="px-4 py-2.5 font-medium uppercase tracking-wider text-center text-[11px]">SL</th>
+                            <th className="px-4 py-2.5 font-medium uppercase tracking-wider text-right text-[11px]">Giá</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-[var(--border)]">
                           {extractCollection(selectedOrder.items).length > 0 ? (
                             extractCollection(selectedOrder.items).map((item, idx) => (
                               <tr key={idx} className="hover:bg-[var(--hover)] transition-colors">
-                                <td className="px-4 py-3">
-                                  <p className="font-bold text-[var(--foreground)]">{pickString(item, ["productName", "name", "title"]) || "Sản phẩm không tên"}</p>
+                                <td className="px-4 py-2.5">
+                                  <p className="font-medium text-[var(--foreground)] text-xs">{pickString(item, ["productName", "name", "title"]) || "Sản phẩm không tên"}</p>
                                   <p className="text-[10px] text-[var(--muted)]">#{pickString(item, ["sku", "code"]) || "NO-SKU"}</p>
                                 </td>
-                                <td className="px-4 py-3 text-center font-black">{pickNumber(item, ["quantity", "count"]) || 1}</td>
-                                <td className="px-4 py-3 text-right font-bold text-[var(--foreground)]">{formatCurrency(pickNumber(item, ["price"]) ?? 0)}</td>
+                                <td className="px-4 py-2.5 text-center font-semibold text-xs">{pickNumber(item, ["quantity", "count"]) || 1}</td>
+                                <td className="px-4 py-2.5 text-right font-medium text-[var(--foreground)] text-xs">{formatCurrency(pickNumber(item, ["price"]) ?? 0)}</td>
                               </tr>
                             ))
                           ) : (
@@ -597,10 +706,10 @@ export function OrdersScreen() {
                             </tr>
                           )}
                         </tbody>
-                        <tfoot className="bg-[var(--surface-subdued)]/50 font-black border-t border-[var(--border)]">
+                        <tfoot className="font-semibold border-t border-[var(--border)]">
                           <tr>
-                            <td colSpan={2} className="px-4 py-3 text-right text-[var(--muted)] uppercase tracking-wider">Tổng cộng</td>
-                            <td className="px-4 py-3 text-right text-[#1447E6]">{formatCurrency(pickNumber(selectedOrder, ["totalPrice", "amount"]) ?? 0)}</td>
+                            <td colSpan={2} className="px-4 py-2.5 text-right text-[var(--muted)] uppercase tracking-wider text-xs">Tổng cộng</td>
+                            <td className="px-4 py-2.5 text-right text-[var(--primary)] text-xs">{formatCurrency(pickNumber(selectedOrder, ["totalPrice", "amount"]) ?? 0)}</td>
                           </tr>
                         </tfoot>
                       </table>
@@ -608,32 +717,32 @@ export function OrdersScreen() {
                   </div>
 
                   {/* Notes Section */}
-                  <div className="space-y-4 pb-6">
-                    <h5 className="text-[10px] font-black uppercase tracking-widest text-[var(--muted)] flex items-center gap-2 px-1">
+                  <div className="space-y-3 pb-4">
+                    <h5 className="text-[10px] font-medium uppercase tracking-widest text-[var(--muted)] flex items-center gap-2 px-1">
                        <Truck className="w-3.5 h-3.5" /> Ghi chú & Vận chuyển
                     </h5>
-                    <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface-muted)] p-5 space-y-3 shadow-sm">
+                    <div className="rounded-lg border border-[var(--border)] bg-[var(--surface-muted)] p-4 space-y-3">
                        <div>
-                         <p className="text-[10px] font-black text-[var(--muted)] uppercase tracking-wider mb-1">Ghi chú đơn hàng</p>
-                         <p className="text-xs font-semibold text-[var(--foreground)] italic">
+                         <p className="text-[10px] font-medium text-[var(--muted)] uppercase tracking-wider mb-1">Ghi chú đơn hàng</p>
+                         <p className="text-xs font-medium text-[var(--foreground)] italic">
                             {pickString(selectedOrder, ["note", "customerNote"]) || "Không có ghi chú nào cho đơn hàng này."}
                          </p>
                        </div>
                        <div className="pt-3 border-t border-[var(--border)]/50">
-                         <p className="text-[10px] font-black text-[var(--muted)] uppercase tracking-wider mb-1">Trạng thái vận chuyển</p>
+                         <p className="text-[10px] font-medium text-[var(--muted)] uppercase tracking-wider mb-1">Trạng thái vận chuyển</p>
                          <div className="flex items-center gap-2">
-                           <div className="w-2 h-2 rounded-full bg-orange-500 animate-pulse" />
-                           <span className="text-xs font-black text-orange-600 uppercase tracking-tight">Đang chờ chuẩn bị hàng</span>
+                           <div className="w-1.5 h-1.5 rounded-full bg-orange-500 animate-pulse" />
+                           <span className="text-xs font-medium text-orange-600">Đang chờ chuẩn bị hàng</span>
                          </div>
                        </div>
                     </div>
                   </div>
                 </div>
 
-                <div className="p-6 border-t border-[var(--border)] bg-[var(--surface-subdued)] shrink-0 grid grid-cols-2 gap-4">
+                <div className="p-5 border-t border-[var(--border)] shrink-0 grid grid-cols-2 gap-3">
                   <button
                     onClick={() => setIsDeliveryModalOpen(true)}
-                    className="h-14 rounded-2xl bg-orange-600 hover:bg-orange-700 text-xs font-black text-white shadow-lg shadow-orange-500/10 transition-all flex items-center justify-center gap-2 active:scale-[0.97]"
+                    className="h-11 rounded-lg bg-orange-600 hover:bg-orange-700 text-xs font-semibold text-white transition-colors flex items-center justify-center gap-2"
                   >
                     <Truck className="w-4 h-4" />
                     GIAO HÀNG
@@ -641,7 +750,7 @@ export function OrdersScreen() {
                   <button
                     onClick={() => handlePrintSingle(selectedOrder)}
                     disabled={isPrinting}
-                    className="h-14 rounded-2xl bg-[#28c840] hover:bg-[#23af37] text-xs font-black text-white shadow-lg shadow-green-500/10 transition-all flex items-center justify-center gap-2 active:scale-[0.97] disabled:opacity-50"
+                    className="h-11 rounded-lg bg-[var(--accent-green)] hover:bg-[var(--accent-green-strong)] text-xs font-semibold text-white transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
                   >
                     <Printer className="w-4 h-4" />
                     {isPrinting ? "ĐANG IN..." : "IN VẬN ĐƠN"}
@@ -663,18 +772,30 @@ export function OrdersScreen() {
       {printProgress && typeof document !== "undefined" && createPortal(
         <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm">
           <div className="rounded-2xl bg-white p-8 w-80 shadow-2xl flex flex-col items-center">
-            <svg className="h-10 w-10 text-[#1447E6] animate-spin mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+            <svg className="h-10 w-10 text-[var(--primary)] animate-spin mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
             <h3 className="text-lg font-bold text-gray-900 mb-1">Đang in đơn hàng</h3>
             <p className="text-sm font-medium text-gray-500 mb-4">
               Đơn thứ {printProgress.current} trong số {printProgress.total} đơn
             </p>
             <div className="w-full bg-gray-200 rounded-full h-2.5">
-              <div className="bg-[#1447E6] h-2.5 rounded-full transition-all duration-300" style={{ width: `${(printProgress.current / printProgress.total) * 100}%` }}></div>
+              <div className="bg-[var(--primary)] h-2.5 rounded-full transition-all duration-300" style={{ width: `${(printProgress.current / printProgress.total) * 100}%` }}></div>
             </div>
           </div>
         </div>,
         document.body
       )}
+
+      {/* Local Bridge Setup & Offline Modal */}
+      <BridgeSetupModal
+        isOpen={isBridgeOfflineOpen}
+        onClose={() => setIsBridgeOfflineOpen(false)}
+        onRetry={async () => {
+          setIsBridgeOfflineOpen(false);
+          showToast("Đang kiểm tra kết nối với Local Bridge...", "success");
+        }}
+      />
+
+      {toast && typeof document !== "undefined" && createPortal(<Toast message={toast.message} type={toast.type} />, document.body)}
     </div>
   );
 }

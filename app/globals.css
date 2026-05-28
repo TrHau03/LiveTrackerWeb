@@ -1,51 +1,114 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
 @import "tailwindcss";
 
 :root {
-  --background: #fafafb;
-  --background-secondary: #f1f4f9;
-  --foreground: #1a1f36;
-  --foreground-soft: #4f566b;
-  --muted: #a3acb9;
-  --border: #edf2f7;
+  /* Core Palette — Clean Admin Dashboard */
+  --background: #F7F8FA;
+  --background-secondary: #EBEDF0;
+  --foreground: #1A1D26;
+  --foreground-soft: #6B7280;
+  --muted: #9CA3AF;
+  --border: #E5E7EB;
   --surface: #ffffff;
   --surface-strong: #ffffff;
   --surface-elevated: #ffffff;
-  --surface-muted: #f7fafc;
-  --primary: #1447E6;
-  --primary-strong: #0E3BBF;
-  --primary-soft: rgba(20, 71, 230, 0.1);
-  --shadow-soft: 0 10px 30px rgba(0, 0, 0, 0.04);
-  --shadow-strong: 0 20px 50px rgba(0, 0, 0, 0.08);
-  --radius-lg: 16px;
-  --sidebar-width: 220px;
+  --surface-muted: #F9FAFB;
+
+  /* Primary — Blue accent (for active/interactive) */
+  --primary: #2563EB;
+  --primary-strong: #1D4ED8;
+  --primary-soft: rgba(37, 99, 235, 0.06);
+
+  /* Green — Action/success accent (inspired by reference) */
+  --accent-green: #22C55E;
+  --accent-green-strong: #16A34A;
+  --accent-green-soft: rgba(34, 197, 94, 0.08);
+
+  /* Shadows — Minimal, subtle */
+  --shadow-soft: 0 1px 3px rgba(0, 0, 0, 0.04), 0 1px 2px rgba(0, 0, 0, 0.06);
+  --shadow-strong: 0 4px 12px rgba(0, 0, 0, 0.06);
+
+  /* Radius */
+  --radius-lg: 12px;
+  --radius-md: 8px;
+  --radius-sm: 6px;
+
+  /* Sidebar */
+  --sidebar-width: 240px;
   --sidebar-width-icon: 68px;
+  --sidebar-bg: #ffffff;
+  --sidebar-border: #E5E7EB;
+  --sidebar-fg: #6B7280;
+  --sidebar-fg-hover: #1A1D26;
+  --sidebar-active-bg: #EFF6FF;
+  --sidebar-active-fg: #2563EB;
+  --sidebar-logo-filter: none;
+
+  /* Header — Solid white */
+  --header-bg: #ffffff;
+  --header-border: #E5E7EB;
+  --header-fg: #1A1D26;
+  --header-fg-muted: #9CA3AF;
+
+  /* Hover */
+  --hover: rgba(0, 0, 0, 0.02);
+
+  /* Status Colors */
+  --status-active: #22C55E;
+  --status-active-bg: rgba(34, 197, 94, 0.08);
+  --status-pending: #F59E0B;
+  --status-pending-bg: rgba(245, 158, 11, 0.08);
+  --status-inactive: #9CA3AF;
+  --status-inactive-bg: rgba(156, 163, 175, 0.08);
+
   color-scheme: light;
 }
 
 .dark {
-  --background: #090d16;
-  --background-secondary: #0d1421;
-  --foreground: #f3f6fb;
-  --foreground-soft: #c7d2df;
-  --muted: #91a2b7;
-  --border: rgba(148, 163, 184, 0.14);
-  --surface: rgba(12, 18, 31, 0.8);
-  --surface-strong: rgba(13, 21, 35, 0.96);
-  --surface-elevated: #111827;
-  --surface-muted: rgba(19, 27, 43, 0.88);
-  --sidebar-width-icon: 68px;
-  --primary: #4D7CFF;
-  --primary-strong: #1447E6;
-  --primary-soft: rgba(77, 124, 255, 0.2);
-  --shadow-soft: 0 26px 70px rgba(2, 6, 23, 0.42);
-  --shadow-strong: 0 42px 120px rgba(2, 6, 23, 0.52);
+  --background: #0F1117;
+  --background-secondary: #1A1D26;
+  --foreground: #F3F4F6;
+  --foreground-soft: #D1D5DB;
+  --muted: #9CA3AF;
+  --border: rgba(255, 255, 255, 0.08);
+  --surface: #1A1D26;
+  --surface-strong: #1F2937;
+  --surface-elevated: #1F2937;
+  --surface-muted: rgba(31, 41, 55, 0.5);
+
+  --primary: #3B82F6;
+  --primary-strong: #2563EB;
+  --primary-soft: rgba(59, 130, 246, 0.12);
+
+  --accent-green: #34D399;
+  --accent-green-strong: #22C55E;
+  --accent-green-soft: rgba(52, 211, 153, 0.12);
+
+  --shadow-soft: 0 1px 3px rgba(0, 0, 0, 0.3);
+  --shadow-strong: 0 4px 12px rgba(0, 0, 0, 0.4);
+
+  --sidebar-bg: #1A1D26;
+  --sidebar-border: rgba(255, 255, 255, 0.06);
+  --sidebar-fg: #9CA3AF;
+  --sidebar-fg-hover: #F3F4F6;
+  --sidebar-active-bg: rgba(59, 130, 246, 0.12);
+  --sidebar-active-fg: #3B82F6;
+  --sidebar-logo-filter: brightness(0) invert(1);
+
+  --header-bg: #1A1D26;
+  --header-border: rgba(255, 255, 255, 0.06);
+  --header-fg: #F3F4F6;
+  --header-fg-muted: #9CA3AF;
+
+  --hover: rgba(255, 255, 255, 0.03);
+
   color-scheme: dark;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: "Avenir Next", "Segoe UI", sans-serif;
+  --font-sans: "Inter", system-ui, -apple-system, sans-serif;
   --font-mono: "SFMono-Regular", "SF Mono", Consolas, "Liberation Mono",
     Menlo, monospace;
 }
@@ -62,14 +125,16 @@ body {
   min-height: 100vh;
   background: var(--background);
   color: var(--foreground);
-  font-family: "Avenir Next", "Segoe UI", sans-serif;
+  font-family: "Inter", system-ui, -apple-system, sans-serif;
   transition:
-    background-color 220ms ease,
-    color 220ms ease;
+    background-color 200ms ease,
+    color 200ms ease;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 ::selection {
-  background: rgba(20, 71, 230, 0.24);
+  background: rgba(37, 99, 235, 0.15);
 }
 
 a,
@@ -90,11 +155,38 @@ code {
 }
 
 ::-webkit-scrollbar {
-  width: 10px;
-  height: 10px;
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(148, 163, 184, 0.3);
+  background: rgba(0, 0, 0, 0.12);
   border-radius: 999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.2);
+}
+
+/* Custom Scrollbar for sidebar */
+.custom-scrollbar-premium::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+
+.custom-scrollbar-premium::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.custom-scrollbar-premium::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.08);
+  border-radius: 99px;
+}
+
+.custom-scrollbar-premium::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.15);
 }

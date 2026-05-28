@@ -61,7 +61,7 @@ export function CustomersScreen() {
   }, [customers.length]);
 
   return (
-    <div className="space-y-8 pb-28 lg:pb-6">
+    <div className="space-y-6 pb-28 lg:pb-6">
 
       <Panel
         title="Customer base"
@@ -80,15 +80,15 @@ export function CustomersScreen() {
           <EmptyState message="Chưa có khách hàng phù hợp." />
         ) : null}
 
-        <div className="grid grid-cols-1 xl:grid-cols-[6fr_4fr] gap-6">
-          <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] overflow-hidden shadow-sm order-1">
+        <div className="grid grid-cols-1 xl:grid-cols-[6fr_4fr] gap-4">
+          <div className="rounded-lg border border-[var(--border)] bg-[var(--surface)] overflow-hidden order-1">
             <div className="overflow-x-auto">
               <table className="w-full text-left text-sm text-[var(--foreground)]">
                 <thead className="bg-[var(--surface-muted)] text-xs uppercase text-[var(--muted)] border-b border-[var(--border)]">
                   <tr>
-                    <th scope="col" className="px-4 py-3 font-semibold">Khách hàng</th>
-                    <th scope="col" className="px-4 py-3 font-semibold">Số điện thoại</th>
-                    <th scope="col" className="px-4 py-3 font-semibold">Lần cuối</th>
+                    <th scope="col" className="px-4 py-3 font-medium tracking-wider text-[11px]">Khách hàng</th>
+                    <th scope="col" className="px-4 py-3 font-medium tracking-wider text-[11px]">Số điện thoại</th>
+                    <th scope="col" className="px-4 py-3 font-medium tracking-wider text-[11px]">Lần cuối</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[var(--border)]">
@@ -99,19 +99,38 @@ export function CustomersScreen() {
                       <tr
                         key={`${pickString(customer, ["id", "_id"]) || index}`}
                         onClick={() => setSelectedCustomerId(pickString(customer, ["id", "_id"]) || "")}
-                        className={`cursor-pointer transition-colors hover:bg-[var(--surface-muted)]/60 ${isActive ? 'bg-[var(--surface-muted)]/80' : ''}`}
+                        className={`cursor-pointer transition-colors hover:bg-[var(--hover)] ${isActive ? 'bg-blue-50 dark:bg-blue-900/10' : ''}`}
                       >
                         <td className="px-4 py-3">
-                          <div className="flex items-center gap-3">
-                            <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold text-white shadow-sm ${isActive ? 'bg-[var(--primary)]' : 'bg-gray-400 dark:bg-gray-600'}`}>
-                              {name[0]?.toUpperCase() || "C"}
+                          <div className="flex items-center gap-2.5">
+                            <div className="h-7 w-7 overflow-hidden rounded-full ring-1 ring-[var(--border)] bg-[color:var(--primary-soft)] flex items-center justify-center text-[var(--primary)] shrink-0 text-xs relative">
+                              {pickString(customer, ["avatar"]) ? (
+                                <>
+                                  <img 
+                                    src={pickString(customer, ["avatar"])!} 
+                                    alt={name} 
+                                    className="h-full w-full object-cover" 
+                                    onError={(e) => {
+                                      (e.target as HTMLImageElement).style.display = 'none';
+                                      (e.target as HTMLImageElement).parentElement?.classList.add('fallback-active');
+                                    }} 
+                                  />
+                                  <div className="absolute inset-0 items-center justify-center bg-[color:var(--primary-soft)] text-[var(--primary)] font-bold hidden [.fallback-active_&]:flex uppercase">
+                                    {name[0]?.toUpperCase() || "C"}
+                                  </div>
+                                </>
+                              ) : (
+                                <span className="font-bold uppercase">
+                                  {name[0]?.toUpperCase() || "C"}
+                                </span>
+                              )}
                             </div>
-                            <span className={`font-semibold ${isActive ? 'text-[var(--primary)]' : 'text-[var(--foreground)]'}`}>
+                            <span className={`font-medium text-sm ${isActive ? 'text-[var(--primary)]' : 'text-[var(--foreground)]'}`}>
                               {name}
                             </span>
                           </div>
                         </td>
-                        <td className="px-4 py-3 text-[var(--foreground-soft)] font-medium">
+                        <td className="px-4 py-3 text-[var(--foreground-soft)] font-medium text-xs">
                           {pickString(customer, ["phone"]) || "—"}
                         </td>
                         <td className="px-4 py-3 text-xs text-[var(--muted)]">
@@ -132,9 +151,28 @@ export function CustomersScreen() {
               <ErrorState message={detailState.error} compact />
             ) : (
               <div className="space-y-6">
-                <div className="flex flex-col items-center gap-3 border-b border-[var(--border)] pb-6 pt-2">
-                  <div className="flex h-16 w-16 items-center justify-center rounded-full bg-[var(--primary)] text-2xl font-semibold text-white shadow-sm ring-4 ring-[var(--surface-muted)]">
-                    {(pickString(detail, ["igName", "name"]) || "C")[0]?.toUpperCase()}
+                <div className="flex flex-col items-center gap-3 border-b border-[var(--border)] pb-5 pt-2">
+                  <div className="h-14 w-14 overflow-hidden rounded-full ring-2 ring-[var(--surface-muted)] bg-[color:var(--primary-soft)] flex items-center justify-center text-[var(--primary)] shrink-0 text-xl relative">
+                    {pickString(detail, ["avatar"]) ? (
+                      <>
+                        <img 
+                          src={pickString(detail, ["avatar"])!} 
+                          alt="Avatar" 
+                          className="h-full w-full object-cover" 
+                          onError={(e) => {
+                            (e.target as HTMLImageElement).style.display = 'none';
+                            (e.target as HTMLImageElement).parentElement?.classList.add('fallback-active');
+                          }} 
+                        />
+                        <div className="absolute inset-0 items-center justify-center bg-[color:var(--primary-soft)] text-[var(--primary)] font-bold hidden [.fallback-active_&]:flex uppercase">
+                          {(pickString(detail, ["igName", "name"]) || "C")[0]?.toUpperCase()}
+                        </div>
+                      </>
+                    ) : (
+                      <span className="font-bold uppercase">
+                        {(pickString(detail, ["igName", "name"]) || "C")[0]?.toUpperCase()}
+                      </span>
+                    )}
                   </div>
                   <div className="text-center">
                     <p className="text-lg font-semibold text-[var(--foreground)]">
@@ -170,7 +208,7 @@ export function CustomersScreen() {
                       <span className="text-sm text-[var(--muted)]">No tags</span>
                     ) : (
                       tags.map((tag, index) => (
-                        <span key={`${pickString(tag, ["id", "_id"]) || index}`} className="inline-flex rounded-md bg-[color:var(--primary-soft)] px-2 py-1 text-xs font-medium text-[var(--primary)]">
+                        <span key={`${pickString(tag, ["id", "_id"]) || index}`} className="inline-flex rounded-full bg-[color:var(--primary-soft)] px-2.5 py-0.5 text-[11px] font-medium text-[var(--primary)]">
                           {pickString(tag, ["label", "name"]) || "Tag"}
                         </span>
                       ))
@@ -179,7 +217,7 @@ export function CustomersScreen() {
                 </div>
 
                 <div className="pt-2">
-                  <h4 className="mb-4 text-xs font-semibold uppercase tracking-wider text-[var(--muted)]">Recent History</h4>
+                  <h4 className="mb-3 text-xs font-medium uppercase tracking-wider text-[var(--muted)]">Recent History</h4>
                   <div className="space-y-4 border-l-2 border-[var(--border)] pl-3">
                     {histories.length === 0 ? (
                       <span className="text-sm text-[var(--muted)]">Chưa có lịch sử.</span>

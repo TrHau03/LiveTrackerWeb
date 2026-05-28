@@ -119,6 +119,7 @@ export function LiveListColumn({
     owner: pickString(asRecord(live.user), ["fullName", "name"]) || session.user?.fullName || "Owner",
     igLiveId: pickString(live, ["igLiveId"]) || "instagram-live",
     shopId: pickString(live, ["shopId"]) || pickString(asRecord(live.shop), ["id", "_id"]),
+    coverUrl: pickString(live as any, ["coverUrl", "cover", "thumbnail", "image", "avatar"]) || null,
   }));
 
   const availableShops = useMemo(() => {
@@ -335,11 +336,11 @@ export function LiveListColumn({
 
         <div className="space-y-4">
           {groupedLives.map((group) => (
-            <div key={group.shopId} className="flex flex-col border border-[var(--border)] rounded-xl bg-[var(--surface)] overflow-hidden shadow-sm">
+            <div key={group.shopId} className="flex flex-col border border-[var(--border)] rounded-lg bg-[var(--surface)] overflow-hidden">
               <div className="bg-[var(--surface-muted)]/50 px-3 py-2 border-b border-[var(--border)] flex items-center gap-2">
                 <ShopAvatar name={group.shopName} url={group.shopAvatar} size="xs" />
-                <span className="text-xs font-bold text-[var(--foreground)] uppercase tracking-wider">{group.shopName}</span>
-                <span className="ml-auto text-[10px] font-semibold bg-[var(--surface)] border border-[var(--border)] px-1.5 py-0.5 rounded-full text-[var(--muted)]">
+                <span className="text-xs font-semibold text-[var(--foreground)] uppercase tracking-wider">{group.shopName}</span>
+                <span className="ml-auto text-[10px] font-medium bg-[var(--surface)] border border-[var(--border)] px-1.5 py-0.5 rounded-full text-[var(--muted)]">
                   {group.lives.length} Live
                 </span>
               </div>
@@ -352,29 +353,52 @@ export function LiveListColumn({
                     <button
                       key={live.id}
                       onClick={() => { if (live.id) onSelectLive(live.id) }}
-                      className={`w-full text-left rounded-lg p-2.5 transition border ${isActive
+                      className={`w-full text-left rounded-lg p-2.5 transition border flex gap-3 items-center ${isActive
                         ? "bg-[color:var(--primary-soft)] border-[var(--primary)]/30 text-[var(--primary)] shadow-sm"
                         : "border-[var(--border)]/50 bg-transparent hover:bg-[var(--surface-muted)] text-[var(--foreground)] hover:border-[var(--border)]"
                         }`}
                     >
-                      <div className="mb-1.5 flex items-center justify-between">
-                        <span className={`inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider ${live.isLive ? 'bg-red-50 text-red-700' : 'bg-[var(--surface-muted)] text-[var(--muted)]'}`}>
-                          {live.isLive && <span className="h-1.5 w-1.5 rounded-full animate-[pulse_2s_ease-in-out_infinite] bg-red-500"></span>}
-                          {live.isLive ? "Đang Live" : "Đã Kết Thúc"}
-                        </span>
+                      {/* Cột trái: Khung ảnh live */}
+                      <div className="relative shrink-0">
+                        {live.coverUrl ? (
+                          <div className="h-10 w-10 relative flex shrink-0 overflow-hidden rounded-lg ring-1 ring-[var(--border)] bg-[var(--surface-muted)]">
+                            <img src={live.coverUrl} alt="Live Cover" className="h-full w-full object-cover" />
+                          </div>
+                        ) : (
+                          <div className="h-10 w-10 flex items-center justify-center rounded-lg bg-[var(--surface-muted)] border border-[var(--border)]/60 text-[var(--muted)] shrink-0" title="Không hiển thị ảnh">
+                            <svg className="h-5 w-5 opacity-60" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                            </svg>
+                          </div>
+                        )}
+                        {live.isLive && (
+                          <span className="absolute -bottom-0.5 -right-0.5 flex h-2.5 w-2.5">
+                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                            <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-red-500"></span>
+                          </span>
+                        )}
                       </div>
-                      <p className={`mb-2.5 truncate text-sm font-bold ${isActive ? "text-[var(--primary)]" : "text-[var(--foreground)]"}`}>
-                        {formatLiveDateTime(live.updatedAt || "")}
-                      </p>
-                      <div className="flex items-center gap-4 text-xs">
-                        <span className="flex items-center gap-1.5">
-                          <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" /></svg>
-                          <strong className={isActive ? "text-[var(--primary)]" : "text-[var(--foreground)]"}>{formatNumber(displayComments)}</strong>
-                        </span>
-                        <span className="flex items-center gap-1.5">
-                          <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" /></svg>
-                          <strong className={isActive ? "text-[var(--primary)]" : "text-[var(--foreground)]"}>{formatNumber(displayOrders)}</strong>
-                        </span>
+
+                      {/* Cột phải: Thông tin live */}
+                      <div className="flex-1 min-w-0 flex flex-col gap-0.5">
+                        <div className="flex items-center justify-between">
+                          <span className={`inline-flex items-center gap-1 rounded-full px-1.5 py-0.2 text-[9px] font-semibold uppercase tracking-wider ${live.isLive ? 'bg-red-50 text-red-700' : 'bg-[var(--surface-muted)] text-[var(--muted)]'}`}>
+                            {live.isLive ? "Đang Live" : "Đã Kết Thúc"}
+                          </span>
+                        </div>
+                        <p className={`truncate text-sm font-semibold leading-tight ${isActive ? "text-[var(--primary)]" : "text-[var(--foreground)]"}`}>
+                          {formatLiveDateTime(live.updatedAt || "")}
+                        </p>
+                        <div className="flex items-center gap-3 text-xs text-[var(--muted)] mt-0.5">
+                          <span className="flex items-center gap-1">
+                            <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" /></svg>
+                            <strong className={isActive ? "text-[var(--primary)]" : "text-[var(--foreground)]"}>{formatNumber(displayComments)}</strong>
+                          </span>
+                          <span className="flex items-center gap-1">
+                            <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" /></svg>
+                            <strong className={isActive ? "text-[var(--primary)]" : "text-[var(--foreground)]"}>{formatNumber(displayOrders)}</strong>
+                          </span>
+                        </div>
                       </div>
                     </button>
                   );
@@ -396,19 +420,21 @@ function ShopAvatar({
 }: { 
   name: string; 
   url?: string; 
-  size?: "xs" | "sm" | "md"; 
+  size?: "xs" | "sm" | "md" | "lg"; 
   isAll?: boolean;
 }) {
   const sizeClasses = {
     xs: "h-5 w-5 text-[10px]",
     sm: "h-6 w-6 text-xs",
     md: "h-8 w-8 text-sm",
+    lg: "h-10 w-10 text-sm",
   };
 
   const iconClasses = {
     xs: "h-3 w-3",
     sm: "h-3.5 w-3.5",
     md: "h-4.5 w-4.5",
+    lg: "h-5 w-5",
   };
 
   if (isAll) {

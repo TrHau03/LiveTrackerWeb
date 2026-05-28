@@ -12,8 +12,9 @@ import { applyAuthResponses } from "@/hooks/use-auth-sync";
 import { asRecord, pickString, pickNumber, pickBoolean, extractCollection } from "@/lib/proxy-client";
 import { createOrder } from "@/lib/services/orders-service";
 import { updateComment, linkBackup, unlinkBackup } from "@/lib/services/comments-service";
-import { printReceiptHtml, RECEIPT_CSS } from "@/lib/printUtils";
+import { printReceiptHtml, printReceipt, RECEIPT_CSS } from "@/lib/printUtils";
 import { CommentReceipt } from "@/components/print/CommentReceipt";
+import { BridgeSetupModal } from "@/components/print/BridgeSetupModal";
 import { Virtuoso, VirtuosoHandle } from "react-virtuoso";
 
 import {
@@ -158,7 +159,7 @@ function CustomerClosedItemsDropdown({
       setIsFetching(true);
       try {
         const { fetchMyOrders } = await import("@/lib/services/orders-service");
-        
+
         const res = await fetchMyOrders(session, {
           liveId,
           search: igUsername || igUserId,
@@ -166,19 +167,19 @@ function CustomerClosedItemsDropdown({
           sortBy: "createdAt",
           sortOrder: "desc"
         });
-        
+
         applyAuthResponses([res.response], patchSession, logout);
         if (res.ok && res.data) {
           const orders = extractCollection(res.data);
-          
+
           // Trích xuất tất cả bình luận từ các đơn hàng thuộc liveId này
           const allCommentsFromOrders: Record<string, unknown>[] = [];
-          
+
           if (Array.isArray(orders)) {
             orders.forEach(order => {
               const oRecord = asRecord(order);
               const oLiveId = pickString(asRecord(oRecord.liveId) || oRecord, ["_id", "liveId"]);
-              
+
               // Kiểm tra xem đơn hàng có thuộc livestream hiện tại không
               if (oLiveId === liveId || !liveId) {
                 const commentList = oRecord.commentIds;
@@ -188,14 +189,14 @@ function CustomerClosedItemsDropdown({
               }
             });
           }
-          
+
           // Sắp xếp lại tất cả bình luận theo thời gian mới nhất ở trên
           allCommentsFromOrders.sort((a, b) => {
             const dateA = new Date(pickString(a, ["createdAt", "created_at"]) || 0).getTime();
             const dateB = new Date(pickString(b, ["createdAt", "created_at"]) || 0).getTime();
             return dateB - dateA;
           });
-          
+
           setItems(allCommentsFromOrders);
         } else {
           // Fallback to offline filter if API fails or returns no data
@@ -248,19 +249,18 @@ function CustomerClosedItemsDropdown({
         title="Số lượng món đã mua (Click để xem và lọc đơn)"
       >
         <div className="relative">
-            <svg className="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-1.3 5h12.6M9 19h.01M16 19h.01" /></svg>
-            <span className="absolute -top-1.5 -right-1.5 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-green-600 text-[8px] font-bold text-white ring-1 ring-white animate-in zoom-in-50 duration-200">
-                {customerClosedCount}
-            </span>
+          <svg className="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-1.3 5h12.6M9 19h.01M16 19h.01" /></svg>
+          <span className="absolute -top-1.5 -right-1.5 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-green-600 text-[8px] font-bold text-white ring-1 ring-white animate-in zoom-in-50 duration-200">
+            {customerClosedCount}
+          </span>
         </div>
       </button>
 
       {isOpen && (
-        <div className={`absolute left-0 w-72 rounded-xl border border-[var(--border)] bg-[var(--surface)] p-2 shadow-xl z-[100] animate-in fade-in transition-all duration-200 ${
-          popoverDirection === 'up' 
-            ? 'bottom-full mb-2 slide-in-from-bottom-2' 
+        <div className={`absolute left-0 w-72 rounded-xl border border-[var(--border)] bg-[var(--surface)] p-2 shadow-xl z-[100] animate-in fade-in transition-all duration-200 ${popoverDirection === 'up'
+            ? 'bottom-full mb-2 slide-in-from-bottom-2'
             : 'top-full mt-1.5 slide-in-from-top-2'
-        }`}>
+          }`}>
           <div className="mb-2 px-1 pb-2 border-b border-[var(--border)]">
             <div className="flex items-center justify-between">
               <span className="text-xs font-bold text-[var(--foreground)]">Các món đã chốt hiện tại</span>
@@ -379,6 +379,9 @@ export function LiveCommentColumn({
   // Confirm cancel state
   const [confirmCancelOpen, setConfirmCancelOpen] = useState(false);
   const [commentToCancel, setCommentToCancel] = useState<Record<string, unknown> | null>(null);
+
+  // Local Bridge offline modal state
+  const [isBridgeOfflineOpen, setIsBridgeOfflineOpen] = useState(false);
 
   // Print receipt ref
   const printContainerRef = useRef<HTMLDivElement>(null);
@@ -521,7 +524,7 @@ export function LiveCommentColumn({
     const cleanup = startSSE();
     return cleanup;
   }, [liveId, session.accessToken, patchSession, logout, queryClient, autoReconnectSSE]);
-  
+
   // Cập nhật stats lên component cha khi có thay đổi
   useEffect(() => {
     if (onLiveStatsUpdate) {
@@ -603,7 +606,15 @@ export function LiveCommentColumn({
 
       const receiptEl = container.querySelector(".receipt") as HTMLElement;
       if (receiptEl) {
-        printReceiptHtml(receiptEl);
+        const result = await printReceipt(receiptEl);
+        if (!result.success) {
+          if (result.isOffline) {
+            setIsBridgeOfflineOpen(true);
+            showToast("⚠️ KHÔNG TÌM THẤY LOCAL BRIDGE! Vui lòng khởi động ứng dụng hoặc cài đặt phần mềm máy in.", "error");
+          } else {
+            showToast(`⚠️ Lỗi máy in: ${result.error}`, "error");
+          }
+        }
       }
 
       // Cleanup after print
@@ -770,7 +781,7 @@ export function LiveCommentColumn({
   };
 
   // ═══════════════════════════════════════════
-  // ACTION: In thêm (quantity + 1 → in lại)
+  // ACTION: Chốt thêm (quantity + 1 → in lại)
   // ═══════════════════════════════════════════
 
   const handlePrintMore = async (comment: Record<string, unknown>) => {
@@ -803,7 +814,7 @@ export function LiveCommentColumn({
         showToast("Không thể cập nhật số lượng", "error");
       }
     } catch {
-      showToast("Lỗi khi in thêm", "error");
+      showToast("Lỗi khi Chốt thêm", "error");
     } finally {
       setCommentLoading(commentId, false);
     }
@@ -857,15 +868,36 @@ export function LiveCommentColumn({
           {/* Hàng 1: Avatar căn giữa với Tên và Nội dung */}
           <div className="flex items-center gap-3 min-w-0">
             <div className="shrink-0 w-11 flex flex-col items-center">
-              <div className="h-8 w-8 overflow-hidden rounded-full ring-2 ring-[var(--surface)] shadow-sm bg-[color:var(--primary-soft)] flex items-center justify-center text-[var(--primary)] shrink-0 transition-transform group-hover:scale-110">
-                 <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 24 24"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
+              <div className="h-8 w-8 overflow-hidden rounded-full ring-2 ring-[var(--surface)] shadow-sm bg-[color:var(--primary-soft)] flex items-center justify-center text-[var(--primary)] shrink-0 relative">
+                {pickString(comment, ["customerAvatar", "avatar"]) ? (
+                  <>
+                    <img
+                      src={pickString(comment, ["customerAvatar", "avatar"])}
+                      alt={pickString(comment, ["igUsername", "username"]) || "Avatar"}
+                      className="h-full w-full object-cover"
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).style.display = 'none';
+                        (e.target as HTMLImageElement).parentElement?.classList.add('fallback-active');
+                      }}
+                    />
+                    <div className="absolute inset-0 items-center justify-center bg-[color:var(--primary-soft)] text-[var(--primary)] font-bold hidden [.fallback-active_&]:flex">
+                      <svg className="h-4 w-4 opacity-75 text-[var(--primary)]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                      </svg>
+                    </div>
+                  </>
+                ) : (
+                  <svg className="h-4 w-4 opacity-75 text-[var(--primary)]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                  </svg>
+                )}
               </div>
             </div>
-            
+
             <div className="flex-1 min-w-0 flex flex-col">
               <div className="flex items-center gap-2 mb-0.5 pr-2">
                 <div className={`flex items-center flex-wrap gap-1.5 text-xs font-bold ${isError ? 'text-red-500' : 'text-[var(--foreground)]'}`}>
-                  <span className="truncate max-w-[120px] leading-tight">{pickString(comment, ["igUsername", "username"]) || "Instagram User"}</span>
+                  <span className="truncate max-w-[120px] leading-tight text-sm font-extrabold">{pickString(comment, ["igUsername", "username"]) || "Instagram User"}</span>
 
                   {pickString(comment, ["customerPhone"]) && (
                     <span title={`SĐT: ${pickString(comment, ["customerPhone"])}`} className="text-emerald-600 bg-emerald-50 p-0.5 rounded-full shrink-0 inline-flex items-center justify-center">
@@ -890,7 +922,7 @@ export function LiveCommentColumn({
                   {pickString(comment, ["createdAt", "created_at"]) ? new Date(pickString(comment, ["createdAt", "created_at"]) as string).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : ''}
                 </span>
               </div>
-              <p className={`text-sm leading-tight whitespace-pre-wrap break-words ${isError ? 'text-red-600/80' : 'text-[var(--foreground-soft)]'}`}>{pickString(comment, ["text", "content"])}</p>
+              <p className={`text-[15px] font-semibold leading-snug whitespace-pre-wrap break-words ${isError ? 'text-red-600/90' : 'text-[var(--foreground)]'}`}>{pickString(comment, ["text", "content"])}</p>
             </div>
           </div>
 
@@ -911,7 +943,7 @@ export function LiveCommentColumn({
                 />
               )}
             </div>
-            
+
             <div className="flex-1 flex flex-wrap items-center gap-2">
               {/* ── STATUS === null: Chốt đơn, Đã báo lỗi, Dự bị ── */}
               {isNullStatus && (
@@ -919,41 +951,41 @@ export function LiveCommentColumn({
                   <button
                     onClick={() => handleConfirmOrder(comment, "NORMAL")}
                     disabled={isLoading}
-                    className="flex items-center gap-1.5 rounded-md bg-[var(--primary)] px-2.5 py-1 text-xs font-bold text-white shadow-sm hover:bg-[var(--primary-strong)] transition active:scale-95 shrink-0 disabled:opacity-50"
+                    className="flex items-center gap-1 rounded-lg bg-[var(--primary)] text-white hover:bg-[var(--primary-strong)] border border-[var(--primary)] shadow-sm transition active:scale-95 shrink-0 disabled:opacity-50 font-bold px-2.5 py-1 text-[11px]"
                   >
                     {isLoading ? (
-                      <svg className="h-3.5 w-3.5 animate-spin" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+                      <svg className="h-3 w-3 animate-spin" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
                     ) : (
-                      <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" /></svg>
+                      <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" /></svg>
                     )}
                     Chốt đơn
                   </button>
                   <button
                     onClick={() => handleConfirmOrder(comment, "CONFIRMED_ERROR")}
                     disabled={isLoading}
-                    className="flex items-center gap-1.5 rounded-md border border-amber-300 !bg-white px-2.5 py-1 text-[10px] font-medium text-amber-700 hover:bg-amber-50 transition active:scale-95 shrink-0 disabled:opacity-50 dark:bg-amber-900/20 dark:text-amber-400 dark:border-amber-700"
+                    className="flex items-center rounded-lg bg-amber-600 text-white hover:bg-amber-700 border border-amber-600 shadow-sm transition active:scale-95 shrink-0 disabled:opacity-50 font-bold p-1.5 text-[11px]"
+                    title="Đã báo lỗi"
                   >
-                    <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4v.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                    Đã báo lỗi
+                    <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 8v4m0 4v.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                   </button>
                   <button
                     onClick={() => handleBackup(comment)}
                     disabled={isLoading}
-                    className="flex items-center gap-1.5 rounded-md border border-[var(--border)] bg-[var(--surface)] px-2.5 py-1 text-[10px] font-medium text-[var(--muted)] shadow-sm hover:bg-[var(--surface-muted)] hover:border-[var(--primary)] hover:text-[var(--foreground)] transition active:scale-95 shrink-0 disabled:opacity-50"
+                    className="flex items-center rounded-lg bg-slate-600 text-white hover:bg-slate-700 border border-slate-600 shadow-sm transition active:scale-95 shrink-0 disabled:opacity-50 font-bold p-1.5 text-[11px]"
+                    title="Dự bị"
                   >
-                    <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                    Dự bị
+                    <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                   </button>
                 </>
               )}
 
-              {/* ── STATUS === NORMAL: Huỷ chốt, In thêm ── */}
+              {/* ── STATUS === NORMAL: Huỷ chốt, Chốt thêm ── */}
               {isNormal && (
                 <>
                   <button
                     onClick={() => handleCancelOrder(comment)}
                     disabled={isLoading}
-                    className="flex items-center gap-1.5 rounded-md border border-red-200 bg-red-50 px-2.5 py-1 text-[10px] font-medium text-red-600 shadow-sm hover:bg-red-100 transition active:scale-95 shrink-0 disabled:opacity-50 dark:bg-red-900/20 dark:text-red-400 dark:border-red-800"
+                    className="flex items-center gap-1 rounded-lg bg-red-600 text-white hover:bg-red-700 border border-red-600 shadow-sm transition active:scale-95 shrink-0 disabled:opacity-50 font-bold px-2.5 py-1 text-[11px]"
                   >
                     <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
                     Huỷ chốt
@@ -961,10 +993,10 @@ export function LiveCommentColumn({
                   <button
                     onClick={() => handlePrintMore(comment)}
                     disabled={isLoading}
-                    className="flex items-center gap-1.5 rounded-md bg-orange-500 px-2.5 py-1 text-xs font-bold text-white shadow-sm hover:bg-orange-600 transition active:scale-95 shrink-0 disabled:opacity-50"
+                    className="flex items-center gap-1 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 border border-emerald-600 shadow-sm transition active:scale-95 shrink-0 disabled:opacity-50 font-bold px-2.5 py-1 text-[11px]"
                   >
-                    <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" /></svg>
-                    In thêm{quantity > 1 ? ` (${quantity})` : ""}
+                    <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" /></svg>
+                    Chốt thêm{quantity > 1 ? ` (${quantity})` : ""}
                   </button>
                 </>
               )}
@@ -974,20 +1006,20 @@ export function LiveCommentColumn({
                 <button
                   onClick={() => handleUnlinkBackup(comment)}
                   disabled={isLoading}
-                  className="flex items-center gap-1.5 rounded-md border border-red-200 bg-red-50 px-2.5 py-1 text-[10px] font-medium text-red-600 shadow-sm hover:bg-red-100 transition active:scale-95 shrink-0 disabled:opacity-50 dark:bg-red-900/20 dark:text-red-400 dark:border-red-800"
+                  className="flex items-center gap-1 rounded-lg bg-red-600 text-white hover:bg-red-700 border border-red-600 shadow-sm transition active:scale-95 shrink-0 disabled:opacity-50 font-bold px-2.5 py-1 text-[11px]"
                 >
                   <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
                   Huỷ dự bị
                 </button>
               )}
 
-              {/* ── STATUS === CONFIRMED_ERROR: Huỷ chốt, In thêm ── */}
+              {/* ── STATUS === CONFIRMED_ERROR: Huỷ chốt, Chốt thêm ── */}
               {isError && (
                 <>
                   <button
                     onClick={() => handleCancelOrder(comment)}
                     disabled={isLoading}
-                    className="flex items-center gap-1.5 rounded-md border border-red-200 bg-red-50 px-2.5 py-1 text-[10px] font-medium text-red-600 shadow-sm hover:bg-red-100 transition active:scale-95 shrink-0 disabled:opacity-50 dark:bg-red-900/20 dark:text-red-400 dark:border-red-800"
+                    className="flex items-center gap-1 rounded-lg bg-red-600 text-white hover:bg-red-700 border border-red-600 shadow-sm transition active:scale-95 shrink-0 disabled:opacity-50 font-bold px-2.5 py-1 text-[11px]"
                   >
                     <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
                     Huỷ chốt
@@ -995,10 +1027,10 @@ export function LiveCommentColumn({
                   <button
                     onClick={() => handlePrintMore(comment)}
                     disabled={isLoading}
-                    className="flex items-center gap-1.5 rounded-md bg-orange-500 px-2.5 py-1 text-xs font-bold text-white shadow-sm hover:bg-orange-600 transition active:scale-95 shrink-0 disabled:opacity-50"
+                    className="flex items-center gap-1 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 border border-emerald-600 shadow-sm transition active:scale-95 shrink-0 disabled:opacity-50 font-bold px-2.5 py-1 text-[11px]"
                   >
-                    <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" /></svg>
-                    In thêm{quantity > 1 ? ` (${quantity})` : ""}
+                    <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" /></svg>
+                    Chốt thêm{quantity > 1 ? ` (${quantity})` : ""}
                   </button>
                 </>
               )}
@@ -1022,8 +1054,8 @@ export function LiveCommentColumn({
   useEffect(() => {
     setFirstItemIndex(1000000);
     prevCommentsLengthRef.current = historyComments.length;
-    prevFirstIdRef.current = historyComments.length > 0 
-      ? pickString(historyComments[0], ["id", "_id", "commentId"]) || null 
+    prevFirstIdRef.current = historyComments.length > 0
+      ? pickString(historyComments[0], ["id", "_id", "commentId"]) || null
       : null;
   }, [commentDisplayOrder, liveId]);
 
@@ -1040,7 +1072,7 @@ export function LiveCommentColumn({
           setFirstItemIndex(prev => prev - addedCount);
         }
       }
-      
+
       prevFirstIdRef.current = currentFirstId;
       prevCommentsLengthRef.current = currentLength;
     } else if (historyComments.length === 0) {
@@ -1062,7 +1094,7 @@ export function LiveCommentColumn({
                 {formatNumber(Math.max(hookLiveStats.totalComment, stats.totalComment))} bình luận
               </span>
             )}
-            <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider ${sseStatus === "live" ? "bg-green-50 text-green-700 ring-1 ring-inset ring-green-600/20" : sseStatus === "connecting" ? "bg-blue-50 text-blue-700 ring-1 ring-inset ring-blue-600/20" : "bg-red-50 text-red-700 ring-1 ring-inset ring-red-600/20"}`}>
+            <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider ${sseStatus === "live" ? "bg-green-50 text-green-700 ring-1 ring-inset ring-green-600/20" : sseStatus === "connecting" ? "bg-[var(--primary-soft)] text-[var(--primary)] ring-1 ring-inset ring-[var(--primary)]/20" : "bg-red-50 text-red-700 ring-1 ring-inset ring-red-600/20"}`}>
               {sseStatus === "live" && <span className="mr-1.5 h-1.5 w-1.5 rounded-full bg-green-500 animate-pulse"></span>}
               {sseStatus === "connecting" && <svg className="h-2.5 w-2.5 mr-1 animate-spin" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>}
               {sseStatus === "live" ? "Live" : sseStatus === "connecting" ? "Đang nối..." : "Mất mạng"}
@@ -1083,7 +1115,7 @@ export function LiveCommentColumn({
             key={`${liveId}-${commentDisplayOrder}`}
             ref={virtuosoRef}
             data={displayComments}
-            className="h-full custom-scrollbar"
+            className="h-full custom-scrollbar-premium"
             atBottomStateChange={setAtBottom}
             atTopStateChange={setAtTop}
             itemContent={ItemContent}
@@ -1133,16 +1165,16 @@ export function LiveCommentColumn({
         title="Xác nhận huỷ chốt"
         message={
           <div className="space-y-3">
-             <p>Bạn có chắc chắn muốn huỷ chốt món này không? Hành động này không thể hoàn tác.</p>
-             <div className="rounded-xl bg-[var(--surface-muted)]/50 p-3 border border-[var(--border)] space-y-2">
-                <div className="flex justify-between items-center">
-                    <span className="text-xs font-bold text-[var(--primary)]">{pickString(commentToCancel, ["igUsername", "username"]) || "Khách hàng"}</span>
-                    <span className="text-[10px] text-[var(--muted)]">
-                        {pickString(commentToCancel, ["createdAt", "created_at"]) ? new Date(pickString(commentToCancel, ["createdAt", "created_at"]) as string).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : ''}
-                    </span>
-                </div>
-                <p className="text-xs text-[var(--foreground-soft)] italic">"{pickString(commentToCancel, ["text", "content"])}"</p>
-             </div>
+            <p>Bạn có chắc chắn muốn huỷ chốt món này không? Hành động này không thể hoàn tác.</p>
+            <div className="rounded-xl bg-[var(--surface-muted)]/50 p-3 border border-[var(--border)] space-y-2">
+              <div className="flex justify-between items-center">
+                <span className="text-xs font-bold text-[var(--primary)]">{pickString(commentToCancel, ["igUsername", "username"]) || "Khách hàng"}</span>
+                <span className="text-[10px] text-[var(--muted)]">
+                  {pickString(commentToCancel, ["createdAt", "created_at"]) ? new Date(pickString(commentToCancel, ["createdAt", "created_at"]) as string).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : ''}
+                </span>
+              </div>
+              <p className="text-xs text-[var(--foreground-soft)] italic">"{pickString(commentToCancel, ["text", "content"])}"</p>
+            </div>
           </div>
         }
         confirmLabel="Huỷ chốt ngay"
@@ -1150,6 +1182,16 @@ export function LiveCommentColumn({
         isDanger={true}
         onConfirm={confirmCancelOrder}
         onCancel={() => setConfirmCancelOpen(false)}
+      />
+
+      {/* Local Bridge Setup & Offline Modal */}
+      <BridgeSetupModal
+        isOpen={isBridgeOfflineOpen}
+        onClose={() => setIsBridgeOfflineOpen(false)}
+        onRetry={async () => {
+          setIsBridgeOfflineOpen(false);
+          showToast("Đang kiểm tra kết nối với Local Bridge...", "success");
+        }}
       />
     </div>
   );

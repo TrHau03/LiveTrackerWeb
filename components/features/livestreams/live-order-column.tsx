@@ -11,10 +11,11 @@ import { useSettingsStore } from "@/stores/settings-store";
 import { usePrintSettings } from "@/hooks/usePrintSettings";
 import { applyAuthResponses } from "@/hooks/use-auth-sync";
 import { asRecord, extractApiData, extractCollection, pickString, pickNumber, formatCurrency, formatDateTime } from "@/lib/proxy-client";
-import { printReceiptHtml, renderReceiptToImage } from "@/lib/printUtils";
+import { printReceiptHtml, printReceipt, renderReceiptToImage } from "@/lib/printUtils";
 import { sendBill, deleteOrder, removeCommentFromOrder } from "@/lib/services/orders-service";
 import { OrderReceipt } from "@/components/print/OrderReceipt";
 import { PrintModeDropdown } from "@/components/print/PrintModeDropdown";
+import { BridgeSetupModal } from "@/components/print/BridgeSetupModal";
 import type { LiveStats } from "@/hooks/use-comments";
 import type { PrintMode } from "@/types";
 
@@ -60,6 +61,9 @@ export function LiveOrderColumn({
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
   const [confirmRemoveOpen, setConfirmRemoveOpen] = useState(false);
   const [commentToRemove, setCommentToRemove] = useState<Record<string, unknown> | null>(null);
+
+  // Local Bridge offline modal state
+  const [isBridgeOfflineOpen, setIsBridgeOfflineOpen] = useState(false);
 
   const showToast = useCallback((message: string, type: "success" | "error" = "success") => {
     setToast({ message, type });
@@ -178,7 +182,7 @@ export function LiveOrderColumn({
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-3">
+      <div className="flex-1 overflow-y-auto p-3 custom-scrollbar-premium">
         {state.status === "loading" ? <LoadingState compact /> : null}
         {state.status === "error" ? <ErrorState message={state.error} compact /> : null}
         {state.status === "ready" && filteredOrders.length === 0 ? (
@@ -197,8 +201,32 @@ export function LiveOrderColumn({
                   }`}
               >
                 <div className="mb-2 flex items-start justify-between">
-                  <div className="flex items-center gap-2.5">
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <div className="h-6 w-6 overflow-hidden rounded-full ring-1 ring-[var(--border)] shadow-sm bg-[color:var(--primary-soft)] flex items-center justify-center text-[var(--primary)] shrink-0 text-[10px] relative">
+                      {pickString(asRecord(order.customerId), ["avatar"]) ? (
+                        <>
+                          <img 
+                            src={pickString(asRecord(order.customerId), ["avatar"])!} 
+                            alt={pickString(asRecord(order.customerId), ["igName"]) || pickString(order, ["igName", "customerName"]) || "Avatar"} 
+                            className="h-full w-full object-cover" 
+                            onError={(e) => {
+                              (e.target as HTMLImageElement).style.display = 'none';
+                              (e.target as HTMLImageElement).parentElement?.classList.add('fallback-active');
+                            }} 
+                          />
+                          <div className="absolute inset-0 items-center justify-center bg-[color:var(--primary-soft)] text-[var(--primary)] font-bold hidden [.fallback-active_&]:flex uppercase">
+                            {(pickString(asRecord(order.customerId), ["igName"]) || pickString(order, ["igName", "customerName"]) || "K").charAt(0)}
+                          </div>
+                        </>
+                      ) : (
+                        <span className="font-bold uppercase">
+                          {(pickString(asRecord(order.customerId), ["igName"]) || pickString(order, ["igName", "customerName"]) || "K").charAt(0)}
+                        </span>
+                      )}
+                    </div>
+                    <span className="truncate">
                       {pickString(asRecord(order.customerId), ["igName"]) || pickString(order, ["igName", "customerName"]) || "Khách hàng"}
+                    </span>
                   </div>
                   <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${isActive ? 'text-[var(--primary-strong)]' : 'text-[var(--primary)]'}`}>
                     {formatCurrency(pickNumber(order, ["totalPrice", "amount"]) ?? 0)}
@@ -239,7 +267,7 @@ export function LiveOrderColumn({
               </button>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-4 space-y-5 custom-scrollbar">
+            <div className="flex-1 overflow-y-auto p-4 space-y-5 custom-scrollbar-premium">
               <div className="space-y-3">
                 <h5 className="text-[10px] font-bold uppercase tracking-[0.1em] text-[var(--muted)]">Thông tin người mua</h5>
                 <div className="rounded-xl border border-[var(--border)] bg-[var(--surface-subdued)] p-3.5 space-y-2.5">
@@ -248,10 +276,34 @@ export function LiveOrderColumn({
                       const custId = pickString(asRecord(selectedOrder?.customerId), ["id", "_id"]) || pickString(selectedOrder, ["customerId"]);
                       setCustomerPopupId(customerPopupId === custId ? null : custId);
                     }}
-                    className="font-semibold text-[var(--primary)] text-sm hover:underline transition-colors text-left w-full flex items-center gap-1.5"
+                    className="font-semibold text-[var(--primary)] text-sm hover:underline transition-colors text-left w-full flex items-center gap-2"
                   >
-                    {pickString(asRecord(selectedOrder?.customerId), ["igName"]) || pickString(selectedOrder, ["igName", "customerName"]) || "Người mua"}
-                    <svg className={`h-3 w-3 text-[var(--muted)] transition-transform ${customerPopupId ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" /></svg>
+                    <div className="h-8 w-8 overflow-hidden rounded-full ring-2 ring-[var(--surface)] shadow-sm bg-[color:var(--primary-soft)] flex items-center justify-center text-[var(--primary)] shrink-0 text-xs relative">
+                      {pickString(asRecord(selectedOrder?.customerId), ["avatar"]) ? (
+                        <>
+                          <img 
+                            src={pickString(asRecord(selectedOrder?.customerId), ["avatar"])!} 
+                            alt="Avatar" 
+                            className="h-full w-full object-cover" 
+                            onError={(e) => {
+                              (e.target as HTMLImageElement).style.display = 'none';
+                              (e.target as HTMLImageElement).parentElement?.classList.add('fallback-active');
+                            }} 
+                          />
+                          <div className="absolute inset-0 items-center justify-center bg-[color:var(--primary-soft)] text-[var(--primary)] font-bold hidden [.fallback-active_&]:flex uppercase">
+                            {(pickString(asRecord(selectedOrder?.customerId), ["igName"]) || pickString(selectedOrder, ["igName", "customerName"]) || "K").charAt(0)}
+                          </div>
+                        </>
+                      ) : (
+                        <span className="font-bold uppercase">
+                          {(pickString(asRecord(selectedOrder?.customerId), ["igName"]) || pickString(selectedOrder, ["igName", "customerName"]) || "K").charAt(0)}
+                        </span>
+                      )}
+                    </div>
+                    <span className="flex-1 truncate">
+                      {pickString(asRecord(selectedOrder?.customerId), ["igName"]) || pickString(selectedOrder, ["igName", "customerName"]) || "Người mua"}
+                    </span>
+                    <svg className={`h-3 w-3 text-[var(--muted)] transition-transform shrink-0 ${customerPopupId ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" /></svg>
                   </button>
                   <p className="text-xs text-[var(--foreground-soft)] flex items-center gap-1.5 font-medium">
                     <svg className="h-3.5 w-3.5 text-[var(--muted)]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" /></svg>
@@ -270,6 +322,36 @@ export function LiveOrderColumn({
                       <button onClick={() => setCustomerPopupId(null)} className="text-[var(--muted)] hover:text-[var(--foreground)]">
                         <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
                       </button>
+                    </div>
+                    <div className="flex items-center gap-3 border-b border-[var(--primary)]/10 pb-3">
+                      <div className="h-10 w-10 overflow-hidden rounded-full ring-2 ring-[var(--surface)] shadow-sm bg-[color:var(--primary-soft)] flex items-center justify-center text-[var(--primary)] shrink-0 text-sm relative">
+                        {pickString(customerDetail, ["avatar"]) ? (
+                          <>
+                            <img 
+                              src={pickString(customerDetail, ["avatar"])!} 
+                              alt="Avatar" 
+                              className="h-full w-full object-cover" 
+                              onError={(e) => {
+                                (e.target as HTMLImageElement).style.display = 'none';
+                                (e.target as HTMLImageElement).parentElement?.classList.add('fallback-active');
+                              }} 
+                            />
+                            <div className="absolute inset-0 items-center justify-center bg-[color:var(--primary-soft)] text-[var(--primary)] font-bold hidden [.fallback-active_&]:flex uppercase">
+                              {(pickString(customerDetail, ["igName", "name"]) || "K").charAt(0)}
+                            </div>
+                          </>
+                        ) : (
+                          <span className="font-bold uppercase">
+                            {(pickString(customerDetail, ["igName", "name"]) || "K").charAt(0)}
+                          </span>
+                        )}
+                      </div>
+                      <div>
+                        <h6 className="font-bold text-[var(--foreground)] text-xs">
+                          {pickString(customerDetail, ["igName", "name"]) || "Khách hàng"}
+                        </h6>
+                        <p className="text-[10px] text-[var(--muted)]">Instagram customer</p>
+                      </div>
                     </div>
                     <div className="space-y-2 text-xs">
                       {pickString(customerDetail, ["phone"]) && (
@@ -380,7 +462,7 @@ export function LiveOrderColumn({
               <button
                 onClick={() => setConfirmDeleteOpen(true)}
                 disabled={deleteLoading}
-                className="rounded-xl bg-red-50 px-4 py-2.5 text-xs font-bold text-red-600 shadow-[var(--shadow-soft)] hover:bg-red-100 transition-colors border border-red-200 disabled:opacity-50 dark:bg-red-900/20 dark:text-red-400 dark:border-red-800"
+                className="rounded-xl bg-red-600 text-white border border-red-600 hover:bg-red-700 shadow-sm transition active:scale-95 disabled:opacity-50 px-4 py-2.5 text-xs font-bold shrink-0 shadow-[var(--shadow-soft)] duration-150"
               >
                 {deleteLoading ? "Đang xoá..." : "Xoá đơn"}
               </button>
@@ -410,7 +492,19 @@ export function LiveOrderColumn({
 
                       await new Promise(r => setTimeout(r, 150));
                       const receiptEl = container.querySelector(".receipt") as HTMLElement;
-                      if (receiptEl) printReceiptHtml(receiptEl);
+                      if (receiptEl) {
+                        const result = await printReceipt(receiptEl);
+                        if (!result.success) {
+                          if (result.isOffline) {
+                            setIsBridgeOfflineOpen(true);
+                            showToast("⚠️ KHÔNG TÌM THẤY LOCAL BRIDGE! Vui lòng khởi động ứng dụng hoặc cài đặt phần mềm máy in.", "error");
+                          } else {
+                            showToast(`⚠️ Lỗi máy in: ${result.error}`, "error");
+                          }
+                        } else {
+                          showToast("Đã gửi lệnh in thành công qua Local Bridge.", "success");
+                        }
+                      }
 
                       setTimeout(() => {
                         root.unmount();
@@ -511,6 +605,16 @@ export function LiveOrderColumn({
           </>
         )}
       </div>
+
+      {/* Local Bridge Setup & Offline Modal */}
+      <BridgeSetupModal
+        isOpen={isBridgeOfflineOpen}
+        onClose={() => setIsBridgeOfflineOpen(false)}
+        onRetry={async () => {
+          setIsBridgeOfflineOpen(false);
+          showToast("Đang kiểm tra kết nối với Local Bridge...", "success");
+        }}
+      />
 
       {toast && typeof document !== "undefined" && createPortal(<Toast message={toast.message} type={toast.type} />, document.body)}
     </div>

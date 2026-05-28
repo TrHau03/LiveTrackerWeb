@@ -190,7 +190,7 @@ export function DeliveryModal({ isOpen, onClose, order }: DeliveryModalProps) {
         {/* Header */}
         <div className="flex items-center justify-between border-b border-[var(--border)] p-8 shrink-0 bg-[var(--surface-subdued)]">
           <div className="flex items-center gap-5">
-            <div className="h-14 w-14 rounded-2xl bg-gradient-to-br from-[#1447E6] to-[#0E3BBF] flex items-center justify-center text-white shadow-xl shadow-blue-500/20">
+            <div className="h-14 w-14 rounded-2xl bg-gradient-to-br from-[var(--primary)] to-[var(--primary-strong)] flex items-center justify-center text-white shadow-lg shadow-[var(--primary)]/15">
               <Truck className="w-7 h-7" />
             </div>
             <div>
@@ -217,7 +217,7 @@ export function DeliveryModal({ isOpen, onClose, order }: DeliveryModalProps) {
             {/* Left Column: Receiver Info */}
             <div className="col-span-12 lg:col-span-7 space-y-6">
               <div className="rounded-3xl bg-[var(--surface)] border border-[var(--border)] p-8 shadow-sm space-y-8">
-                <SectionTitle icon={<User className="text-[#1447E6]" />} title="Thông tin người nhận" />
+                <SectionTitle icon={<User className="text-[var(--primary)]" />} title="Thông tin người nhận" />
                 <div className="grid grid-cols-2 gap-6">
                   <FormField label="Tên khách hàng">
                     <input 
@@ -280,7 +280,7 @@ export function DeliveryModal({ isOpen, onClose, order }: DeliveryModalProps) {
 
               {/* Sender Info (Editable) */}
               <div className="rounded-3xl bg-[var(--surface)] border border-[var(--border)] p-8 shadow-sm space-y-8">
-                <SectionTitle icon={<Truck className="text-[#1447E6]" />} title="Thông tin người gửi (Kho hàng)" />
+                <SectionTitle icon={<Truck className="text-[var(--primary)]" />} title="Thông tin người gửi (Kho hàng)" />
                 <div className="grid grid-cols-2 gap-6">
                   <FormField label="Tên người gửi / Tên kho">
                     <input 
@@ -346,7 +346,7 @@ export function DeliveryModal({ isOpen, onClose, order }: DeliveryModalProps) {
             {/* Right Column: Package & Shipping Settings */}
             <div className="col-span-12 lg:col-span-5 space-y-6">
               <div className="rounded-3xl bg-[var(--surface)] border border-[var(--border)] p-8 shadow-sm space-y-8">
-                <SectionTitle icon={<Package className="text-[#1447E6]" />} title="Chi tiết kiện hàng" />
+                <SectionTitle icon={<Package className="text-[var(--primary)]" />} title="Chi tiết kiện hàng" />
                 <div className="grid grid-cols-2 gap-6">
                   <FormField label="Giá trị hàng" icon={<DollarSign />}>
                     <input 
@@ -361,7 +361,7 @@ export function DeliveryModal({ isOpen, onClose, order }: DeliveryModalProps) {
                       type="number"
                       value={form.codMoney}
                       onChange={e => handleUpdateField("codMoney", e.target.value)}
-                      className={CONTROL_CLASS + " w-full font-black text-[#1447E6] bg-blue-50/30"}
+                      className={CONTROL_CLASS + " w-full font-black text-[var(--primary)] bg-[var(--primary-soft)]/40"}
                     />
                   </FormField>
                 </div>
@@ -397,7 +397,7 @@ export function DeliveryModal({ isOpen, onClose, order }: DeliveryModalProps) {
               </div>
 
               <div className="rounded-3xl bg-[var(--surface)] border border-[var(--border)] p-8 shadow-sm space-y-6">
-                <SectionTitle icon={<Settings2 className="text-[#1447E6]" />} title="Vận chuyển & Thanh toán" />
+                <SectionTitle icon={<Settings2 className="text-[var(--primary)]" />} title="Vận chuyển & Thanh toán" />
                 
                 <FormField label="Loại dịch vụ">
                   <select value={form.productType} onChange={e => handleUpdateField("productType", e.target.value)} className={CONTROL_CLASS + " w-full"}>
@@ -419,7 +419,7 @@ export function DeliveryModal({ isOpen, onClose, order }: DeliveryModalProps) {
                   <button 
                     onClick={handleCalculateFee}
                     disabled={calculateFees.isPending}
-                    className="w-full h-14 rounded-2xl bg-blue-50 dark:bg-blue-900/10 text-[#1447E6] border border-blue-100 dark:border-blue-800/20 font-black text-xs transition-all hover:bg-[#1447E6] hover:text-white flex items-center justify-center gap-3 shadow-sm active:scale-95"
+                    className="w-full h-14 rounded-2xl bg-[var(--primary-soft)] hover:bg-[var(--primary)] hover:text-white text-[var(--primary)] border border-[var(--primary)]/10 font-black text-xs transition-all flex items-center justify-center gap-3 shadow-sm active:scale-95"
                   >
                     <Calculator className="w-5 h-5" />
                     {calculateFees.isPending ? "ĐANG TÍNH PHÍ..." : "DỰ TÍNH PHÍ VẬN CHUYỂN"}
@@ -435,7 +435,7 @@ export function DeliveryModal({ isOpen, onClose, order }: DeliveryModalProps) {
         <div className="p-8 border-t border-[var(--border)] bg-[var(--surface-subdued)] shrink-0 flex items-center justify-between">
            <div className="flex flex-col">
               <span className="text-[10px] font-black text-[var(--muted)] uppercase tracking-wider">Tổng cộng cần thu</span>
-              <span className="text-2xl font-black text-[#1447E6]">{formatCurrency(Number(form.codMoney))}</span>
+              <span className="text-2xl font-black text-[var(--primary)]">{formatCurrency(Number(form.codMoney))}</span>
            </div>
            <div className="flex gap-4">
               <button 
@@ -447,7 +447,7 @@ export function DeliveryModal({ isOpen, onClose, order }: DeliveryModalProps) {
               <button 
                 onClick={handleSubmit}
                 disabled={createOrder.isPending}
-                className="h-14 px-10 rounded-2xl bg-[#1447E6] hover:bg-[#0E3BBF] text-xs font-black text-white shadow-xl shadow-blue-500/20 transition-all flex items-center gap-3 active:scale-[0.97] disabled:opacity-50"
+                className="h-14 px-10 rounded-2xl bg-[var(--primary)] hover:bg-[var(--primary-strong)] text-xs font-black text-white shadow-lg shadow-[var(--primary)]/15 transition-all flex items-center gap-3 active:scale-[0.97] disabled:opacity-50"
               >
                 <Send className="w-4 h-4" />
                 {createOrder.isPending ? "ĐANG XỬ LÝ..." : "GỬI ĐƠN GIAO Hàng"}
