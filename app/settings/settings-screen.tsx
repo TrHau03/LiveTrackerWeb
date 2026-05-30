@@ -6,8 +6,11 @@ import { useSession } from "@/components/session-provider";
 import { useHeaderStore } from "@/lib/store/header-store";
 import { PrintSettingsPanel } from "@/components/print/PrintSettingsPanel";
 import { Panel, CONTROL_CLASS, SECONDARY_BUTTON_CLASS } from "@/components/ui/workspace-shared";
-import { Globe, Tv, Printer, LogOut, CheckCircle, AlertCircle, RefreshCw } from "lucide-react";
+import { Globe, Tv, Printer, LogOut, CheckCircle, AlertCircle, RefreshCw, Trash2 } from "lucide-react";
 import { useInstagramOAuth } from "@/hooks/use-instagram-oauth";
+import { deleteShopFromBackend } from "@/lib/instagram-auth";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { motion, AnimatePresence } from "framer-motion";
 
 export function SettingsScreen() {
   const { session } = useSession();
@@ -191,20 +194,57 @@ function InstagramConnectPanel() {
   const { session, logout, patchSession } = useSession();
   const {
     startInstagramAuth,
-    refreshConnectionStatus,
-    connectionState,
     isLoading,
     error,
     notice,
-    clearFeedback,
   } = useInstagramOAuth({ session, patchSession, logout });
+
+  const [deletingShopId, setDeletingShopId] = useState<string | null>(null);
+  const [isConfirmOpen, setIsConfirmOpen] = useState(false);
+  const [shopIdToDelete, setShopIdToDelete] = useState<string | null>(null);
 
   const shops = session.user?.shops ?? [];
   const isConnected = shops.length > 0;
 
-  async function handleRefresh() {
-    clearFeedback();
-    await refreshConnectionStatus();
+  function handleDeleteShop(shopId: string) {
+    setShopIdToDelete(shopId);
+    setIsConfirmOpen(true);
+  }
+
+  async function onConfirmDelete() {
+    if (!shopIdToDelete || deletingShopId) return;
+    setIsConfirmOpen(false);
+
+    const shopId = shopIdToDelete;
+    setShopIdToDelete(null);
+    setDeletingShopId(shopId);
+
+    try {
+      const res = await deleteShopFromBackend(session, shopId);
+      if (res.ok) {
+        const updatedShops = shops.filter((s) => s.id !== shopId);
+        if (session.user) {
+          patchSession({
+            user: {
+              ...session.user,
+              shops: updatedShops,
+            },
+          });
+        }
+      } else {
+        alert("Không thể xóa cửa hàng. Vui lòng thử lại sau.");
+      }
+    } catch (err) {
+      console.error("Delete shop error:", err);
+      alert("Đã xảy ra lỗi khi xóa cửa hàng.");
+    } finally {
+      setDeletingShopId(null);
+    }
+  }
+
+  function onCancelDelete() {
+    setIsConfirmOpen(false);
+    setShopIdToDelete(null);
   }
 
   return (
@@ -216,29 +256,49 @@ function InstagramConnectPanel() {
             <p className="text-[11px] font-semibold text-[var(--foreground-soft)] uppercase tracking-wider">
               Cửa hàng đã kết nối ({shops.length})
             </p>
-            <div className="grid gap-2">
-              {shops.map((shop) => (
-                <div 
-                  key={shop.id} 
-                  className="flex items-center gap-3 rounded-xl border border-[var(--border)] bg-[var(--surface-muted)] p-3 shadow-sm"
-                >
-                  <div className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-tr from-pink-500 to-yellow-500 text-sm font-bold text-white shadow-sm shrink-0">
-                    {shop.avatar ? (
-                      <img src={shop.avatar} alt={shop.name} className="h-full w-full rounded-full object-cover" />
-                    ) : (
-                      shop.name[0]?.toUpperCase() || "S"
-                    )}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-[var(--foreground)] truncate">{shop.name}</p>
-                    <p className="text-[11px] text-[var(--muted)] truncate">ID: {shop.id}</p>
-                  </div>
-                  <span className="inline-flex items-center gap-1 rounded-full bg-pink-500/10 px-2 py-0.5 text-[10px] font-medium text-pink-600 dark:text-pink-400">
-                    <InstagramIcon className="h-3 w-3" color="currentColor" />
-                    Instagram
-                  </span>
-                </div>
-              ))}
+            <div className="space-y-2">
+              <AnimatePresence initial={false}>
+                {shops.map((shop) => (
+                  <motion.div
+                    key={shop.id}
+                    initial={{ opacity: 0, height: 0, scale: 0.95 }}
+                    animate={{ opacity: 1, height: "auto", scale: 1 }}
+                    exit={{ opacity: 0, height: 0, scale: 0.95 }}
+                    transition={{ duration: 0.2 }}
+                    className="overflow-hidden"
+                  >
+                    <div 
+                      className="flex items-center gap-3 rounded-xl border border-[var(--border)] bg-[var(--surface-muted)] p-3 shadow-sm"
+                    >
+                      <div className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-tr from-pink-500 to-yellow-500 text-sm font-bold text-white shadow-sm shrink-0">
+                        {shop.avatar ? (
+                          <img src={shop.avatar} alt={shop.name} className="h-full w-full rounded-full object-cover" />
+                        ) : (
+                          shop.name[0]?.toUpperCase() || "S"
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <p className="text-sm font-semibold text-[var(--foreground)] truncate">{shop.name}</p>
+                          <span className="inline-flex items-center gap-1 rounded-full bg-pink-500/10 px-2 py-0.5 text-[10px] font-medium text-pink-600 dark:text-pink-400 shrink-0">
+                            Instagram
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-[var(--muted)] truncate">ID: {shop.id}</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => void handleDeleteShop(shop.id)}
+                        disabled={deletingShopId !== null}
+                        className="p-1.5 rounded-lg text-[var(--muted)] hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/20 transition disabled:opacity-50 shrink-0"
+                        title="Xóa cửa hàng"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </div>
+                  </motion.div>
+                ))}
+              </AnimatePresence>
             </div>
           </div>
         ) : (
@@ -267,7 +327,7 @@ function InstagramConnectPanel() {
             type="button"
             onClick={() => void startInstagramAuth()}
             disabled={isLoading}
-            className="flex-1 inline-flex h-9 items-center justify-center gap-2 rounded-lg px-4 text-sm font-semibold text-white transition-all hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-60"
+            className="w-full inline-flex h-9 items-center justify-center gap-2 rounded-lg px-4 text-sm font-semibold text-white transition-all hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-60"
             style={{
               background: "linear-gradient(135deg, #f09433 0%, #e6683c 25%, #dc2743 50%, #cc2366 75%, #bc1888 100%)",
               boxShadow: "0 4px 12px rgba(220,39,67,0.2)",
@@ -280,23 +340,19 @@ function InstagramConnectPanel() {
                 ? "Kết nối thêm tài khoản"
                 : "Kết nối Instagram"}
           </button>
-          <button
-            id="instagram-refresh-btn"
-            type="button"
-            onClick={() => void handleRefresh()}
-            disabled={isLoading || connectionState === "loading"}
-            className={`${SECONDARY_BUTTON_CLASS} h-9 gap-2 px-3`}
-            title="Làm mới trạng thái kết nối"
-          >
-            <RefreshCw className={`h-4 w-4 ${connectionState === "loading" ? "animate-spin" : ""}`} />
-            <span className="sr-only sm:not-sr-only text-xs">Làm mới</span>
-          </button>
         </div>
-
-        <p className="text-[11px] text-[var(--muted)] leading-5">
-          Kết nối tài khoản Instagram Business để nhận comment, tin nhắn và quản lý livestream.
-        </p>
       </div>
+
+      <ConfirmDialog
+        isOpen={isConfirmOpen}
+        title="Xác nhận xóa cửa hàng"
+        message="Bạn có chắc chắn muốn xóa cửa hàng này khỏi tài khoản của bạn không? Hành động này không thể hoàn tác."
+        confirmLabel="Xóa"
+        cancelLabel="Hủy"
+        isDanger={true}
+        onConfirm={onConfirmDelete}
+        onCancel={onCancelDelete}
+      />
     </Panel>
   );
 }
