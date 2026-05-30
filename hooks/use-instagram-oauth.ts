@@ -10,9 +10,12 @@ import {
 
 import { applyAuthResponses } from "@/lib/auth-response";
 import {
+  OAUTH_STATE_STORAGE_KEY,
+  getInstagramOAuthConfig,
+  isInstagramLinkResultMessage,
+} from "@/lib/instagram-auth";
+import {
   fetchInstagramConnectionStatus,
-  INSTAGRAM_OAUTH_BACKEND_ORIGIN,
-  isInstagramOAuthMessagePayload,
   openCenteredPopup,
   primeInstagramPopup,
   requestInstagramAuthUrl,
@@ -216,7 +219,7 @@ export function useInstagramOAuth({
         return;
       }
 
-      if (event.origin !== INSTAGRAM_OAUTH_BACKEND_ORIGIN) {
+      if (event.origin !== window.location.origin) {
         return;
       }
 
@@ -224,16 +227,7 @@ export function useInstagramOAuth({
         return;
       }
 
-      if (!isInstagramOAuthMessagePayload(event.data)) {
-        return;
-      }
-
-      const expectedState = expectedStateRef.current;
-      if (
-        expectedState &&
-        event.data.state &&
-        event.data.state !== expectedState
-      ) {
+      if (!isInstagramLinkResultMessage(event.data)) {
         return;
       }
 
@@ -242,13 +236,12 @@ export function useInstagramOAuth({
           kind: "success",
           message: event.data.message || AUTH_SUCCESS_MESSAGE,
         });
-        return;
+      } else {
+        await finishAuthentication({
+          kind: "error",
+          message: event.data.message || AUTH_ERROR_MESSAGE,
+        });
       }
-
-      await finishAuthentication({
-        kind: "error",
-        message: event.data.message || AUTH_ERROR_MESSAGE,
-      });
     },
     [finishAuthentication],
   );
@@ -345,36 +338,52 @@ export function useInstagramOAuth({
       setNotice("Opening Instagram authentication...");
     });
 
+    let authUrl = "";
+    let state = "";
+
     try {
       const result = await requestInstagramAuthUrl(session, {
         clientOrigin: window.location.origin,
       });
       applyAuthResponses([result.response], patchSession, logout);
-
-      if (finishedRef.current || popupRef.current !== popup) {
-        return;
-      }
-
-      if (popup.closed) {
-        await finishAuthentication({
-          kind: "cancelled",
-          message: AUTH_CANCELLED_MESSAGE,
-        });
-        return;
-      }
-
-      expectedStateRef.current = result.state;
-      popup.location.replace(result.authUrl);
-      popup.focus();
+      authUrl = result.authUrl;
+      state = result.state;
     } catch (requestError) {
-      await finishAuthentication({
-        kind: "error",
-        message:
-          requestError instanceof Error
-            ? requestError.message
-            : AUTH_ERROR_MESSAGE,
+      console.warn("Backend auth start failed, falling back to local URL generation:", requestError);
+      const config = getInstagramOAuthConfig();
+      state = JSON.stringify({
+        source: "web",
+        nonce: typeof window !== "undefined" && window.crypto?.randomUUID 
+          ? window.crypto.randomUUID() 
+          : `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`,
       });
+      
+      const localUrl = new URL(config.authUrl);
+      localUrl.searchParams.set("client_id", config.clientId);
+      localUrl.searchParams.set("redirect_uri", config.redirectUri);
+      localUrl.searchParams.set("response_type", config.responseType);
+      localUrl.searchParams.set("scope", config.scopes.join(","));
+      localUrl.searchParams.set("state", state);
+      authUrl = localUrl.toString();
     }
+
+    if (finishedRef.current || popupRef.current !== popup) {
+      return;
+    }
+
+    if (popup.closed) {
+      await finishAuthentication({
+        kind: "cancelled",
+        message: AUTH_CANCELLED_MESSAGE,
+      });
+      return;
+    }
+
+    window.localStorage.setItem(OAUTH_STATE_STORAGE_KEY, state);
+    expectedStateRef.current = state;
+    
+    popup.location.replace(authUrl);
+    popup.focus();
   }
 
   function clearFeedback() {

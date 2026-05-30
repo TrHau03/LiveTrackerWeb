@@ -6,7 +6,8 @@ import { useSession } from "@/components/session-provider";
 import { useHeaderStore } from "@/lib/store/header-store";
 import { PrintSettingsPanel } from "@/components/print/PrintSettingsPanel";
 import { Panel, CONTROL_CLASS, SECONDARY_BUTTON_CLASS } from "@/components/ui/workspace-shared";
-import { Globe, Tv, Printer, LogOut } from "lucide-react";
+import { Globe, Tv, Printer, LogOut, CheckCircle, AlertCircle, RefreshCw } from "lucide-react";
+import { useInstagramOAuth } from "@/hooks/use-instagram-oauth";
 
 export function SettingsScreen() {
   const { session } = useSession();
@@ -115,6 +116,9 @@ export function SettingsScreen() {
             </div>
           </Panel>
 
+          {/* Panel kết nối Instagram */}
+          <InstagramConnectPanel />
+
         </div>
 
         {/* Cột phải: Máy in nhiệt & Nội dung in (col-span-7) */}
@@ -178,5 +182,142 @@ export function SettingsScreen() {
 
       </div>
     </div>
+  );
+}
+
+// ─── Instagram Connect Panel ───────────────────────────────────────────────
+
+function InstagramConnectPanel() {
+  const { session, logout, patchSession } = useSession();
+  const {
+    startInstagramAuth,
+    refreshConnectionStatus,
+    connectionState,
+    connectionStatus,
+    isLoading,
+    error,
+    notice,
+    clearFeedback,
+  } = useInstagramOAuth({ session, patchSession, logout });
+
+  const isConnected = Boolean(connectionStatus?.isConnected);
+
+  async function handleRefresh() {
+    clearFeedback();
+    await refreshConnectionStatus();
+  }
+
+  return (
+    <Panel title="Instagram">
+      <div className="space-y-4">
+        {/* Header gradient Instagram */}
+        <div className="relative overflow-hidden rounded-xl p-4"
+          style={{
+            background: "linear-gradient(135deg, #f09433 0%, #e6683c 25%, #dc2743 50%, #cc2366 75%, #bc1888 100%)",
+          }}
+        >
+          <div className="absolute inset-0 opacity-20"
+            style={{ background: "radial-gradient(circle at 70% 30%, #fff 0%, transparent 60%)" }}
+          />
+          <div className="relative flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-white/20 backdrop-blur-sm">
+              <InstagramIcon className="h-5 w-5" color="white" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold text-white">Instagram Business</p>
+              <p className="text-xs text-white/80 mt-0.5">
+                {connectionState === "loading" && !connectionStatus
+                  ? "Đang kiểm tra..."
+                  : isConnected
+                    ? `Đã kết nối${connectionStatus?.username ? ` · @${connectionStatus.username}` : ""}`
+                    : "Chưa kết nối"}
+              </p>
+            </div>
+            {/* Status badge */}
+            <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider ${
+              isConnected
+                ? "bg-green-500/30 text-green-100"
+                : "bg-white/20 text-white/80"
+            }`}>
+              {isConnected
+                ? <CheckCircle className="h-3 w-3" />
+                : <AlertCircle className="h-3 w-3" />
+              }
+              {isConnected ? "Connected" : "Not connected"}
+            </span>
+          </div>
+        </div>
+
+        {/* Feedback */}
+        {notice && (
+          <p className="rounded-lg bg-[var(--surface-muted)] px-3 py-2 text-xs text-[var(--foreground-soft)]">
+            {notice}
+          </p>
+        )}
+        {error && (
+          <p className="rounded-lg bg-red-50 px-3 py-2 text-xs text-red-600 dark:bg-red-950/20 dark:text-red-400">
+            {error}
+          </p>
+        )}
+
+        {/* Actions */}
+        <div className="flex flex-col sm:flex-row gap-2">
+          <button
+            id="instagram-auth-btn"
+            type="button"
+            onClick={() => void startInstagramAuth()}
+            disabled={isLoading}
+            className="flex-1 inline-flex h-9 items-center justify-center gap-2 rounded-lg px-4 text-sm font-semibold text-white transition-all hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-60"
+            style={{
+              background: "linear-gradient(135deg, #f09433 0%, #e6683c 25%, #dc2743 50%, #cc2366 75%, #bc1888 100%)",
+              boxShadow: "0 4px 15px rgba(220,39,67,0.3)",
+            }}
+          >
+            <InstagramIcon className="h-4 w-4" color="white" />
+            {isLoading
+              ? "Đang xác thực..."
+              : isConnected
+                ? "Kết nối lại Instagram"
+                : "Kết nối Instagram"}
+          </button>
+          <button
+            id="instagram-refresh-btn"
+            type="button"
+            onClick={() => void handleRefresh()}
+            disabled={isLoading || connectionState === "loading"}
+            className={`${SECONDARY_BUTTON_CLASS} h-9 gap-2 px-3`}
+            title="Làm mới trạng thái kết nối"
+          >
+            <RefreshCw className={`h-4 w-4 ${connectionState === "loading" ? "animate-spin" : ""}`} />
+            <span className="sr-only sm:not-sr-only text-xs">Làm mới</span>
+          </button>
+        </div>
+
+        <p className="text-[11px] text-[var(--muted)] leading-5">
+          Kết nối tài khoản Instagram Business để nhận comment, tin nhắn và quản lý livestream.
+          Sẽ mở cửa sổ mới để xác thực với Meta.
+        </p>
+      </div>
+    </Panel>
+  );
+}
+
+// Instagram icon SVG (not available in lucide-react)
+function InstagramIcon({ className, color = "currentColor" }: { className?: string; color?: string }) {
+  return (
+    <svg
+      className={className}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke={color}
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <rect width="20" height="20" x="2" y="2" rx="5" ry="5" />
+      <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z" />
+      <line x1="17.5" x2="17.51" y1="6.5" y2="6.5" />
+    </svg>
   );
 }

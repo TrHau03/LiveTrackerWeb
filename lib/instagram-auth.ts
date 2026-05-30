@@ -6,14 +6,18 @@ import {
 } from "@/lib/proxy-client";
 import type { SessionSettings } from "@/lib/workspace-session";
 
-const OAUTH_STATE_STORAGE_KEY = "live-tracker-web.instagram-oauth-state";
+export const OAUTH_STATE_STORAGE_KEY = "live-tracker-web.instagram-oauth-state";
 const OAUTH_STATE_LAST_OK_STORAGE_KEY =
   "live-tracker-web.instagram-oauth-state-ok";
 export const INSTAGRAM_LINK_MESSAGE_TYPE = "livetracker:instagram-link";
-export const INSTAGRAM_APP_ID = "1494270874967671";
+export const INSTAGRAM_APP_ID =
+  process.env.NEXT_PUBLIC_INSTAGRAM_CLIENT_ID ?? "1494270874967671";
 export const INSTAGRAM_AUTHORIZE_URL =
   "https://api.instagram.com/oauth/authorize";
-export const INSTAGRAM_REDIRECT_URL = "https://livetracker-ulz2.onrender.com/ul";
+/** Web redirect URI — trỏ thẳng về web app, phải đăng ký trong Meta Developer Console */
+export const INSTAGRAM_REDIRECT_URL =
+  process.env.NEXT_PUBLIC_INSTAGRAM_REDIRECT_URI ??
+  `${process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000"}/ul/auth/instagram/callback`;
 export const INSTAGRAM_SCOPES = [
   "instagram_business_basic",
   "instagram_business_manage_messages",
@@ -63,7 +67,7 @@ export function getInstagramOAuthConfig(): InstagramOAuthConfig {
     authUrl: INSTAGRAM_AUTHORIZE_URL,
     clientId: INSTAGRAM_APP_ID,
     redirectUri: INSTAGRAM_REDIRECT_URL,
-    callbackPath: "/ul",
+    callbackPath: "/ul/auth/instagram/callback",
     responseType: INSTAGRAM_RESPONSE_TYPE,
     scopes: [...INSTAGRAM_SCOPES],
     profileUrl: INSTAGRAM_PROFILE_URL,
@@ -319,6 +323,21 @@ export function createInstagramShop(
         avatar: profile.avatar || undefined,
       },
     },
+  });
+}
+
+/**
+ * Exchange short-lived token with backend.
+ * Backend will upgrade to long-lived token, save shop, and register webhook.
+ */
+export function exchangeTokenWithBackend(
+  session: SessionSettings,
+  shortLivedToken: string,
+) {
+  return proxyRequest(session, {
+    path: "/instagram-auth/exchange-token",
+    method: "POST",
+    body: { shortLivedToken },
   });
 }
 

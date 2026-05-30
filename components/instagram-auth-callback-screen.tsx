@@ -9,16 +9,13 @@ import { applyAuthResponses } from "@/lib/auth-response";
 import {
   closeInstagramPopupSoon,
   consumeInstagramOAuthState,
-  createInstagramShop,
   exchangeInstagramCode,
-  fetchInstagramConnectionSnapshot,
-  fetchInstagramProfile,
-  findExistingInstagramShop,
+  exchangeTokenWithBackend,
   getInstagramOAuthConfig,
   parseInstagramCallbackPayload,
   sendInstagramLinkResult,
 } from "@/lib/instagram-auth";
-import { asRecord, pickString } from "@/lib/proxy-client";
+import { pickString } from "@/lib/proxy-client";
 
 type CallbackState = {
   status: "working" | "success" | "error";
@@ -85,37 +82,20 @@ export function InstagramAuthCallbackScreen() {
       }
 
       try {
+        // Step 1: Exchange authorization code → short-lived access token (via Next.js API route, secret kept server-side)
         const tokenResult = await exchangeInstagramCode(
           callbackPayload.code,
           oauthConfig.redirectUri,
         );
-        const profile = await fetchInstagramProfile(tokenResult.accessToken);
-        if (!profile.id && !profile.username) {
-          throw new Error("Không lấy được profile Instagram hợp lệ.");
-        }
 
-        const snapshot = await fetchInstagramConnectionSnapshot(session);
-        applyAuthResponses(snapshot.responses, patchSession, logout);
+        // Step 2: Hand off short-lived token to backend — backend upgrades to long-lived token, saves shop, registers webhook
+        const backendResult = await exchangeTokenWithBackend(session, tokenResult.accessToken);
+        applyAuthResponses([backendResult.response], patchSession, logout);
 
-        const existingShop = findExistingInstagramShop(snapshot.shops, profile);
-        if (existingShop) {
-          if (!active) {
-            return;
-          }
-
-          finish(
-            true,
-            "Instagram account đã tồn tại trong workspace. Tab đăng nhập sẽ tự đóng.",
-          );
-          return;
-        }
-
-        const createShop = await createInstagramShop(session, profile);
-        applyAuthResponses([createShop.response], patchSession, logout);
-
-        if (!createShop.ok) {
+        if (!backendResult.ok) {
           throw new Error(
-            getResponseMessage(createShop.data, "Không thể thêm shop từ Instagram."),
+            pickString(backendResult.data as Record<string, unknown>, ["message"]) ||
+            "Backend không thể xử lý Instagram token.",
           );
         }
 
@@ -123,12 +103,7 @@ export function InstagramAuthCallbackScreen() {
           return;
         }
 
-        finish(
-          true,
-          `Đã thêm shop ${
-            profile.name || profile.username || "Instagram"
-          } vào workspace. Tab đăng nhập sẽ tự đóng.`,
-        );
+        finish(true, "Kết nối Instagram thành công. Cửa sổ sẽ tự đóng.");
       } catch (error) {
         if (!active) {
           return;
@@ -249,7 +224,3 @@ function StepCard({
   );
 }
 
-function getResponseMessage(payload: unknown, fallback: string) {
-  const record = asRecord(payload);
-  return pickString(record, ["message"]) || fallback;
-}
