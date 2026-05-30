@@ -9,8 +9,7 @@ import { applyAuthResponses } from "@/lib/auth-response";
 import {
   closeInstagramPopupSoon,
   consumeInstagramOAuthState,
-  exchangeInstagramCode,
-  exchangeTokenWithBackend,
+  exchangeCodeWithBackend,
   getInstagramOAuthConfig,
   parseInstagramCallbackPayload,
   sendInstagramLinkResult,
@@ -82,20 +81,18 @@ export function InstagramAuthCallbackScreen() {
       }
 
       try {
-        // Step 1: Exchange authorization code → short-lived access token (via Next.js API route, secret kept server-side)
-        const tokenResult = await exchangeInstagramCode(
+        // Gửi authorization code lên backend để đổi token và hoàn tất liên kết (tránh CORS dưới client)
+        const backendResult = await exchangeCodeWithBackend(
+          session,
           callbackPayload.code,
           oauthConfig.redirectUri,
         );
-
-        // Step 2: Hand off short-lived token to backend — backend upgrades to long-lived token, saves shop, registers webhook
-        const backendResult = await exchangeTokenWithBackend(session, tokenResult.accessToken);
         applyAuthResponses([backendResult.response], patchSession, logout);
 
         if (!backendResult.ok) {
           throw new Error(
             pickString(backendResult.data as Record<string, unknown>, ["message"]) ||
-            "Backend không thể xử lý Instagram token.",
+            "Backend không thể xử lý Instagram code.",
           );
         }
 

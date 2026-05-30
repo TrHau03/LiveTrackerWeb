@@ -87,20 +87,6 @@ Một số endpoint trả file stream, SSE hoặc trả object trực tiếp.
 - Legacy Instagram callback vẫn support:
   - `/ul`
   - `/ul/instagram-auth-callback`
-- **Web Instagram OAuth** (direct web redirect — không qua backend server):
-  - `redirect_uri` đăng ký trên Meta Developer Console: `https://app.livetracker.vn/ul/auth/instagram/callback`
-  - Flow:
-    1. User click nút → popup mở URL `https://api.instagram.com/oauth/authorize?...&redirect_uri=<web_url>`
-    2. Instagram redirect thẳng về web app với `?code=...`
-    3. Web page gọi Next.js Route Handler `POST /api/instagram/exchange-code` (giữ `client_secret` server-side)
-    4. Route Handler đổi `code` → `short_lived_token` qua Instagram API
-    5. Web gọi backend `POST /instagram-auth/exchange-token` với `{ shortLivedToken }` → backend upgrade long-lived, lưu shop, register webhook
-  - Env vars cần thiết:
-    - `NEXT_PUBLIC_INSTAGRAM_CLIENT_ID` — client ID (public ok)
-    - `INSTAGRAM_CLIENT_SECRET` — **server-only**, KHÔNG dùng prefix `NEXT_PUBLIC_`
-    - `NEXT_PUBLIC_SITE_URL` — URL web app (vd: `https://app.livetracker.vn`)
-    - `NEXT_PUBLIC_INSTAGRAM_REDIRECT_URI` — override redirect URI nếu cần (optional)
-  - Next.js phải chạy server mode (`output: "standalone"`), không dùng static export
 - Nếu request `/ul/*` thật sự tới server:
   - `source=web` hoặc `state` resolve ra `web`:
     - backend redirect `302` sang `https://app.livetracker.vn/...`
@@ -1014,6 +1000,23 @@ Response chính:
 }
 ```
 
+`ExchangeCodeDto`
+
+```json
+{
+  "code": "string",
+  "redirectUri": "string"
+}
+```
+
+`VerifyTokenDto`
+
+```json
+{
+  "accessToken": "string"
+}
+```
+
 `RegisterInstagramWebhookDto`
 
 ```json
@@ -1032,13 +1035,15 @@ Response chính:
 
 ### Auth / shop connection
 
-| Method | Path                               | Auth   | Role          | Request                     | Response                                          |
-| ------ | ---------------------------------- | ------ | ------------- | --------------------------- | ------------------------------------------------- |
-| `POST` | `/instagram-auth/start`            | Bearer | Authenticated | none                        | Tạo OAuth state + trả authorize URL cho web popup |
-| `POST` | `/instagram-auth/exchange-token`   | Bearer | Authenticated | `body: { shortLivedToken }` | Exchange token và lưu shop vào user               |
-| `POST` | `/instagram-auth/register-webhook` | Bearer | Authenticated | `body: { instagramUserId }` | Register webhook IG                               |
-| `POST` | `/instagram-auth/revoke`           | Bearer | Authenticated | `body: { instagramUserId }` | Revoke token, disconnect shop                     |
-| `GET`  | `/instagram-auth/status`           | Bearer | Authenticated | none                        | Connection status, không trả token                |
+| Method | Path                               | Auth   | Role          | Request                       | Response                                          |
+| ------ | ---------------------------------- | ------ | ------------- | ----------------------------- | ------------------------------------------------- |
+| `POST` | `/instagram-auth/start`            | Bearer | Authenticated | none                          | Tạo OAuth state + trả authorize URL cho web popup |
+| `POST` | `/instagram-auth/exchange-token`   | Bearer | Authenticated | `body: { shortLivedToken }`   | Exchange token và lưu shop vào user               |
+| `POST` | `/instagram-auth/exchange-code`    | Bearer | Authenticated | `body: { code, redirectUri }` | Server-side code exchange (CORS bypass) + lưu shop |
+| `POST` | `/instagram-auth/verify-token`     | Bearer | Authenticated | `body: { accessToken }`       | Verify access token và trả kết quả hợp lệ         |
+| `POST` | `/instagram-auth/register-webhook` | Bearer | Authenticated | `body: { instagramUserId }`   | Register webhook IG                               |
+| `POST` | `/instagram-auth/revoke`           | Bearer | Authenticated | `body: { instagramUserId }`   | Revoke token, disconnect shop                     |
+| `GET`  | `/instagram-auth/status`           | Bearer | Authenticated | none                          | Connection status, không trả token                |
 
 ### Public webhook
 
@@ -1303,9 +1308,66 @@ Các module dưới `src/modules` hiện không expose controller API riêng:
 
 ### Instagram OAuth
 
-- Web flow:
-  - luôn gắn `state=web` hoặc state object có `source: "web"`
-  - callback `/ul/*` sẽ redirect về `app.livetracker.vn`
+#### New CORS-safe Web Flow (Server-side Code Exchange):
+Do Instagram API chặn CORS khi gọi trực tiếp từ trình duyệt và bắt buộc phải truyền `client_secret` (không an toàn khi lưu ở client-side), Web app cần sử dụng flow callback trung gian qua Backend:
+1. **Mở Popup OAuth**: Web app (client-side) tự sinh state và mở popup URL:
+   `https://api.instagram.com/oauth/authorize?client_id=<client_id>&redirect_uri=<web_callback_url>&scope=instagram_business_basic,instagram_business_manage_messages,instagram_business_manage_comments&response_type=code&state=<state>`
+2. **Instagram Redirect**: Instagram redirect thẳng về Web app callback page (popup) với query parameter `?code=...` và `state`.
+3. **Trao đổi Code**: Web callback page kiểm tra khớp `state`, sau đó gọi API của Backend:
+   - **Endpoint**: `POST /instagram-auth/exchange-code`
+   - **Auth**: Bearer Token
+   - **Request Body**:
+     ```json
+     {
+       "code": "auth_code_tu_instagram",
+       "redirectUri": "web_callback_url_gui_len"
+     }
+     ```
+4. **Backend xử lý**: Server-side của Backend thực hiện fetch tới `POST https://api.instagram.com/oauth/access_token` để lấy short-lived token, nâng cấp lên long-lived token, lưu shop liên kết, đăng ký webhook và trả về thành công.
+5. **Hoàn thành**: Web callback page gửi `postMessage` thông báo thành công cho main window và đóng popup.
+
+#### Environment Variables (Web Frontend):
+Cần cấu hình các biến môi trường sau cho Web app (chạy tĩnh hoàn toàn `output: "export"`, tương thích Cloudflare Pages):
+- `NEXT_PUBLIC_INSTAGRAM_CLIENT_ID` — Instagram App/Client ID (Public)
+- `NEXT_PUBLIC_SITE_URL` — URL của Web app (ví dụ: `https://app.livetracker.vn`)
+- `NEXT_PUBLIC_INSTAGRAM_REDIRECT_URI` — (Optional) Đường dẫn callback cụ thể nếu muốn override, mặc định nên sử dụng `<NEXT_PUBLIC_SITE_URL>/ul/auth/instagram/callback`
+
+#### Token Verification API:
+Web app có thể kiểm tra xem Access Token của Instagram còn hiệu lực hay không bằng cách gọi API:
+- **Endpoint**: `POST /instagram-auth/verify-token`
+- **Auth**: Bearer Token
+- **Request Body**:
+  ```json
+  {
+    "accessToken": "instagram_access_token_can_verify"
+  }
+  ```
+- **Response**:
+  - Hợp lệ:
+    ```json
+    {
+      "success": true,
+      "data": {
+        "valid": true,
+        "data": {
+          "userId": "string",
+          "username": "string",
+          "name": "string"
+        }
+      }
+    }
+    ```
+  - Không hợp lệ / Hết hạn:
+    ```json
+    {
+      "success": true,
+      "data": {
+        "valid": false,
+        "message": "Chi tiết lỗi từ Instagram API"
+      }
+    }
+    ```
+
 - App flow:
   - luôn gắn `state=app` hoặc state object có `source: "app"`
   - callback `/ul/*` sẽ giữ Universal Link behavior cũ
