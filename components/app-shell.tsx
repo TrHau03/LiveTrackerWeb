@@ -12,6 +12,7 @@ import { appNavigation } from "@/lib/site";
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const isViewportLocked = pathname === "/livestreams" || pathname === "/customers" || pathname === "/messenger";
   const { authStatus, isAuthenticated, logout, session } = useSession();
   const { theme, toggleTheme } = useTheme();
   const [isCollapsed, setIsCollapsed] = React.useState(false);
@@ -97,7 +98,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="min-h-screen bg-[var(--background)]">
-      <div className={`flex gap-0 ${pathname === "/livestreams" ? "h-screen overflow-hidden" : "min-h-screen"}`}>
+      <div className={`flex gap-0 ${isViewportLocked ? "h-screen overflow-hidden" : "min-h-screen"}`}>
         {/* Backdrop for mobile */}
         {isMobileMenuOpen && (
           <div
@@ -206,16 +207,32 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </aside>
 
         {/* Main Content Area */}
-        <div className={`flex min-w-0 flex-1 flex-col ${pathname === "/livestreams" ? "h-screen overflow-hidden" : "min-h-screen"}`}>
+        <div className={`flex min-w-0 flex-1 flex-col ${isViewportLocked ? "h-screen overflow-hidden" : "min-h-screen"}`}>
           <Header />
 
-          <main className={`min-w-0 flex-1 ${pathname === "/livestreams" ? "px-2 sm:px-3 pb-0 flex flex-col overflow-hidden" : "px-4 sm:px-6 lg:px-8 pt-6 pb-24 lg:pb-8"}`}>
-            <div className={`w-full h-full ${pathname === "/livestreams" ? "flex flex-col flex-1 overflow-hidden" : "block max-w-[1400px] mx-auto"}`}>{children}</div>
+          <main className={`min-w-0 flex-1 ${
+            pathname === "/livestreams"
+              ? "px-2 sm:px-3 pt-2 pb-0 flex flex-col overflow-hidden"
+              : pathname === "/messenger"
+                ? "px-2 sm:px-3 pt-2 pb-0 flex flex-col overflow-hidden"
+                : pathname === "/customers"
+                  ? "px-2 sm:px-3 pt-2 pb-0 flex flex-col overflow-hidden"
+                  : pathname === "/orders"
+                    ? "px-2 sm:px-3 pt-2 pb-24 lg:pb-8"
+                    : pathname === "/"
+                      ? "px-2 sm:px-3 pt-2 pb-24 lg:pb-8"
+                      : pathname === "/settings"
+                        ? "px-2 sm:px-3 pt-2 pb-24 lg:pb-8"
+                        : isViewportLocked
+                          ? "px-4 sm:px-6 lg:px-8 pt-6 pb-0 flex flex-col overflow-hidden"
+                          : "px-4 sm:px-6 lg:px-8 pt-6 pb-24 lg:pb-8"
+          }`}>
+            <div className={`w-full h-full ${isViewportLocked ? "flex flex-col flex-1 overflow-hidden" : "block max-w-[1536px] mx-auto"}`}>{children}</div>
           </main>
 
-          {pathname !== "/livestreams" && (
+          {!isViewportLocked && (
             <footer className="mt-auto hidden border-t border-[var(--border)] bg-[var(--surface)] px-6 py-3 lg:block shrink-0">
-              <div className="mx-auto flex max-w-[1400px] items-center justify-between text-xs text-[var(--muted)]">
+              <div className="mx-auto flex max-w-[1536px] items-center justify-between text-xs text-[var(--muted)]">
                 <p>© {new Date().getFullYear()} LiveTracker. All rights reserved.</p>
                 <div className="flex gap-4">
                   <a href="#" className="hover:text-[var(--foreground)] transition-colors">Hỗ trợ</a>
@@ -288,13 +305,21 @@ function NavIcon({ href, active }: { href: string; active: boolean }) {
     );
   }
 
-  if (href === "/settings") {
+  if (href === "/messenger") {
     return (
       <svg viewBox="0 0 24 24" fill={active ? "currentColor" : "none"} stroke="currentColor" strokeWidth="1.8" className={className}>
-        <path d="M4.5 12a7.5 7.5 0 1115 0 7.5 7.5 0 01-15 0z" />
-        <path d="M12 9v3m0 0v3m0-3h3m-3 0H9" />
+        <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2v10z" />
       </svg>
-    )
+    );
+  }
+
+  if (href === "/settings") {
+    return (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className={className}>
+        <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.1a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" />
+        <circle cx="12" cy="12" r="3" fill={active ? "currentColor" : "none"} />
+      </svg>
+    );
   }
 
   return (

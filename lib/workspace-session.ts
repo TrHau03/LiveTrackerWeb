@@ -7,6 +7,7 @@ export type AuthUser = {
   phone?: string;
   address?: string;
   shops?: Array<{ id: string; name: string; avatar?: string; phone?: string; address?: string }>;
+  messageTemplate?: any;
 };
 
 export type SessionSettings = {

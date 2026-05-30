@@ -5,9 +5,9 @@ import Link from "next/link";
 import { useSession } from "@/components/session-provider";
 import { useQuery } from "@tanstack/react-query";
 import { useHeaderStore } from "@/lib/store/header-store";
-import { streamProxyRequest, proxyRequest } from "@/lib/proxy-client";
+import { streamProxyRequest, proxyRequest, asRecord, extractApiData, extractCollection, pickString, pickNumber, pickBoolean } from "@/lib/proxy-client";
 import { applyAuthResponses } from "@/hooks/use-auth-sync";
-import { asRecord, extractApiData, extractCollection, pickString, pickNumber, pickBoolean } from "@/lib/proxy-client";
+import { ChatPanel } from "../messenger/chat-panel";
 
 import {
   Hero,
@@ -69,6 +69,36 @@ export function LiveDetailScreen({ liveId }: { liveId: string }) {
 
   const setHeader = useHeaderStore(state => state.setHeader);
   const resetHeader = useHeaderStore(state => state.resetHeader);
+
+  // States for Quick Chat panel
+  const [quickChatUsername, setQuickChatUsername] = useState<string | null>(null);
+  const [quickConversation, setQuickConversation] = useState<any | null>(null);
+  const [isFetchingQuickConv, setIsFetchingQuickConv] = useState(false);
+
+  const handleStartQuickChat = async (comment: Record<string, unknown>) => {
+    const username = pickString(comment, ["igUsername", "username"]);
+    if (!username) return;
+
+    setQuickChatUsername(username);
+    setIsFetchingQuickConv(true);
+    setQuickConversation(null);
+
+    try {
+      const response = await proxyRequest(session, {
+        path: "/messenger/conversations",
+        method: "GET",
+        query: { limit: 1, search: username },
+      });
+      
+      const page = extractApiData<any>(response.data);
+      const conversation = page?.items?.[0] || null;
+      setQuickConversation(conversation);
+    } catch (error) {
+      console.error("Failed to find conversation for quick chat", error);
+    } finally {
+      setIsFetchingQuickConv(false);
+    }
+  };
 
   useEffect(() => {
     const controller = new AbortController();
@@ -139,9 +169,9 @@ export function LiveDetailScreen({ liveId }: { liveId: string }) {
   }, [liveTitle, shop.name]);
 
   return (
-    <div className="space-y-8 pb-28 lg:pb-6">
+    <div className="space-y-4 pb-28 lg:pb-6 pt-0">
 
-      <div className="grid gap-6 xl:grid-cols-[1.12fr_0.88fr]">
+      <div className="grid gap-3.5 xl:grid-cols-[1.12fr_0.88fr]">
         <Panel
           title="Comment stream"
           action={
@@ -182,6 +212,30 @@ export function LiveDetailScreen({ liveId }: { liveId: string }) {
                     </p>
                   </div>
                   <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => handleStartQuickChat(comment)}
+                      style={{
+                        width: "28px",
+                        height: "28px",
+                        borderRadius: "50%",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        backgroundColor: "rgba(59, 130, 246, 0.12)",
+                        color: "#3b82f6",
+                        border: "none",
+                        cursor: "pointer",
+                        transition: "all 150ms",
+                      }}
+                      className="quick-chat-btn"
+                      title="Trò chuyện nhanh"
+                    >
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                        <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2v10z" />
+                      </svg>
+                    </button>
+
                     <Tag tone="muted">
                       Qty {formatNumber(pickNumber(comment, ["quantity"]) ?? 1)}
                     </Tag>
@@ -198,119 +252,203 @@ export function LiveDetailScreen({ liveId }: { liveId: string }) {
           </div>
         </Panel>
 
-        <div className="space-y-6">
-          <Panel title="Instagram companion">
-            <div className="overflow-hidden rounded-[30px] border border-[var(--border)] bg-[linear-gradient(180deg,_rgba(9,13,22,0.98)_0%,_rgba(17,24,39,1)_100%)] shadow-[var(--shadow-soft)]">
-              <div className="flex items-center gap-3 border-b border-white/10 px-4 py-3 text-white/70">
-                <div className="flex items-center gap-1.5">
-                  <span className="h-2.5 w-2.5 rounded-full bg-[#ff5f57]" />
-                  <span className="h-2.5 w-2.5 rounded-full bg-[#ffbd2e]" />
-                  <span className="h-2.5 w-2.5 rounded-full bg-[#28c840]" />
-                </div>
-                <div className="min-w-0 rounded-full border border-white/10 bg-white/5 px-4 py-1 text-xs font-medium text-white/72">
-                  <span className="block truncate">
-                    {instagramHandle
-                      ? `instagram.com/${instagramHandle}`
-                      : "instagram.com"}
-                  </span>
-                </div>
-              </div>
-
-              <div className="space-y-5 p-5">
-                <div className="rounded-[26px] border border-white/10 bg-white/6 p-5 text-white">
-                  <div className="flex items-center justify-between gap-4">
-                    <div className="flex items-center gap-3">
-                      <span className="flex h-12 w-12 items-center justify-center rounded-[18px] bg-[linear-gradient(135deg,_rgba(255,255,255,0.2)_0%,_rgba(255,255,255,0.06)_100%)] text-sm font-semibold text-white">
-                        {liveTitle.slice(0, 1).toUpperCase()}
-                      </span>
-                      <div className="min-w-0">
-                        <p className="truncate text-sm font-semibold text-white">
-                          {liveTitle}
-                        </p>
-                        <p className="mt-1 text-xs text-white/60">
-                          {instagramHandle ? `@${instagramHandle}` : "Instagram live"}
-                        </p>
-                      </div>
-                    </div>
-                    <span className="rounded-full bg-emerald-400/14 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-300">
-                      {pickBoolean(live, ["isLive"]) ? "Live signal" : "Preview"}
+        <div className="space-y-4 relative overflow-hidden min-h-[600px] flex flex-col">
+          {/* Main panels with slide transition */}
+          <div
+            className={`space-y-4 flex-1 flex flex-col transition-all duration-300 ease-out ${
+              quickChatUsername
+                ? "opacity-0 pointer-events-none translate-x-[-50px]"
+                : "opacity-100 translate-x-0"
+            }`}
+          >
+            <Panel title="Instagram companion">
+              <div className="overflow-hidden rounded-[30px] border border-[var(--border)] bg-[linear-gradient(180deg,_rgba(9,13,22,0.98)_0%,_rgba(17,24,39,1)_100%)] shadow-[var(--shadow-soft)]">
+                <div className="flex items-center gap-3 border-b border-white/10 px-4 py-3 text-white/70">
+                  <div className="flex items-center gap-1.5">
+                    <span className="h-2.5 w-2.5 rounded-full bg-[#ff5f57]" />
+                    <span className="h-2.5 w-2.5 rounded-full bg-[#ffbd2e]" />
+                    <span className="h-2.5 w-2.5 rounded-full bg-[#28c840]" />
+                  </div>
+                  <div className="min-w-0 rounded-full border border-white/10 bg-white/5 px-4 py-1 text-xs font-medium text-white/72">
+                    <span className="block truncate">
+                      {instagramHandle
+                        ? `instagram.com/${instagramHandle}`
+                        : "instagram.com"}
                     </span>
                   </div>
+                </div>
 
-                  <p className="mt-5 text-2xl font-semibold tracking-[-0.04em] text-white">
-                    Open the real Instagram view without broken embeds.
-                  </p>
-                  <p className="mt-3 text-sm leading-7 text-white/68">
-                    Instagram chặn việc nhúng trực tiếp trong iframe. Panel này
-                    giữ đúng context phiên live để đội vận hành mở nhanh ở tab mới
-                    mà không gặp lỗi `refused to connect`.
-                  </p>
+                <div className="space-y-4 p-4">
+                  <div className="rounded-[26px] border border-white/10 bg-white/6 p-5 text-white">
+                    <div className="flex items-center justify-between gap-4">
+                      <div className="flex items-center gap-3">
+                        <span className="flex h-12 w-12 items-center justify-center rounded-[18px] bg-[linear-gradient(135deg,_rgba(255,255,255,0.2)_0%,_rgba(255,255,255,0.06)_100%)] text-sm font-semibold text-white">
+                          {liveTitle.slice(0, 1).toUpperCase()}
+                        </span>
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-semibold text-white">
+                            {liveTitle}
+                          </p>
+                          <p className="mt-1 text-xs text-white/60">
+                            {instagramHandle ? `@${instagramHandle}` : "Instagram live"}
+                          </p>
+                        </div>
+                      </div>
+                      <span className="rounded-full bg-emerald-400/14 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-300">
+                        {pickBoolean(live, ["isLive"]) ? "Live signal" : "Preview"}
+                      </span>
+                    </div>
 
-                  <div className="mt-5 grid grid-cols-3 gap-3">
-                    <CompanionMetric
-                      label="Comments"
-                      value={formatNumber(
-                        pickNumber(live, ["totalComment", "totalComments"]) ??
-                        (data?.comments?.length ?? 0) + realtimeComments.length,
-                      )}
+                    <p className="mt-5 text-2xl font-semibold tracking-[-0.04em] text-white">
+                      Open the real Instagram view without broken embeds.
+                    </p>
+                    <p className="mt-3 text-sm leading-7 text-white/68">
+                      Instagram chặn việc nhúng trực tiếp trong iframe. Panel này
+                      giữ đúng context phiên live để đội vận hành mở nhanh ở tab mới
+                      mà không gặp lỗi `refused to connect`.
+                    </p>
+
+                    <div className="mt-3.5 grid grid-cols-3 gap-3">
+                      <CompanionMetric
+                        label="Comments"
+                        value={formatNumber(
+                          pickNumber(live, ["totalComment", "totalComments"]) ??
+                          (data?.comments?.length ?? 0) + realtimeComments.length,
+                        )}
+                      />
+                      <CompanionMetric
+                        label="Orders"
+                        value={formatNumber(
+                          pickNumber(live, ["totalOrder", "totalOrders"]) ?? 0,
+                        )}
+                      />
+                      <CompanionMetric
+                        label="Updated"
+                        value={compactDate(
+                          pickString(live, ["lastWebhookAt", "updatedAt"]) || "",
+                        )}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <MiniMetric
+                      label="IG handle"
+                      value={instagramHandle ? `@${instagramHandle}` : "Open homepage"}
                     />
-                    <CompanionMetric
-                      label="Orders"
-                      value={formatNumber(
-                        pickNumber(live, ["totalOrder", "totalOrders"]) ?? 0,
-                      )}
-                    />
-                    <CompanionMetric
-                      label="Updated"
-                      value={compactDate(
-                        pickString(live, ["lastWebhookAt", "updatedAt"]) || "",
-                      )}
+                    <MiniMetric
+                      label="Owner"
+                      value={
+                        pickString(user, ["fullName", "name", "username"]) ||
+                        session.user?.fullName ||
+                        "Owner"
+                      }
                     />
                   </div>
-                </div>
 
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <MiniMetric
-                    label="IG handle"
-                    value={instagramHandle ? `@${instagramHandle}` : "Open homepage"}
-                  />
-                  <MiniMetric
-                    label="Owner"
-                    value={
-                      pickString(user, ["fullName", "name", "username"]) ||
-                      session.user?.fullName ||
-                      "Owner"
-                    }
-                  />
-                </div>
-
-                <div className="flex flex-col gap-3 sm:flex-row">
-                  <a
-                    href={instagramUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className={`${PRIMARY_BUTTON_CLASS} flex-1`}
-                  >
-                    Open Instagram
-                  </a>
-                  <Link href="/livestreams" className={`${SECONDARY_BUTTON_CLASS} flex-1`}>
-                    Back to livestreams
-                  </Link>
+                  <div className="flex flex-col gap-3 sm:flex-row">
+                    <a
+                      href={instagramUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className={`${PRIMARY_BUTTON_CLASS} flex-1`}
+                    >
+                      Open Instagram
+                    </a>
+                    <Link href="/livestreams" className={`${SECONDARY_BUTTON_CLASS} flex-1`}>
+                      Back to livestreams
+                    </Link>
+                  </div>
                 </div>
               </div>
-            </div>
-          </Panel>
+            </Panel>
 
-          <Panel title="Overview">
-            <div className="grid gap-3">
-              <MiniMetric label="IG Live ID" value={pickString(live, ["igLiveId"]) || liveId} />
-              <MiniMetric label="Shop" value={pickString(shop, ["name"]) || "Unknown"} />
-              <MiniMetric label="Owner" value={pickString(user, ["fullName", "name"]) || session.user?.fullName || "Owner"} />
-              <MiniMetric label="Comments" value={formatNumber(pickNumber(live, ["totalComment", "totalComments"]) ?? (data?.comments?.length ?? 0) + realtimeComments.length)} />
-              <MiniMetric label="Orders" value={formatNumber(pickNumber(live, ["totalOrder", "totalOrders"]) ?? 0)} />
-              <MiniMetric label="Last activity" value={formatDateTime(pickString(live, ["lastWebhookAt", "updatedAt"]))} />
+            <Panel title="Overview">
+              <div className="grid gap-3">
+                <MiniMetric label="IG Live ID" value={pickString(live, ["igLiveId"]) || liveId} />
+                <MiniMetric label="Shop" value={pickString(shop, ["name"]) || "Unknown"} />
+                <MiniMetric label="Owner" value={pickString(user, ["fullName", "name"]) || session.user?.fullName || "Owner"} />
+                <MiniMetric label="Comments" value={formatNumber(pickNumber(live, ["totalComment", "totalComments"]) ?? (data?.comments?.length ?? 0) + realtimeComments.length)} />
+                <MiniMetric label="Orders" value={formatNumber(pickNumber(live, ["totalOrder", "totalOrders"]) ?? 0)} />
+                <MiniMetric label="Last activity" value={formatDateTime(pickString(live, ["lastWebhookAt", "updatedAt"]))} />
+              </div>
+            </Panel>
+          </div>
+
+          {/* Quick Chat Overlay Panel with slide animation */}
+          <div
+            className={`absolute inset-0 bg-[var(--surface)] border border-[var(--border)] rounded-[24px] overflow-hidden flex flex-col transition-all duration-300 ease-out z-10 shadow-[var(--shadow-medium)] ${
+              quickChatUsername
+                ? "opacity-100 translate-x-0 pointer-events-auto"
+                : "opacity-0 pointer-events-none translate-x-[100%]"
+            }`}
+          >
+            {/* Quick Chat Header */}
+            <div className="flex items-center gap-3 border-b border-[var(--border)] px-4 py-3 bg-[var(--surface-muted)] shrink-0">
+              <button
+                type="button"
+                onClick={() => setQuickChatUsername(null)}
+                className="h-8 w-8 rounded-full border border-[var(--border)] bg-[var(--surface)] hover:bg-[var(--hover)] flex items-center justify-center text-[var(--foreground)] transition-colors"
+                title="Quay lại"
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                  <path d="M19 12H5M12 19l-7-7 7-7" />
+                </svg>
+              </button>
+              <div className="min-w-0">
+                <h4 className="text-sm font-bold text-[var(--foreground)] truncate">
+                  Trò chuyện nhanh: @{quickChatUsername}
+                </h4>
+                <p className="text-[11px] text-[var(--muted)]">Instagram Chat</p>
+              </div>
             </div>
-          </Panel>
+
+            {/* Quick Chat Content wrapper */}
+            <div className="flex-1 min-h-0 relative flex flex-col">
+              {isFetchingQuickConv ? (
+                <div className="flex-1 flex flex-col items-center justify-center gap-2 p-6">
+                  <span className="live-detail-spinner" />
+                  <span className="text-xs text-[var(--muted)]">Đang tải cuộc trò chuyện...</span>
+                </div>
+              ) : !quickConversation ? (
+                <div className="flex-1 flex flex-col items-center justify-center text-center p-6 gap-3">
+                  <div className="h-12 w-12 rounded-full border border-[var(--border)] bg-[var(--surface-muted)] flex items-center justify-center text-[var(--muted)]">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                      <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2v10z" />
+                    </svg>
+                  </div>
+                  <div>
+                    <h5 className="text-sm font-semibold text-[var(--foreground)]">Không tìm thấy hội thoại</h5>
+                    <p className="text-xs text-[var(--muted)] mt-1 max-w-[240px] mx-auto">
+                      Chưa có hội thoại nào được đồng bộ của người dùng @{quickChatUsername} trên hệ thống.
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex-1 min-h-0 flex flex-col">
+                  <ChatPanel conversation={quickConversation} />
+                </div>
+              )}
+            </div>
+          </div>
+
+          <style jsx>{`
+            .quick-chat-btn:hover {
+              background-color: rgba(59, 130, 246, 0.22) !important;
+              transform: scale(1.05);
+            }
+            .live-detail-spinner {
+              width: 24px;
+              height: 24px;
+              border: 2px solid var(--border);
+              border-top-color: var(--primary);
+              border-radius: 50%;
+              animation: spin 600ms linear infinite;
+            }
+            @keyframes spin {
+              to { transform: rotate(360deg); }
+            }
+          `}</style>
         </div>
       </div>
     </div>

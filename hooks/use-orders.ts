@@ -8,11 +8,11 @@ import { useSession } from "@/components/session-provider";
 import { fetchMyOrders, fetchLiveOrders, exportOrdersExcel } from "@/lib/services/orders-service";
 import { applyAuthResponses } from "@/hooks/use-auth-sync";
 
-export function useOrders(queryMeta?: { page?: number; limit?: number; search?: string; startDate?: string; endDate?: string }) {
+export function useOrders(queryMeta?: { page?: number; limit?: number; search?: string; startDate?: string; endDate?: string; customerId?: string }) {
   const { logout, patchSession, session } = useSession();
 
   return useQuery({
-    queryKey: ["orders", session.user?.id, queryMeta?.page, queryMeta?.limit, queryMeta?.search, queryMeta?.startDate, queryMeta?.endDate],
+    queryKey: ["orders", session.user?.id, queryMeta?.page, queryMeta?.limit, queryMeta?.search, queryMeta?.startDate, queryMeta?.endDate, queryMeta?.customerId],
     queryFn: async () => {
       const response = await fetchMyOrders(session, {
         page: queryMeta?.page || 1,
@@ -20,6 +20,7 @@ export function useOrders(queryMeta?: { page?: number; limit?: number; search?: 
         search: queryMeta?.search || undefined,
         fromDate: queryMeta?.startDate,
         toDate: queryMeta?.endDate,
+        customerId: queryMeta?.customerId,
       });
       applyAuthResponses([response.response], patchSession, logout);
       return response.data;

@@ -37,6 +37,11 @@ export const appNavigation = [
     shortLabel: "Khách",
   },
   {
+    href: "/messenger",
+    label: "Tin nhắn",
+    shortLabel: "Chat",
+  },
+  {
     href: "/settings",
     label: "Cài đặt",
     shortLabel: "CĐ",

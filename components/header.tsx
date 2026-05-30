@@ -49,6 +49,14 @@ function Breadcrumb() {
 export function Header() {
   const config = useConfigHeader();
   const dynamicHeader = useHeaderStore();
+  const pathname = usePathname();
+
+  const isCompactPadding =
+    pathname === "/livestreams" ||
+    pathname === "/messenger" ||
+    pathname === "/customers" ||
+    pathname === "/orders" ||
+    pathname === "/";
 
   const title = dynamicHeader.title || config.title;
   const subtitle = dynamicHeader.subtitle || config.subtitle;
@@ -57,7 +65,9 @@ export function Header() {
 
   return (
     <header
-      className="px-4 sm:px-6 lg:px-8 py-3 border-b border-[var(--header-border)] bg-[var(--header-bg)] sticky top-0 z-30 transition-colors duration-200"
+      className={`${
+        isCompactPadding ? "px-2 sm:px-3" : "px-4 sm:px-6 lg:px-8"
+      } py-3 border-b border-[var(--header-border)] bg-[var(--header-bg)] sticky top-0 z-30 transition-colors duration-200`}
     >
       <div className="flex flex-col gap-2 max-w-[1400px] mx-auto">
         {/* Breadcrumb Row */}

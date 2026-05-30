@@ -315,9 +315,9 @@ export function OrdersScreen() {
   };
 
   return (
-    <div className="space-y-8 pb-28 lg:pb-6">
+    <div className="space-y-4 pb-28 lg:pb-6 pt-0">
 
-      <div className="grid gap-6 md:grid-cols-3">
+      <div className="grid gap-3.5 md:grid-cols-3">
         <StatCard
           label="Đơn cần xử lý"
           value={totalOrdersCount}
@@ -343,9 +343,9 @@ export function OrdersScreen() {
 
       <Panel title="Danh sách Đơn hàng" className="overflow-hidden relative">
         <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between p-3 rounded-lg border border-[var(--border)] bg-[var(--surface-muted)]">
-          <div className="flex flex-col sm:flex-row flex-1 w-full max-w-4xl items-center gap-3">
+          <div className="flex flex-col md:flex-row md:flex-wrap lg:flex-nowrap flex-1 w-full lg:max-w-5xl items-stretch md:items-center gap-3">
             {/* Ô Search (Bên trái) */}
-            <div className="relative flex-1 group w-full">
+            <div className="relative flex-1 md:min-w-[280px] lg:min-w-[320px] group w-full">
               <SearchIcon className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--muted)] group-focus-within:text-[var(--primary)] transition-colors" />
               <input
                 value={query}
@@ -356,7 +356,7 @@ export function OrdersScreen() {
             </div>
 
             {/* Khối bộ lọc nhanh và khoảng thời gian (Bên phải) */}
-            <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto shrink-0">
+            <div className="flex flex-wrap items-center gap-2 w-full md:w-auto shrink-0">
               <div className="flex bg-[var(--surface)] rounded-lg p-0.5 border border-[var(--border)] shrink-0 overflow-x-auto no-scrollbar w-full sm:w-auto">
                 <button
                   onClick={() => setPeriod("today")}
@@ -438,7 +438,7 @@ export function OrdersScreen() {
             <table className="w-full text-left text-xs whitespace-nowrap">
               <thead className="bg-[var(--surface-muted)] text-[var(--muted)] border-b border-[var(--border)]">
                 <tr>
-                  <th className="px-5 py-4 w-12 text-center">
+                  <th className="px-4 py-2.5 w-12 text-center">
                     <input
                       type="checkbox"
                       className="w-4 h-4 rounded border-[var(--border)] text-[var(--primary)] focus:ring-[var(--primary)]"
@@ -446,11 +446,11 @@ export function OrdersScreen() {
                       onChange={handleToggleSelectAll}
                     />
                   </th>
-                  <th className="px-4 py-3 font-medium uppercase tracking-wider text-[11px]">Mã đơn hàng</th>
-                  <th className="px-4 py-3 font-medium uppercase tracking-wider text-[11px]">Khách hàng</th>
-                  <th className="px-4 py-3 font-medium uppercase tracking-wider text-[11px]">Số điện thoại</th>
-                  <th className="px-4 py-3 font-medium uppercase tracking-wider text-right text-[11px]">Tổng thanh toán</th>
-                  <th className="px-4 py-3 font-medium uppercase tracking-wider text-center text-[11px]">Trạng thái</th>
+                  <th className="px-4 py-2.5 font-medium uppercase tracking-wider text-[11px]">Mã đơn hàng</th>
+                  <th className="px-4 py-2.5 font-medium uppercase tracking-wider text-[11px]">Khách hàng</th>
+                  <th className="px-4 py-2.5 font-medium uppercase tracking-wider text-[11px]">Số điện thoại</th>
+                  <th className="px-4 py-2.5 font-medium uppercase tracking-wider text-right text-[11px]">Tổng thanh toán</th>
+                  <th className="px-4 py-2.5 font-medium uppercase tracking-wider text-center text-[11px]">Trạng thái</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[var(--border)]">
@@ -466,7 +466,7 @@ export function OrdersScreen() {
                       onClick={() => setSelectedOrderId(id)}
                       className={`cursor-pointer group transition-colors hover:bg-[var(--hover)] ${isActive ? "bg-blue-50 dark:bg-blue-900/10" : ""}`}
                     >
-                      <td className="px-5 py-4 text-center" onClick={e => e.stopPropagation()}>
+                      <td className="px-4 py-2.5 text-center" onClick={e => e.stopPropagation()}>
                         <input
                           type="checkbox"
                           className="w-4 h-4 rounded border-[var(--border)] text-[var(--primary)] focus:ring-[var(--primary)]"
@@ -474,14 +474,14 @@ export function OrdersScreen() {
                           onChange={() => handleToggleSelect(id)}
                         />
                       </td>
-                      <td className="px-4 py-3">
+                      <td className="px-4 py-2.5">
                         <span className="font-mono text-xs font-medium text-[var(--primary)] bg-[var(--primary-soft)] px-2 py-0.5 rounded">
                           #{pickString(order, ["orderCode", "code"]) || id?.substring(0, 8)}
                         </span>
                       </td>
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-2.5">
-                          <div className="h-8 w-8 overflow-hidden rounded-full ring-1 ring-[var(--border)] bg-[color:var(--primary-soft)] flex items-center justify-center text-[var(--primary)] shrink-0 text-xs relative">
+                      <td className="px-4 py-2.5">
+                        <div className="flex items-center gap-2">
+                          <div className="h-7 w-7 overflow-hidden rounded-full ring-1 ring-[var(--border)] bg-[color:var(--primary-soft)] flex items-center justify-center text-[var(--primary)] shrink-0 text-xs relative">
                             {pickString(customerInfo, ["avatar"]) ? (
                               <>
                                 <img 
@@ -506,18 +506,18 @@ export function OrdersScreen() {
                           <span className="font-medium text-[var(--foreground)] text-sm group-hover:text-[var(--primary)] transition-colors">{name}</span>
                         </div>
                       </td>
-                      <td className="px-4 py-3">
+                      <td className="px-4 py-2.5">
                         <div className="flex items-center gap-1.5 text-[var(--muted)] font-medium text-xs">
                           <Phone className="w-3.5 h-3.5 shrink-0" />
                           <span>{pickString(order, ["phone"]) || "—"}</span>
                         </div>
                       </td>
-                      <td className="px-4 py-3 font-semibold text-right text-[var(--foreground)] text-sm">
+                      <td className="px-4 py-2.5 font-semibold text-right text-[var(--foreground)] text-sm">
                         {formatCurrency(pickNumber(order, ["totalPrice", "amount"]) ?? 0)}
                       </td>
-                      <td className="px-4 py-3 text-center">
-                        <span className="relative inline-flex items-center gap-1.5 rounded-full bg-amber-50 dark:bg-amber-950/30 px-2.5 py-0.5 text-[11px] font-medium text-amber-700 dark:text-amber-400">
-                          <span className="flex h-1.5 w-1.5 rounded-full bg-amber-500 animate-pulse"></span>
+                      <td className="px-4 py-2.5 text-center">
+                        <span className="relative inline-flex items-center gap-1.5 rounded-full bg-orange-50 border border-orange-200 px-2.5 py-0.5 text-[11px] font-semibold text-orange-700">
+                          <span className="flex h-1.5 w-1.5 rounded-full bg-orange-500 animate-pulse"></span>
                           Chờ xử lý
                         </span>
                       </td>

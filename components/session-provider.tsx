@@ -22,6 +22,15 @@ type LoginPayload = {
   password: string;
 };
 
+type RegisterPayload = {
+  email: string;
+  password: string;
+  confirmPassword: string;
+  username?: string;
+  fullName?: string;
+  role?: string[];
+};
+
 type SessionContextValue = {
   authStatus: "booting" | "signed_out" | "signed_in";
   isReady: boolean;
@@ -30,6 +39,7 @@ type SessionContextValue = {
   loginError: string;
   session: SessionSettings;
   login: (payload: LoginPayload) => Promise<boolean>;
+  register: (payload: RegisterPayload) => Promise<{ success: boolean; message: string }>;
   logout: () => Promise<void>;
   patchSession: (patch: Partial<SessionSettings>) => void;
   refreshUser: () => Promise<void>;
@@ -199,6 +209,44 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
           setIsLoggingIn(false);
         }
       },
+      register: async (payload) => {
+        try {
+          const baseUrl = process.env.NEXT_PUBLIC_API_URL || "https://admin.livetracker.vn/api/v1";
+          const response = await fetch(`${baseUrl}/auth/register`, {
+            method: "POST",
+            headers: {
+              "content-type": "application/json",
+            },
+            body: JSON.stringify({
+              ...payload,
+              role: payload.role || ["User"],
+            }),
+            cache: "no-store",
+          });
+
+          const data = (await response.json()) as {
+            success: boolean;
+            message?: string;
+          };
+
+          if (!response.ok || !data.success) {
+            return {
+              success: false,
+              message: data.message || "Đăng ký thất bại.",
+            };
+          }
+
+          return {
+            success: true,
+            message: data.message || "Đăng ký tài khoản thành công.",
+          };
+        } catch (error) {
+          return {
+            success: false,
+            message: error instanceof Error ? error.message : "Đăng ký thất bại.",
+          };
+        }
+      },
       logout: async () => {
         const refreshToken = session.refreshToken;
 
@@ -322,6 +370,7 @@ async function fetchUserProfile(
       avatar: pickString(record, ["avatar"]),
       phone: pickString(record, ["phone", "mobile"]),
       address: pickString(record, ["address", "street"]),
+      messageTemplate: record.messageTemplate,
       shops: (() => {
         if (Array.isArray(record.shops) && record.shops.length > 0) {
           return record.shops.map((s: any) => ({

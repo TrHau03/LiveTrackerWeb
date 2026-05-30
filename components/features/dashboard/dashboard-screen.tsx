@@ -91,12 +91,12 @@ export function DashboardScreen() {
   // Helper để map dữ liệu biểu đồ với điền ngày trung gian (date interpolation)
   const mapSeriesData = (payload: unknown, valueKey: string) => {
     const collection = extractCollection(payload);
-    
+
     // Khởi tạo map chứa tất cả ngày/tháng trong khoảng
     const dateMap = new Map<string, any>();
     const start = new Date(dateRange.startDate);
     const end = new Date(dateRange.endDate);
-    
+
     if (period === "year") {
       // Điền theo tháng
       const current = new Date(start.getFullYear(), start.getMonth(), 1);
@@ -122,7 +122,7 @@ export function DashboardScreen() {
       current.setHours(0, 0, 0, 0);
       const targetEnd = new Date(end);
       targetEnd.setHours(0, 0, 0, 0);
-      
+
       // Giới hạn an toàn tối đa 366 ngày
       let safetyCounter = 0;
       while (current <= targetEnd && safetyCounter < 400) {
@@ -221,6 +221,10 @@ export function DashboardScreen() {
   const totalCommentsFromMetrics = pickNumber(metrics.comments, ["total", "count"]) ?? (typeof metrics.comments === 'number' ? metrics.comments : 0);
   const totalOrdersFromMetrics = pickNumber(metrics.orders, ["total", "count"]) ?? (typeof metrics.orders === 'number' ? metrics.orders : 0);
   const totalRevenueFromMetrics = pickNumber(metrics.revenue, ["total", "value"]) ?? (typeof metrics.revenue === 'number' ? metrics.revenue : 0);
+  const customersData = asRecord(metrics.customers);
+  const newCustomersData = asRecord(customersData.new);
+  const newCustomersCount = pickNumber(newCustomersData, ["current"]) ?? 0;
+  const totalCustomersCount = pickNumber(customersData, ["total"]) ?? 0;
 
   const revenueSummary = getSummary(revenueChartData, 'value', totalRevenueFromMetrics);
   const ordersSummary = getSummary(ordersChartData, 'value');
@@ -280,9 +284,9 @@ export function DashboardScreen() {
   }, [period, dateRange, session.user, setHeader, resetHeader]);
 
   return (
-    <div className="space-y-6 pb-28 lg:pb-6 pt-2">
+    <div className="space-y-4 pb-28 lg:pb-6 pt-0">
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-3.5 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard
           label="Doanh thu ước tính"
           value={formatVNCurrency(revenueSummary.total)}
@@ -307,29 +311,29 @@ export function DashboardScreen() {
           iconColor="text-purple-600"
         />
         <StatCard
-          label="Khách hàng"
-          value={pickNumber(metrics.customers, ["total", "count"]) || 0}
-          extra={pickNumber(metrics.customers, ["newCount", "newCustomers"]) ? `+${pickNumber(metrics.customers, ["newCount", "newCustomers"])} mới` : null}
+          label="Khách hàng mới"
+          value={newCustomersCount}
+          extra={totalCustomersCount ? `Tổng khách hàng: ${totalCustomersCount}` : null}
           icon={<UsersIcon className="w-4 h-4" />}
           iconBg="bg-rose-50"
           iconColor="text-rose-600"
         />
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-2 items-stretch">
+      <div className="grid gap-3.5 lg:grid-cols-2 items-stretch">
         {/* Cột trái: Biểu đồ Doanh thu */}
         <Panel
           title="Báo cáo Doanh thu"
           action={<span className="text-[var(--muted)] text-xs font-medium flex items-center gap-1"><CalendarIcon className="w-3 h-3" /> {periods.find(p => p.id === period)?.label}</span>}
           className="flex flex-col h-full"
         >
-          <div className="flex-1 min-h-[400px] w-full mt-4">
+          <div className="flex-1 min-h-[400px] w-full mt-3">
             {seriesStatus === "pending" ? (
               <div className="h-full w-full flex items-center justify-center">
                 <LoadingState />
               </div>
             ) : (
-              <div className="h-[400px] w-full mt-4">
+              <div className="h-[400px] w-full">
                 <ResponsiveContainer width="100%" height="100%">
                   <AreaChart
                     data={revenueChartData}
@@ -383,7 +387,7 @@ export function DashboardScreen() {
               </div>
             )}
           </div>
-          <div className="mt-6 pt-4 border-t border-[var(--border)] grid grid-cols-3 gap-4">
+          <div className="mt-4 pt-3 border-t border-[var(--border)] grid grid-cols-3 gap-4">
             <div className="flex flex-col">
               <span className="text-[11px] font-medium text-[var(--muted)] uppercase tracking-wider mb-1">Tổng doanh thu</span>
               <span className="text-base font-bold text-[#10B981]">{formatNumber(revenueSummary.total)}đ</span>
@@ -398,10 +402,10 @@ export function DashboardScreen() {
             </div>
           </div>
         </Panel>
-        <div className="flex flex-col gap-4">
+        <div className="flex flex-col gap-3.5">
           {/* Biểu đồ Đơn hàng */}
           <Panel title="Theo dõi Đơn hàng" className="flex-1">
-            <div className="h-[200px] w-full mt-4">
+            <div className="h-[200px] w-full mt-3">
               <ResponsiveContainer width="100%" height="100%">
                 <AreaChart data={ordersChartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
                   <defs>
@@ -450,7 +454,7 @@ export function DashboardScreen() {
                 </AreaChart>
               </ResponsiveContainer>
             </div>
-            <div className="mt-3 flex gap-6 text-sm border-t border-[var(--border)] pt-3 px-2">
+            <div className="mt-2.5 flex gap-5 text-sm border-t border-[var(--border)] pt-2.5 px-2">
               <div>
                 <span className="text-[10px] text-[var(--muted)] block uppercase font-medium tracking-wider">Tổng đơn</span>
                 <span className="text-base font-bold text-[var(--primary)]">{ordersSummary.total}</span>
@@ -464,7 +468,7 @@ export function DashboardScreen() {
 
           {/* Biểu đồ Bình luận */}
           <Panel title="Tương tác Bình luận" className="flex-1">
-            <div className="h-[200px] w-full mt-4">
+            <div className="h-[200px] w-full mt-3">
               <ResponsiveContainer width="100%" height="100%">
                 <AreaChart data={commentsChartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
                   <defs>
@@ -513,7 +517,7 @@ export function DashboardScreen() {
                 </AreaChart>
               </ResponsiveContainer>
             </div>
-            <div className="mt-3 flex gap-6 text-sm border-t border-[var(--border)] pt-3 px-2">
+            <div className="mt-2.5 flex gap-5 text-sm border-t border-[var(--border)] pt-2.5 px-2">
               <div>
                 <span className="text-[10px] text-[var(--muted)] block uppercase font-medium tracking-wider">Tổng CMT</span>
                 <span className="text-base font-bold text-[#8B5CF6]">{commentsSummary.total}</span>
@@ -529,7 +533,7 @@ export function DashboardScreen() {
         </div>
       </div>
 
-      <div className="grid gap-4">
+      <div className="grid gap-3.5">
         <Panel
           title="Đơn hàng gần đây"
           action={<button className="text-[var(--muted)] text-xs font-medium hover:text-[var(--primary)] transition-colors flex items-center gap-1">Xem tất cả <TrendingUpIcon className="w-3 h-3 rotate-90" /></button>}
@@ -538,36 +542,36 @@ export function DashboardScreen() {
           {state.status === "loading" ? <LoadingState /> : null}
           {state.status === "error" ? <ErrorState message={state.error} /> : null}
 
-          <div className="-mx-5 -mb-5 mt-2 overflow-x-auto">
+          <div className="-mx-5 -mb-5 mt-1.5 overflow-x-auto">
             <table className="w-full text-left text-xs whitespace-nowrap">
               <thead className="text-[var(--muted)] bg-[var(--surface-muted)]">
                 <tr>
-                  <th className="px-4 py-3 font-medium uppercase tracking-wider text-[11px]">Mã đơn</th>
-                  <th className="px-4 py-3 font-medium uppercase tracking-wider text-[11px]">Khách hàng</th>
-                  <th className="px-4 py-3 font-medium uppercase tracking-wider text-[11px]">Đơn giá</th>
-                  <th className="px-4 py-3 font-medium uppercase tracking-wider text-center text-[11px]">Số lượng</th>
-                  <th className="px-4 py-3 font-medium uppercase tracking-wider text-[11px]">Tổng tiền</th>
+                  <th className="px-4 py-2.5 font-medium uppercase tracking-wider text-[11px]">Mã đơn</th>
+                  <th className="px-4 py-2.5 font-medium uppercase tracking-wider text-[11px]">Khách hàng</th>
+                  <th className="px-4 py-2.5 font-medium uppercase tracking-wider text-[11px]">Đơn giá</th>
+                  <th className="px-4 py-2.5 font-medium uppercase tracking-wider text-center text-[11px]">Số lượng</th>
+                  <th className="px-4 py-2.5 font-medium uppercase tracking-wider text-[11px]">Tổng tiền</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[var(--border)]">
                 {recentOrders.map((order, index) => (
                   <tr key={`${pickString(order, ["id", "_id", "orderCode"]) || index}`} className="transition-colors hover:bg-[var(--hover)] group">
-                    <td className="px-4 py-3 font-medium text-[var(--foreground-soft)] text-xs">#{pickString(order, ["orderCode", "code"])?.slice(-8) || "ORD-0000"}</td>
-                    <td className="px-5 py-4">
-                      <div className="flex items-center gap-2.5">
-                        <div className="h-7 w-7 rounded-full bg-[var(--primary-soft)] flex items-center justify-center">
-                          <UsersIcon className="w-3.5 h-3.5 text-[var(--primary)]" />
+                    <td className="px-4 py-2.5 font-medium text-[var(--foreground-soft)] text-xs">#{pickString(order, ["orderCode", "code"])?.slice(-8) || "ORD-0000"}</td>
+                    <td className="px-4 py-2.5">
+                      <div className="flex items-center gap-2">
+                        <div className="h-6 w-6 rounded-full bg-[var(--primary-soft)] flex items-center justify-center">
+                          <UsersIcon className="w-3 h-3 text-[var(--primary)]" />
                         </div>
                         <span className="font-medium text-[var(--foreground)] text-xs">{pickString(order, ["igName", "customerName"]) || "Khách hàng"}</span>
                       </div>
                     </td>
-                    <td className="px-4 py-3 text-[var(--foreground-soft)] font-medium text-xs">{formatNumber(pickNumber(order, ["price"]) || 0)}đ</td>
-                    <td className="px-5 py-4 text-center">
+                    <td className="px-4 py-2.5 text-[var(--foreground-soft)] font-medium text-xs">{formatNumber(pickNumber(order, ["price"]) || 0)}đ</td>
+                    <td className="px-4 py-2.5 text-center">
                       <span className="inline-block px-2 py-0.5 bg-[var(--surface-muted)] text-[var(--foreground-soft)] font-medium rounded text-[11px]">
                         {pickNumber(order, ["quantity", "count"]) || 1}
                       </span>
                     </td>
-                    <td className="px-4 py-3 font-semibold text-[var(--primary)] text-xs">{formatNumber(pickNumber(order, ["totalPrice", "amount"]) || 0)}đ</td>
+                    <td className="px-4 py-2.5 font-semibold text-[var(--primary)] text-xs">{formatNumber(pickNumber(order, ["totalPrice", "amount"]) || 0)}đ</td>
                   </tr>
                 ))}
               </tbody>
