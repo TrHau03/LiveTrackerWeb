@@ -21,6 +21,7 @@ import {
   requestInstagramAuthUrl,
   type InstagramConnectionStatus,
 } from "@/lib/instagram-oauth";
+import { proxyRequest, extractCollection } from "@/lib/proxy-client";
 import type { SessionSettings } from "@/lib/workspace-session";
 
 type UseInstagramOAuthOptions = {
@@ -121,6 +122,26 @@ export function useInstagramOAuth({
     try {
       const result = await fetchInstagramConnectionStatus(session);
       applyAuthResponses([result.response], patchSession, logout);
+
+      try {
+        const shopsResult = await proxyRequest<any>(session, {
+          path: "/users/me/shops",
+          method: "GET",
+        });
+        if (shopsResult.ok) {
+          const shopsList = extractCollection(shopsResult.data);
+          if (session.user) {
+            patchSession({
+              user: {
+                ...session.user,
+                shops: shopsList as any,
+              },
+            });
+          }
+        }
+      } catch (shopError) {
+        console.error("Failed to reload user shops:", shopError);
+      }
 
       if (!isMountedRef.current) {
         return result.status;

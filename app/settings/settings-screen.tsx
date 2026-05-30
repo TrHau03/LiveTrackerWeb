@@ -193,14 +193,14 @@ function InstagramConnectPanel() {
     startInstagramAuth,
     refreshConnectionStatus,
     connectionState,
-    connectionStatus,
     isLoading,
     error,
     notice,
     clearFeedback,
   } = useInstagramOAuth({ session, patchSession, logout });
 
-  const isConnected = Boolean(connectionStatus?.isConnected);
+  const shops = session.user?.shops ?? [];
+  const isConnected = shops.length > 0;
 
   async function handleRefresh() {
     clearFeedback();
@@ -210,43 +210,43 @@ function InstagramConnectPanel() {
   return (
     <Panel title="Instagram">
       <div className="space-y-4">
-        {/* Header gradient Instagram */}
-        <div className="relative overflow-hidden rounded-xl p-4"
-          style={{
-            background: "linear-gradient(135deg, #f09433 0%, #e6683c 25%, #dc2743 50%, #cc2366 75%, #bc1888 100%)",
-          }}
-        >
-          <div className="absolute inset-0 opacity-20"
-            style={{ background: "radial-gradient(circle at 70% 30%, #fff 0%, transparent 60%)" }}
-          />
-          <div className="relative flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-white/20 backdrop-blur-sm">
-              <InstagramIcon className="h-5 w-5" color="white" />
+        {/* Danh sách các shop đã kết nối */}
+        {isConnected ? (
+          <div className="space-y-2.5">
+            <p className="text-[11px] font-semibold text-[var(--foreground-soft)] uppercase tracking-wider">
+              Cửa hàng đã kết nối ({shops.length})
+            </p>
+            <div className="grid gap-2">
+              {shops.map((shop) => (
+                <div 
+                  key={shop.id} 
+                  className="flex items-center gap-3 rounded-xl border border-[var(--border)] bg-[var(--surface-muted)] p-3 shadow-sm"
+                >
+                  <div className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-tr from-pink-500 to-yellow-500 text-sm font-bold text-white shadow-sm shrink-0">
+                    {shop.avatar ? (
+                      <img src={shop.avatar} alt={shop.name} className="h-full w-full rounded-full object-cover" />
+                    ) : (
+                      shop.name[0]?.toUpperCase() || "S"
+                    )}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-[var(--foreground)] truncate">{shop.name}</p>
+                    <p className="text-[11px] text-[var(--muted)] truncate">ID: {shop.id}</p>
+                  </div>
+                  <span className="inline-flex items-center gap-1 rounded-full bg-pink-500/10 px-2 py-0.5 text-[10px] font-medium text-pink-600 dark:text-pink-400">
+                    <InstagramIcon className="h-3 w-3" color="currentColor" />
+                    Instagram
+                  </span>
+                </div>
+              ))}
             </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-semibold text-white">Instagram Business</p>
-              <p className="text-xs text-white/80 mt-0.5">
-                {connectionState === "loading" && !connectionStatus
-                  ? "Đang kiểm tra..."
-                  : isConnected
-                    ? `Đã kết nối${connectionStatus?.username ? ` · @${connectionStatus.username}` : ""}`
-                    : "Chưa kết nối"}
-              </p>
-            </div>
-            {/* Status badge */}
-            <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider ${
-              isConnected
-                ? "bg-green-500/30 text-green-100"
-                : "bg-white/20 text-white/80"
-            }`}>
-              {isConnected
-                ? <CheckCircle className="h-3 w-3" />
-                : <AlertCircle className="h-3 w-3" />
-              }
-              {isConnected ? "Connected" : "Not connected"}
-            </span>
           </div>
-        </div>
+        ) : (
+          <div className="rounded-xl border border-dashed border-[var(--border)] p-4 text-center">
+            <InstagramIcon className="mx-auto h-8 w-8 text-[var(--muted)] opacity-50" />
+            <p className="mt-2 text-xs text-[var(--foreground-soft)]">Chưa có tài khoản Instagram nào được kết nối.</p>
+          </div>
+        )}
 
         {/* Feedback */}
         {notice && (
@@ -261,7 +261,7 @@ function InstagramConnectPanel() {
         )}
 
         {/* Actions */}
-        <div className="flex flex-col sm:flex-row gap-2">
+        <div className="flex gap-2">
           <button
             id="instagram-auth-btn"
             type="button"
@@ -270,14 +270,14 @@ function InstagramConnectPanel() {
             className="flex-1 inline-flex h-9 items-center justify-center gap-2 rounded-lg px-4 text-sm font-semibold text-white transition-all hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-60"
             style={{
               background: "linear-gradient(135deg, #f09433 0%, #e6683c 25%, #dc2743 50%, #cc2366 75%, #bc1888 100%)",
-              boxShadow: "0 4px 15px rgba(220,39,67,0.3)",
+              boxShadow: "0 4px 12px rgba(220,39,67,0.2)",
             }}
           >
             <InstagramIcon className="h-4 w-4" color="white" />
             {isLoading
               ? "Đang xác thực..."
               : isConnected
-                ? "Kết nối lại Instagram"
+                ? "Kết nối thêm tài khoản"
                 : "Kết nối Instagram"}
           </button>
           <button
@@ -295,7 +295,6 @@ function InstagramConnectPanel() {
 
         <p className="text-[11px] text-[var(--muted)] leading-5">
           Kết nối tài khoản Instagram Business để nhận comment, tin nhắn và quản lý livestream.
-          Sẽ mở cửa sổ mới để xác thực với Meta.
         </p>
       </div>
     </Panel>
