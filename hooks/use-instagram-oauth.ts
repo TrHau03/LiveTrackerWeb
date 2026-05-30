@@ -338,34 +338,22 @@ export function useInstagramOAuth({
       setNotice("Opening Instagram authentication...");
     });
 
-    let authUrl = "";
-    let state = "";
-
-    try {
-      const result = await requestInstagramAuthUrl(session, {
-        clientOrigin: window.location.origin,
-      });
-      applyAuthResponses([result.response], patchSession, logout);
-      authUrl = result.authUrl;
-      state = result.state;
-    } catch (requestError) {
-      console.warn("Backend auth start failed, falling back to local URL generation:", requestError);
-      const config = getInstagramOAuthConfig();
-      state = JSON.stringify({
-        source: "web",
-        nonce: typeof window !== "undefined" && window.crypto?.randomUUID 
-          ? window.crypto.randomUUID() 
-          : `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`,
-      });
-      
-      const localUrl = new URL(config.authUrl);
-      localUrl.searchParams.set("client_id", config.clientId);
-      localUrl.searchParams.set("redirect_uri", config.redirectUri);
-      localUrl.searchParams.set("response_type", config.responseType);
-      localUrl.searchParams.set("scope", config.scopes.join(","));
-      localUrl.searchParams.set("state", state);
-      authUrl = localUrl.toString();
-    }
+    // Luôn luôn tự sinh Auth URL ở client để đảm bảo redirect_uri khớp 100% với Web app cấu hình trong Meta Console
+    const config = getInstagramOAuthConfig();
+    const state = JSON.stringify({
+      source: "web",
+      nonce: typeof window !== "undefined" && window.crypto?.randomUUID 
+        ? window.crypto.randomUUID() 
+        : `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`,
+    });
+    
+    const localUrl = new URL(config.authUrl);
+    localUrl.searchParams.set("client_id", config.clientId);
+    localUrl.searchParams.set("redirect_uri", config.redirectUri);
+    localUrl.searchParams.set("response_type", config.responseType);
+    localUrl.searchParams.set("scope", config.scopes.join(","));
+    localUrl.searchParams.set("state", state);
+    const authUrl = localUrl.toString();
 
     if (finishedRef.current || popupRef.current !== popup) {
       return;
