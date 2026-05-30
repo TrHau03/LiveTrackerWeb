@@ -315,6 +315,16 @@ export function exchangeTokenWithBackend(
   });
 }
 
+export function deleteShopFromBackend(
+  session: SessionSettings,
+  shopId: string,
+) {
+  return proxyRequest(session, {
+    path: `/users/me/shops/${shopId}`,
+    method: "DELETE",
+  });
+}
+
 function buildInstagramLoginUrl(
   config: InstagramOAuthConfig,
   state: string,
