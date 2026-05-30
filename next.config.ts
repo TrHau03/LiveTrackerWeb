@@ -1,8 +1,8 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  // Server mode (route handlers enabled — needed for Instagram OAuth code exchange)
-  output: "standalone",
+  // Static export mode (output: 'out' directory for Cloudflare Pages static hosting)
+  output: "export",
 };
 
 export default nextConfig;

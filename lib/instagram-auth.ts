@@ -213,34 +213,51 @@ export async function exchangeInstagramCode(
   accessToken: string;
   userId: string;
 }> {
-  const response = await fetch("/api/instagram/exchange-code", {
+  const clientId = INSTAGRAM_APP_ID;
+  const clientSecret = process.env.NEXT_PUBLIC_INSTAGRAM_CLIENT_SECRET;
+
+  if (!clientSecret) {
+    throw new Error("Cấu hình thiếu NEXT_PUBLIC_INSTAGRAM_CLIENT_SECRET.");
+  }
+
+  const formData = new URLSearchParams({
+    client_id: clientId,
+    client_secret: clientSecret,
+    grant_type: "authorization_code",
+    redirect_uri: redirectUri,
+    code,
+  });
+
+  const response = await fetch("https://api.instagram.com/oauth/access_token", {
     method: "POST",
     headers: {
-      "content-type": "application/json",
+      "content-type": "application/x-www-form-urlencoded",
     },
-    body: JSON.stringify({
-      code,
-      redirectUri,
-    }),
+    body: formData.toString(),
     cache: "no-store",
   });
 
-  const payload = (await response.json()) as {
-    success?: boolean;
-    message?: string;
-    data?: {
-      accessToken?: string;
-      userId?: string;
-    };
-  };
+  const payload = (await response.json()) as Record<string, unknown>;
 
-  if (!response.ok || !payload.data?.accessToken) {
-    throw new Error(payload.message || "Không thể đổi code lấy short-lived token.");
+  if (!response.ok) {
+    const errorMsg =
+      (payload.error_message as string) ||
+      (payload.error_description as string) ||
+      (payload.message as string) ||
+      "Không thể đổi code lấy short-lived token.";
+    throw new Error(errorMsg);
+  }
+
+  const accessToken = payload.access_token as string;
+  const userId = String(payload.user_id ?? "");
+
+  if (!accessToken) {
+    throw new Error("Instagram không trả về access_token.");
   }
 
   return {
-    accessToken: payload.data.accessToken,
-    userId: payload.data.userId ?? "",
+    accessToken,
+    userId,
   };
 }
 
