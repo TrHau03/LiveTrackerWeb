@@ -288,3 +288,81 @@ export type ExportOrdersQuery = {
   endDate: string;
   shopId?: string;
 };
+
+// ─── Messenger ───────────────────────────────────────────────────────────────
+
+export type Conversation = {
+  _id: string;
+  igConversationId: string;
+  shopId: string;
+  participantIgId: string;
+  participantIgName: string;
+  participantAvatar?: string;
+  lastMessageText?: string;
+  lastMessageAt?: string;
+  lastCustomerMessageAt?: string;
+  lastMessageFromShop: boolean;
+  unreadCount: number;
+  isActive: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
+export type TemplateButton = {
+  type: string;
+  title: string;
+  url?: string;
+  payload?: string;
+};
+
+export type TemplateData = {
+  title: string;
+  subtitle: string;
+  buttons: TemplateButton[];
+};
+
+export type MessageStatus = "sending" | "sent" | "delivered" | "failed";
+
+export type MessageType =
+  | "text"
+  | "image"
+  | "video"
+  | "audio"
+  | "story_mention"
+  | "story_reply"
+  | "attachment"
+  | "template";
+
+export type Message = {
+  _id: string;
+  igMessageId: string;
+  conversationId: string;
+  senderId: string;
+  text?: string;
+  sentAt: string;
+  status: MessageStatus;
+  fromShop: boolean;
+  messageType: MessageType;
+  attachmentUrls?: string[];
+  templateData?: TemplateData;
+};
+
+export type ConversationListParams = {
+  page?: number;
+  limit?: number;
+  search?: string;
+};
+
+export type MessageListParams = {
+  cursor?: string;
+  limit?: number;
+};
+
+export type WindowStatus = "open" | "human_agent" | "closed";
+
+export type MessengerSSEEventType =
+  | "connected"
+  | "ping"
+  | "new_message"
+  | "message_status_updated"
+  | "conversation_updated";

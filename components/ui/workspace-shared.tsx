@@ -35,21 +35,28 @@ export function Panel({
   action,
   className = "",
 }: {
-  title: string;
+  title?: string;
   children: React.ReactNode;
   action?: React.ReactNode;
   className?: string;
 }) {
+  const hasHeader = !!(title || action);
   return (
     <section className={`rounded-lg border border-[var(--border)] bg-[var(--surface)] shadow-[var(--shadow-soft)] ${className}`}>
-      <div className="border-b border-[var(--border)] px-5 py-3.5">
-        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-          <h2 className="text-sm font-semibold text-[var(--foreground)]">
-            {title}
-          </h2>
-          {action}
+      {hasHeader && (
+        <div className="border-b border-[var(--border)] px-5 py-3.5">
+          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+            {title && (
+              <h2 className="text-sm font-semibold text-[var(--foreground)]">
+                {title}
+              </h2>
+            )}
+            <div className={!title ? "w-full md:w-auto flex justify-start" : ""}>
+              {action}
+            </div>
+          </div>
         </div>
-      </div>
+      )}
       <div className="p-5">{children}</div>
     </section>
   );

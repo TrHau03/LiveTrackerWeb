@@ -17,6 +17,7 @@ export async function fetchMyOrders(
     liveId?: string;
     sortBy?: string;
     sortOrder?: "asc" | "desc";
+    customerId?: string;
   },
 ) {
   return proxyRequest(session, {
@@ -28,6 +29,7 @@ export async function fetchMyOrders(
       fromDate: query?.fromDate || query?.startDate || undefined,
       toDate: query?.toDate || query?.endDate || undefined,
       liveId: query?.liveId || undefined,
+      customerId: query?.customerId || undefined,
       sortBy: query?.sortBy ?? "createdAt",
       sortOrder: query?.sortOrder ?? "desc",
     },

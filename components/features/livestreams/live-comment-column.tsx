@@ -347,11 +347,13 @@ function Toast({ message, type = "success" }: { message: string; type?: "success
 export function LiveCommentColumn({
   liveId,
   onLiveStatsUpdate,
-  onFilterCustomer
+  onFilterCustomer,
+  onStartQuickChat
 }: {
   liveId: string;
   onLiveStatsUpdate?: (stats: LiveStats) => void;
   onFilterCustomer?: (query: string) => void;
+  onStartQuickChat?: (username: string) => void;
 }) {
   const { session, patchSession, logout } = useSession();
   const queryClient = useQueryClient();
@@ -1034,6 +1036,42 @@ export function LiveCommentColumn({
                   </button>
                 </>
               )}
+
+              {/* Nút Chat nhanh luôn hiển thị ở bên phải */}
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onStartQuickChat?.(pickString(comment, ["igUsername", "username"]) || "");
+                }}
+                style={{
+                  width: "28px",
+                  height: "28px",
+                  borderRadius: "50%",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  backgroundColor: "rgba(225, 48, 108, 0.10)",
+                  border: "none",
+                  cursor: "pointer",
+                  transition: "all 150ms",
+                }}
+                className="quick-chat-btn hover:bg-[rgba(225,48,108,0.20)] hover:scale-105 transition active:scale-95 shrink-0"
+                title="Trò chuyện nhanh"
+              >
+                <svg viewBox="0 0 24 24" width="15" height="15">
+                  <defs>
+                    <linearGradient id="instagram-gradient" x1="0%" y1="100%" x2="100%" y2="0%">
+                      <stop offset="0%" stopColor="#fdf497" />
+                      <stop offset="5%" stopColor="#fdf497" />
+                      <stop offset="45%" stopColor="#fd5949" />
+                      <stop offset="60%" stopColor="#d6249f" />
+                      <stop offset="90%" stopColor="#285AEB" />
+                    </linearGradient>
+                  </defs>
+                  <path d="M12 2C6.48 2 2 6.14 2 11.25c0 2.91 1.45 5.51 3.73 7.18.19.14.3.36.28.6l-.16 2.1c-.05.67.62 1.15 1.21.83l2.36-1.28c.17-.09.38-.1.56-.03 1.27.48 2.65.75 4.02.75 5.52 0 10-4.14 10-9.25S17.52 2 12 2zm1.25 12.02l-2.43-2.59-4.75 2.59 5.21-5.54 2.46 2.59 4.72-2.59-5.21 5.54z" fill="url(#instagram-gradient)"/>
+                </svg>
+              </button>
             </div>
           </div>
         </div>

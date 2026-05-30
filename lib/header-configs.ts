@@ -73,6 +73,14 @@ export const headerConfigs: Record<string, HeaderConfig> = {
             },
         ],
     },
+    "/messenger": {
+        path: "/messenger",
+        title: "Tin Nhắn",
+        subtitle: "Messenger Instagram",
+        showDateRange: false,
+        showThemeToggle: true,
+        actions: [],
+    },
     "/settings": {
         path: "/settings",
         title: "Cài Đặt",
