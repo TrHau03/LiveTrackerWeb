@@ -39,46 +39,59 @@ export function useLocalBridge() {
     }
 
     _activeCheckPromise = (async () => {
-      try {
-        // Timeout 3 giây (đủ cho PNA preflight + actual request khi kết nối HTTPS → localhost)
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 3000);
+      // Cơ chế retry tối đa 3 lần cho mỗi lần kiểm tra nếu gặp lỗi tạm thời (transient)
+      // Giải quyết triệt để vấn đề CORS preflight hoặc DNS resolution bị chậm trong vài giây đầu load trang
+      const maxRetries = 3;
+      const retryDelayMs = 1000; // 1 giây giữa các lần thử lại
 
-        const response = await fetch("http://127.0.0.1:13579/status", {
-          signal: controller.signal,
-          mode: "cors", // Bắt buộc để trigger CORS preflight + PNA đúng chuẩn
-        } as RequestInit);
-        clearTimeout(timeoutId);
+      for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        try {
+          const controller = new AbortController();
+          // Lần thử đầu tiên cho timeout 3s, các lần thử sau cho timeout 1.5s để fail nhanh hơn
+          const timeoutMs = attempt === 1 ? 3000 : 1500;
+          const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
-        if (response.ok) {
-          const json = await response.json();
-          if (json.success && json.data) {
-            const status = json.data as BridgeStatus;
-            _cachedConnected = true;
-            _cachedStatus = status;
-            setBridgeStatus(status);
-            setIsConnected(true);
-            return true;
+          const response = await fetch("http://127.0.0.1:13579/status", {
+            signal: controller.signal,
+            mode: "cors", // Bắt buộc để trigger CORS preflight + PNA đúng chuẩn
+          } as RequestInit);
+          clearTimeout(timeoutId);
+
+          if (response.ok) {
+            const json = await response.json();
+            if (json.success && json.data) {
+              const status = json.data as BridgeStatus;
+              _cachedConnected = true;
+              _cachedStatus = status;
+              setBridgeStatus(status);
+              setIsConnected(true);
+              return true;
+            }
           }
+        } catch (e) {
+          console.warn(`[LocalBridge] Lần thử kết nối thứ ${attempt}/${maxRetries} thất bại:`, e);
         }
-        _cachedConnected = false;
-        _cachedStatus = null;
-        setIsConnected(false);
-        setBridgeStatus(null);
-        return false;
-      } catch (e) {
-        _cachedConnected = false;
-        _cachedStatus = null;
-        setIsConnected(false);
-        setBridgeStatus(null);
-        return false;
-      } finally {
-        _activeCheckPromise = null;
-        setIsChecking(false);
+
+        // Nếu chưa đạt số lần thử tối đa, chờ rồi thử lại
+        if (attempt < maxRetries) {
+          await new Promise((resolve) => setTimeout(resolve, retryDelayMs));
+        }
       }
+
+      // Chỉ chuyển sang trạng thái Offline/Disconnected sau khi TẤT CẢ các lần thử đều thất bại
+      _cachedConnected = false;
+      _cachedStatus = null;
+      setIsConnected(false);
+      setBridgeStatus(null);
+      return false;
     })();
 
-    return _activeCheckPromise;
+    try {
+      return await _activeCheckPromise;
+    } finally {
+      _activeCheckPromise = null;
+      setIsChecking(false);
+    }
   }, []);
 
   // Tự động kiểm tra định kỳ mỗi 5 giây
