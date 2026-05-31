@@ -12,7 +12,7 @@ import { appNavigation } from "@/lib/site";
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const isViewportLocked = pathname === "/livestreams" || pathname === "/customers" || pathname === "/messenger";
+  const isViewportLocked = pathname === "/livestreams" || pathname === "/customers" || pathname === "/messenger" || pathname === "/settings";
   const { authStatus, isAuthenticated, logout, session } = useSession();
   const { theme, toggleTheme } = useTheme();
   const [isCollapsed, setIsCollapsed] = React.useState(false);
@@ -222,7 +222,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                     : pathname === "/"
                       ? "px-2 sm:px-3 pt-2 pb-24 lg:pb-8"
                       : pathname === "/settings"
-                        ? "px-2 sm:px-3 pt-2 pb-24 lg:pb-8"
+                        ? "px-2 sm:px-3 pt-2 pb-0 flex flex-col overflow-hidden"
                         : isViewportLocked
                           ? "px-4 sm:px-6 lg:px-8 pt-6 pb-0 flex flex-col overflow-hidden"
                           : "px-4 sm:px-6 lg:px-8 pt-6 pb-24 lg:pb-8"
