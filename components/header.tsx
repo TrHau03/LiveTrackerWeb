@@ -2,49 +2,10 @@
 
 import React from "react";
 import { usePathname } from "next/navigation";
-import Link from "next/link";
 import { useConfigHeader } from "@/hooks/use-config-header";
 import { useHeaderStore } from "@/lib/store/header-store";
 
-// Breadcrumb mapping for pathname segments
-const breadcrumbLabels: Record<string, string> = {
-  "": "Dashboard",
-  "livestreams": "Phiên Live",
-  "orders": "Đơn hàng",
-  "customers": "Khách hàng",
-  "settings": "Cài đặt",
-};
 
-function Breadcrumb() {
-  const pathname = usePathname();
-  const segments = pathname.split("/").filter(Boolean);
-
-  return (
-    <nav className="flex items-center gap-1.5 text-sm">
-      <Link href="/" className="font-semibold text-[var(--foreground)] hover:text-[var(--primary)] transition-colors">
-        Dashboard
-      </Link>
-      {segments.map((segment, index) => {
-        const href = "/" + segments.slice(0, index + 1).join("/");
-        const label = breadcrumbLabels[segment] || segment;
-        const isLast = index === segments.length - 1;
-
-        return (
-          <React.Fragment key={href}>
-            <span className="text-[var(--muted)]">/</span>
-            {isLast ? (
-              <span className="font-medium text-[var(--muted)]">{label}</span>
-            ) : (
-              <Link href={href} className="font-medium text-[var(--foreground)] hover:text-[var(--primary)] transition-colors">
-                {label}
-              </Link>
-            )}
-          </React.Fragment>
-        );
-      })}
-    </nav>
-  );
-}
 
 export function Header() {
   const config = useConfigHeader();
@@ -69,12 +30,7 @@ export function Header() {
         isCompactPadding ? "px-2 sm:px-3" : "px-4 sm:px-6 lg:px-8"
       } py-3 border-b border-[var(--header-border)] bg-[var(--header-bg)] sticky top-0 z-30 transition-colors duration-200`}
     >
-      <div className="flex flex-col gap-2 max-w-[1400px] mx-auto">
-        {/* Breadcrumb Row */}
-        <div className="hidden lg:flex items-center gap-3">
-          {/* Hamburger for mobile (hidden on lg) */}
-          <Breadcrumb />
-        </div>
+      <div className="flex flex-col gap-2 w-full">
 
         {/* Main Row: Title & Controls */}
         <div className="flex items-center justify-between gap-4">

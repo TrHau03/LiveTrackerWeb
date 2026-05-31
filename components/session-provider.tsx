@@ -9,6 +9,9 @@ import {
   useState,
 } from "react";
 
+import { useQueryClient } from "@tanstack/react-query";
+import { useSettingsStore } from "@/stores/settings-store";
+
 import {
   DEFAULT_SESSION,
   parseStoredSession,
@@ -39,7 +42,9 @@ type SessionContextValue = {
   loginError: string;
   session: SessionSettings;
   login: (payload: LoginPayload) => Promise<boolean>;
-  register: (payload: RegisterPayload) => Promise<{ success: boolean; message: string }>;
+  register: (payload: RegisterPayload) => Promise<{ success: boolean; message: string; requireOtp?: boolean }>;
+  verifyOtp: (email: string, otp: string) => Promise<{ success: boolean; message: string }>;
+  resendOtp: (email: string) => Promise<{ success: boolean; message: string }>;
   logout: () => Promise<void>;
   patchSession: (patch: Partial<SessionSettings>) => void;
   refreshUser: () => Promise<void>;
@@ -48,6 +53,7 @@ type SessionContextValue = {
 const SessionContext = createContext<SessionContextValue | null>(null);
 
 export function SessionProvider({ children }: { children: React.ReactNode }) {
+  const queryClient = useQueryClient();
   const [session, setSession] = useState<SessionSettings>(DEFAULT_SESSION);
   const [isReady, setIsReady] = useState(false);
   const [isLoggingIn, setIsLoggingIn] = useState(false);
@@ -212,21 +218,21 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       register: async (payload) => {
         try {
           const baseUrl = process.env.NEXT_PUBLIC_API_URL || "https://admin.livetracker.vn/api/v1";
+          // eslint-disable-next-line @typescript-eslint/no-unused-vars
+          const { role, ...registerData } = payload;
           const response = await fetch(`${baseUrl}/auth/register`, {
             method: "POST",
             headers: {
               "content-type": "application/json",
             },
-            body: JSON.stringify({
-              ...payload,
-              role: payload.role || ["User"],
-            }),
+            body: JSON.stringify(registerData),
             cache: "no-store",
           });
 
           const data = (await response.json()) as {
             success: boolean;
             message?: string;
+            requireOtp?: boolean;
           };
 
           if (!response.ok || !data.success) {
@@ -239,6 +245,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
           return {
             success: true,
             message: data.message || "Đăng ký tài khoản thành công.",
+            requireOtp: data.requireOtp,
           };
         } catch (error) {
           return {
@@ -247,8 +254,84 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
           };
         }
       },
+      verifyOtp: async (email, otp) => {
+        try {
+          const baseUrl = process.env.NEXT_PUBLIC_API_URL || "https://admin.livetracker.vn/api/v1";
+          const response = await fetch(`${baseUrl}/auth/verify-otp`, {
+            method: "POST",
+            headers: {
+              "content-type": "application/json",
+            },
+            body: JSON.stringify({ email, otp }),
+            cache: "no-store",
+          });
+
+          const data = (await response.json()) as {
+            success: boolean;
+            message?: string;
+          };
+
+          if (!response.ok || !data.success) {
+            return {
+              success: false,
+              message: data.message || "Xác thực OTP thất bại.",
+            };
+          }
+
+          return {
+            success: true,
+            message: data.message || "Xác thực tài khoản thành công.",
+          };
+        } catch (error) {
+          return {
+            success: false,
+            message: error instanceof Error ? error.message : "Xác thực OTP thất bại.",
+          };
+        }
+      },
+      resendOtp: async (email) => {
+        try {
+          const baseUrl = process.env.NEXT_PUBLIC_API_URL || "https://admin.livetracker.vn/api/v1";
+          const response = await fetch(`${baseUrl}/auth/resend-otp`, {
+            method: "POST",
+            headers: {
+              "content-type": "application/json",
+            },
+            body: JSON.stringify({ email }),
+            cache: "no-store",
+          });
+
+          const data = (await response.json()) as {
+            success: boolean;
+            message?: string;
+          };
+
+          if (!response.ok || !data.success) {
+            return {
+              success: false,
+              message: data.message || "Gửi lại OTP thất bại.",
+            };
+          }
+
+          return {
+            success: true,
+            message: data.message || "Mã OTP mới đã được gửi vào email của bạn.",
+          };
+        } catch (error) {
+          return {
+            success: false,
+            message: error instanceof Error ? error.message : "Gửi lại OTP thất bại.",
+          };
+        }
+      },
       logout: async () => {
         const refreshToken = session.refreshToken;
+
+        // Reset active live ID in settings store to prevent loading old live session
+        useSettingsStore.getState().setActiveLiveId(null);
+
+        // Clear all react-query cache to prevent old account data leakage
+        queryClient.clear();
 
         startTransition(() => {
           setSession(DEFAULT_SESSION);

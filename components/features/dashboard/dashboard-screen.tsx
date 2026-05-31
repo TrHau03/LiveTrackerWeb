@@ -239,10 +239,10 @@ export function DashboardScreen() {
   };
 
   const periods = [
-    { id: "day", label: "Hôm nay" },
-    { id: "week", label: "Tuần này" },
-    { id: "month", label: "Tháng này" },
-    { id: "year", label: "Năm nay" },
+    { id: "day", label: "Ngày" },
+    { id: "week", label: "Tuần" },
+    { id: "month", label: "Tháng" },
+    { id: "year", label: "Năm" },
   ] as const;
 
   const setHeader = useHeaderStore((state) => state.setHeader);
@@ -334,7 +334,7 @@ export function DashboardScreen() {
               </div>
             ) : (
               <div className="h-[400px] w-full">
-                <ResponsiveContainer width="100%" height="100%">
+                <ResponsiveContainer width="100%" height="100%" debounce={200}>
                   <AreaChart
                     data={revenueChartData}
                     margin={{ top: 20, right: 30, left: 10, bottom: 20 }}
@@ -406,7 +406,7 @@ export function DashboardScreen() {
           {/* Biểu đồ Đơn hàng */}
           <Panel title="Theo dõi Đơn hàng" className="flex-1">
             <div className="h-[200px] w-full mt-3">
-              <ResponsiveContainer width="100%" height="100%">
+              <ResponsiveContainer width="100%" height="100%" debounce={200}>
                 <AreaChart data={ordersChartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
                   <defs>
                     <linearGradient id="ordersGrad" x1="0" y1="0" x2="0" y2="1">
@@ -469,7 +469,7 @@ export function DashboardScreen() {
           {/* Biểu đồ Bình luận */}
           <Panel title="Tương tác Bình luận" className="flex-1">
             <div className="h-[200px] w-full mt-3">
-              <ResponsiveContainer width="100%" height="100%">
+              <ResponsiveContainer width="100%" height="100%" debounce={200}>
                 <AreaChart data={commentsChartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
                   <defs>
                     <linearGradient id="commentsGrad" x1="0" y1="0" x2="0" y2="1">
