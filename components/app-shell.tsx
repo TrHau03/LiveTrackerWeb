@@ -227,12 +227,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                           ? "px-4 sm:px-6 lg:px-8 pt-6 pb-0 flex flex-col overflow-hidden"
                           : "px-4 sm:px-6 lg:px-8 pt-6 pb-24 lg:pb-8"
           }`}>
-            <div className={`w-full h-full ${isViewportLocked ? "flex flex-col flex-1 overflow-hidden" : "block max-w-[1536px] mx-auto"}`}>{children}</div>
+            <div className={`w-full h-full ${isViewportLocked ? "flex flex-col flex-1 overflow-hidden" : "block w-full mx-auto"}`}>{children}</div>
           </main>
 
           {!isViewportLocked && (
             <footer className="mt-auto hidden border-t border-[var(--border)] bg-[var(--surface)] px-6 py-3 lg:block shrink-0">
-              <div className="mx-auto flex max-w-[1536px] items-center justify-between text-xs text-[var(--muted)]">
+              <div className="mx-auto flex w-full items-center justify-between text-xs text-[var(--muted)]">
                 <p>© {new Date().getFullYear()} LiveTracker. All rights reserved.</p>
                 <div className="flex gap-4">
                   <a href="#" className="hover:text-[var(--foreground)] transition-colors">Hỗ trợ</a>
