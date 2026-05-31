@@ -164,7 +164,7 @@ export async function printReceipt(
     // 1. Ping thử xem Local Bridge có đang online hay không (Timeout 500ms)
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 500);
-    const statusResp = await fetch("http://localhost:13579/status", {
+    const statusResp = await fetch("http://127.0.0.1:13579/status", {
       signal: controller.signal,
     }).catch(() => null);
     clearTimeout(timeoutId);
@@ -177,7 +177,7 @@ export async function printReceipt(
       const formData = new FormData();
       formData.append("image", imageBlob, "receipt.jpg");
 
-      const printResp = await fetch("http://localhost:13579/print", {
+      const printResp = await fetch("http://127.0.0.1:13579/print", {
         method: "POST",
         body: formData,
       });
