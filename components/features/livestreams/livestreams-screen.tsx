@@ -112,7 +112,7 @@ export function LivestreamsScreen() {
               </button>
 
               <a
-                href="https://github.com/TrHau03/LiveTrackerWeb/releases"
+                href="https://github.com/duyzxje/LiveTrackerLocalBridge/releases"
                 target="_blank"
                 rel="noreferrer"
                 className="inline-flex h-8 items-center justify-center gap-1.5 rounded-lg bg-amber-600 hover:bg-amber-700 px-3 text-xs font-semibold text-white hover:-translate-y-0.5 active:translate-y-0 transition shadow-sm"

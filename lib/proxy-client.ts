@@ -346,11 +346,18 @@ export async function streamProxyRequest(
 }
 
 export function extractApiData<T>(payload: unknown): T | null {
-  if (payload && typeof payload === "object" && "data" in payload) {
-    return (payload as { data: T }).data;
+  let current = payload;
+  while (
+    current &&
+    typeof current === "object" &&
+    "data" in current &&
+    (current as any).data !== null &&
+    (typeof (current as any).data === "object" || Array.isArray((current as any).data))
+  ) {
+    current = (current as { data: any }).data;
   }
 
-  return (payload as T) ?? null;
+  return (current as T) ?? null;
 }
 
 export function extractCollection(payload: unknown): Record<string, unknown>[] {

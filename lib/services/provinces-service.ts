@@ -38,3 +38,24 @@ export async function fetchWards(session: SessionSettings, provinceCode: string)
   });
   return result;
 }
+
+export async function fetchOldProvinces(session: SessionSettings) {
+  const result = await proxyRequest<Province[]>(session, {
+    path: "/provinces/old-provinces",
+  });
+  return result;
+}
+
+export async function fetchOldDistricts(session: SessionSettings, parentCode: string) {
+  const result = await proxyRequest<Ward[]>(session, {
+    path: `/provinces/old-districts/${parentCode}`,
+  });
+  return result;
+}
+
+export async function fetchOldWards(session: SessionSettings, parentCode: string) {
+  const result = await proxyRequest<Ward[]>(session, {
+    path: `/provinces/old-wards/${parentCode}`,
+  });
+  return result;
+}

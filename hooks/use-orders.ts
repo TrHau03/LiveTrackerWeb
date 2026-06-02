@@ -2,11 +2,18 @@
  * useOrders — React Query hook cho danh sách đơn hàng.
  */
 import { useEffect } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
 import { useSession } from "@/components/session-provider";
-import { fetchMyOrders, fetchLiveOrders, exportOrdersExcel } from "@/lib/services/orders-service";
 import { applyAuthResponses } from "@/hooks/use-auth-sync";
+import { 
+  updateOrderStatus, 
+  updateOrder, 
+  deleteOrder, 
+  fetchMyOrders, 
+  fetchLiveOrders, 
+  exportOrdersExcel 
+} from "@/lib/services/orders-service";
 
 export function useOrders(queryMeta?: { page?: number; limit?: number; search?: string; startDate?: string; endDate?: string; customerId?: string }) {
   const { logout, patchSession, session } = useSession();
@@ -72,4 +79,58 @@ export function useExportOrders() {
 
     return { ok: true, filename: response.filename };
   };
+}
+
+export function useUpdateOrderStatus() {
+  const queryClient = useQueryClient();
+  const { logout, patchSession, session } = useSession();
+
+  return useMutation({
+    mutationFn: async ({ orderId, status }: { orderId: string; status: string }) => {
+      const response = await updateOrderStatus(session, orderId, status);
+      applyAuthResponses([response.response], patchSession, logout);
+      if (!response.ok) throw new Error("Cập nhật trạng thái thất bại");
+      return response.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["orders"] });
+      queryClient.invalidateQueries({ queryKey: ["live_orders"] });
+    },
+  });
+}
+
+export function useUpdateOrder() {
+  const queryClient = useQueryClient();
+  const { logout, patchSession, session } = useSession();
+
+  return useMutation({
+    mutationFn: async ({ orderId, data }: { orderId: string; data: Record<string, unknown> }) => {
+      const response = await updateOrder(session, orderId, data);
+      applyAuthResponses([response.response], patchSession, logout);
+      if (!response.ok) throw new Error("Cập nhật đơn hàng thất bại");
+      return response.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["orders"] });
+      queryClient.invalidateQueries({ queryKey: ["live_orders"] });
+    },
+  });
+}
+
+export function useDeleteOrder() {
+  const queryClient = useQueryClient();
+  const { logout, patchSession, session } = useSession();
+
+  return useMutation({
+    mutationFn: async (orderId: string) => {
+      const response = await deleteOrder(session, orderId);
+      applyAuthResponses([response.response], patchSession, logout);
+      if (!response.ok) throw new Error("Xóa đơn hàng thất bại");
+      return response.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["orders"] });
+      queryClient.invalidateQueries({ queryKey: ["live_orders"] });
+    },
+  });
 }

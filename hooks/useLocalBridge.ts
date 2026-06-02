@@ -156,6 +156,27 @@ export function useLocalBridge() {
     }
   }, [checkStatus]);
 
+  // Gọi API yêu cầu Local Bridge kiểm tra và tải cập nhật
+  const checkBridgeUpdate = useCallback(async (): Promise<{ success: boolean; message: string; data?: { current_version: string; latest_version: string; has_update: boolean } }> => {
+    try {
+      const response = await fetch("http://127.0.0.1:13579/check-update", {
+        method: "POST",
+      });
+
+      const json = await response.json();
+      return {
+        success: json.success,
+        message: json.message || (json.success ? "Yêu cầu kiểm tra cập nhật thành công" : "Kiểm tra cập nhật thất bại"),
+        data: json.data,
+      };
+    } catch (e) {
+      return {
+        success: false,
+        message: "Không thể kết nối đến Local Bridge để kiểm tra cập nhật.",
+      };
+    }
+  }, []);
+
   return {
     isConnected,
     isChecking,
@@ -163,5 +184,6 @@ export function useLocalBridge() {
     checkStatus,
     printViaBridge,
     saveBridgeConfig,
+    checkBridgeUpdate,
   };
 }

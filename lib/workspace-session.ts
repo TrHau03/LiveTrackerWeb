@@ -6,8 +6,9 @@ export type AuthUser = {
   avatar?: string;
   phone?: string;
   address?: string;
-  shops?: Array<{ id: string; name: string; avatar?: string; phone?: string; address?: string }>;
+  shops?: Array<{ id: string; name: string; avatar?: string; phone?: string; address?: string; province?: string; district?: string; ward?: string; }>;
   messageTemplate?: any;
+  autofill?: any;
 };
 
 export type SessionSettings = {

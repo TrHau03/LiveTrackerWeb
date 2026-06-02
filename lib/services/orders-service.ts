@@ -137,3 +137,27 @@ export async function sendBill(
     bodyMode: "form-data",
   });
 }
+
+export async function updateOrderStatus(
+  session: SessionSettings,
+  orderId: string,
+  status: string,
+) {
+  return proxyRequest(session, {
+    path: `/orders/${orderId}/status`,
+    method: "PATCH",
+    body: { status },
+  });
+}
+
+export async function addManualCommentToOrder(
+  session: SessionSettings,
+  orderId: string,
+  body: { text: string; productName?: string; price?: number; quantity?: number },
+) {
+  return proxyRequest(session, {
+    path: `/orders/${orderId}/add-comment`,
+    method: "POST",
+    body,
+  });
+}
