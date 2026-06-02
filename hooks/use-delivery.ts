@@ -6,13 +6,27 @@ import {
   JtCalculateFeesBizContent, 
   JtCreateOrderBizContent,
   JtCalculateFeesResult,
-  DeliveryCreateOrderResult
+  DeliveryCreateOrderResult,
+  GhnCalculateFeesBizContent,
+  GhnCreateOrderBizContent,
+  GhnCalculateFeesResult,
+  GhtkCalculateFeesBizContent,
+  GhtkCreateOrderBizContent,
+  GhtkCalculateFeesResult,
+  GhnProvince,
+  GhnWard
 } from "@/lib/types/delivery";
 import { 
   fetchDeliveryProviders, 
   calculateJtExpressFees, 
   createJtExpressOrder,
-  fetchDeliveryOrders
+  fetchDeliveryOrders,
+  calculateGhnFees,
+  createGhnOrder,
+  calculateGhtkFees,
+  createGhtkOrder,
+  fetchGhnProvinces,
+  fetchGhnWards
 } from "@/lib/services/delivery-service";
 import { applyAuthResponses } from "@/hooks/use-auth-sync";
 import { extractApiData } from "@/lib/proxy-client";
@@ -35,11 +49,18 @@ export function useCalculateFees() {
   const { logout, patchSession, session } = useSession();
 
   return useMutation({
-    mutationFn: async (bizContent: JtCalculateFeesBizContent) => {
-      const response = await calculateJtExpressFees(session, { bizContent });
+    mutationFn: async ({ provider, bizContent }: { provider: "jt-express" | "ghn" | "ghtk", bizContent: any }) => {
+      let response;
+      if (provider === "jt-express") {
+        response = await calculateJtExpressFees(session, { bizContent });
+      } else if (provider === "ghn") {
+        response = await calculateGhnFees(session, { bizContent });
+      } else {
+        response = await calculateGhtkFees(session, bizContent);
+      }
       applyAuthResponses([response.response], patchSession, logout);
       if (!response.ok) throw new Error("Tính phí thất bại");
-      return extractApiData<JtCalculateFeesResult>(response.data);
+      return extractApiData<any>(response.data);
     },
   });
 }
@@ -48,8 +69,15 @@ export function useCreateDeliveryOrder() {
   const { logout, patchSession, session } = useSession();
 
   return useMutation({
-    mutationFn: async (bizContent: JtCreateOrderBizContent) => {
-      const response = await createJtExpressOrder(session, { bizContent });
+    mutationFn: async ({ provider, bizContent }: { provider: "jt-express" | "ghn" | "ghtk", bizContent: any }) => {
+      let response;
+      if (provider === "jt-express") {
+        response = await createJtExpressOrder(session, { bizContent });
+      } else if (provider === "ghn") {
+        response = await createGhnOrder(session, { bizContent });
+      } else {
+        response = await createGhtkOrder(session, bizContent);
+      }
       applyAuthResponses([response.response], patchSession, logout);
       if (!response.ok) throw new Error("Tạo đơn giao hàng thất bại");
       return extractApiData<DeliveryCreateOrderResult>(response.data);
@@ -70,3 +98,33 @@ export function useDeliveryOrders(query?: { page?: number; limit?: number; searc
     enabled: !!session.accessToken,
   });
 }
+
+export function useGhnProvinces(providerConfigId?: string) {
+  const { logout, patchSession, session } = useSession();
+
+  return useQuery({
+    queryKey: ["ghn-provinces", providerConfigId],
+    queryFn: async () => {
+      const response = await fetchGhnProvinces(session, providerConfigId);
+      applyAuthResponses([response.response], patchSession, logout);
+      return extractApiData<GhnProvince[]>(response.data) || [];
+    },
+    enabled: !!session.accessToken,
+  });
+}
+
+export function useGhnWards(provinceId?: number, providerConfigId?: string) {
+  const { logout, patchSession, session } = useSession();
+
+  return useQuery({
+    queryKey: ["ghn-wards", provinceId, providerConfigId],
+    queryFn: async () => {
+      if (!provinceId) return [];
+      const response = await fetchGhnWards(session, provinceId, providerConfigId);
+      applyAuthResponses([response.response], patchSession, logout);
+      return extractApiData<GhnWard[]>(response.data) || [];
+    },
+    enabled: !!session.accessToken && !!provinceId,
+  });
+}
+

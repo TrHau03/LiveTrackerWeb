@@ -9,10 +9,9 @@ import {
   Package, 
   DollarSign, 
   Settings2,
-  ChevronDown,
-  Search,
   Calculator,
-  Send
+  Send,
+  Building2
 } from "lucide-react";
 import { 
   asRecord, 
@@ -21,7 +20,6 @@ import {
   formatCurrency,
   extractCollection
 } from "@/lib/proxy-client";
-import { useProvinces, useWards } from "@/hooks/use-provinces";
 import { 
   useDeliveryProviders, 
   useCalculateFees, 
@@ -29,12 +27,9 @@ import {
 } from "@/hooks/use-delivery";
 import { useSession } from "@/components/session-provider";
 import { 
-  CONTROL_CLASS, 
-  PRIMARY_BUTTON_CLASS,
-  SECONDARY_BUTTON_CLASS,
-  LoadingState,
-  ErrorState
+  CONTROL_CLASS
 } from "@/components/ui/workspace-shared";
+import { AddressCascadingSelect, AddressData, DeliveryProviderType } from "./address-cascading-select";
 
 interface DeliveryModalProps {
   isOpen: boolean;
@@ -47,61 +42,92 @@ export function DeliveryModal({ isOpen, onClose, order }: DeliveryModalProps) {
   const user = session.user;
   
   // States
-  const [selectedProvider, setSelectedProvider] = useState<string>("jt-express");
+  const [selectedProviderId, setSelectedProviderId] = useState<string>("");
   
-  // Form State
+  // Base Form State
   const [form, setForm] = useState({
     senderName: "",
     senderMobile: "",
-    senderProv: "",
-    senderArea: "",
-    senderAddress: "",
-    
     receiverName: "",
     receiverMobile: "",
-    receiverProv: "",
-    receiverArea: "",
-    receiverAddress: "",
     
     weight: "0.5",
+    length: "10",
+    width: "10",
+    height: "10",
     totalQuantity: "1",
     goodsValue: "0",
     codMoney: "0",
     remark: "",
     
-    orderType: "1",
-    serviceType: "1",
-    deliveryType: "1",
-    goodsType: "bm000010",
-    productType: "EXPRESS",
-    payType: "PP_PM",
-    partSign: "0",
+    // JT specific
+    jtServiceType: "1",
+    jtProductType: "EXPRESS",
+    jtPayType: "PP_PM",
+    
+    // GHN specific
+    ghnServiceTypeId: 2,
+    ghnPaymentTypeId: 1,
+    
+    // GHTK specific
+    ghtkTransport: "road",
+    ghtkIsFreeship: "1",
   });
 
-  // Queries & Mutations
-  const { data: provinces, isLoading: loadingProvinces } = useProvinces();
-  
-  const senderProvinceCode = useMemo(() => 
-    Array.isArray(provinces) ? provinces.find(p => p.name === form.senderProv || p.fullName === form.senderProv)?.code : undefined
-  , [provinces, form.senderProv]);
-  
-  const receiverProvinceCode = useMemo(() => 
-    Array.isArray(provinces) ? provinces.find(p => p.name === form.receiverProv || p.fullName === form.receiverProv)?.code : undefined
-  , [provinces, form.receiverProv]);
+  const [senderAddress, setSenderAddress] = useState<AddressData>({
+    provinceName: "",
+    districtName: "",
+    detailAddress: ""
+  });
 
-  const { data: senderWards } = useWards(senderProvinceCode);
-  const { data: receiverWards } = useWards(receiverProvinceCode);
-  
-  const { data: providers } = useDeliveryProviders();
+  const [receiverAddress, setReceiverAddress] = useState<AddressData>({
+    provinceName: "",
+    districtName: "",
+    detailAddress: ""
+  });
+
+  const [addressMode, setAddressMode] = useState<"new" | "old">("new");
+
+  // Queries & Mutations
+  const { data: providers, isLoading: loadingProviders } = useDeliveryProviders();
   const calculateFees = useCalculateFees();
   const createOrder = useCreateDeliveryOrder();
+
+  const currentProvider = useMemo(() => {
+    return providers?.find(p => (p.id || p.provider) === selectedProviderId) || providers?.[0];
+  }, [providers, selectedProviderId]);
+
+  const providerType = (currentProvider?.provider || "jt-express") as "jt-express" | "ghn" | "ghtk";
 
   // Initialize form with order and user data
   useEffect(() => {
     if (isOpen && order) {
       const customer = asRecord(order.customerId);
-      const items = extractCollection(order.items);
-      const totalQty = items.reduce((acc, item) => acc + (pickNumber(item, ["quantity"]) || 1), 0);
+      
+      const rawComments = (order.commentIds || order.comments || []) as unknown[];
+      let products = Array.isArray(rawComments)
+        ? rawComments
+            .map((c) => asRecord(c))
+            .filter((c) => Object.keys(c).length > 0)
+            .filter((c) => pickString(c, ["status"]) !== "BACKUP")
+            .map((c, index) => ({
+              name: pickString(c, ["text", "content"]) || `Sản phẩm ${index + 1}`,
+              sku: pickString(c, ["sku", "productSku", "code"]),
+              price: pickNumber(c, ["price"]) ?? 0,
+              quantity: pickNumber(c, ["quantity"]) ?? 1,
+            }))
+        : [];
+
+      if (products.length === 0) {
+        products = extractCollection(order.items).map((item) => ({
+          name: pickString(item, ["productName", "name", "title"]) || "Sản phẩm không tên",
+          sku: pickString(item, ["sku", "code"]),
+          price: pickNumber(item, ["price"]) ?? 0,
+          quantity: pickNumber(item, ["quantity", "count"]) ?? 1,
+        }));
+      }
+
+      const totalQty = products.reduce((acc, item) => acc + item.quantity, 0);
       
       const currentShop = user?.shops?.[0];
 
@@ -109,73 +135,253 @@ export function DeliveryModal({ isOpen, onClose, order }: DeliveryModalProps) {
         ...prev,
         senderName: currentShop?.name || user?.fullName || "",
         senderMobile: currentShop?.phone || user?.phone || "",
-        senderAddress: currentShop?.address || user?.address || "",
         
         receiverName: pickString(customer, ["igName", "fullName", "fbName"]) || pickString(order, ["customerName"]) || "",
         receiverMobile: pickString(order, ["phone"]) || pickString(customer, ["phone"]) || "",
-        receiverProv: pickString(order, ["province"]) || pickString(customer, ["province"]) || "",
-        receiverArea: pickString(order, ["ward"]) || pickString(customer, ["ward"]) || "",
-        receiverAddress: pickString(order, ["street"]) || pickString(customer, ["street"]) || "",
         
         goodsValue: String(pickNumber(order, ["totalPrice"]) || 0),
         codMoney: String(pickNumber(order, ["totalPrice"]) || 0),
         totalQuantity: String(totalQty || 1),
       }));
+
+      // Initialize address text (IDs will be populated manually by user or by API later)
+      setSenderAddress({
+        provinceName: currentShop?.province || user?.autofill?.ghn?.old_address?.from_province_name || "",
+        districtName: currentShop?.district || user?.autofill?.ghn?.old_address?.from_district_name || "",
+        wardName: currentShop?.ward || user?.autofill?.ghn?.old_address?.from_ward_name || "",
+        detailAddress: currentShop?.address || user?.address || "",
+      });
+
+      setReceiverAddress({
+        provinceName: pickString(order, ["province"]) || pickString(customer, ["province"]) || "",
+        districtName: pickString(order, ["district"]) || pickString(customer, ["district"]) || "",
+        wardName: pickString(order, ["ward"]) || pickString(customer, ["ward"]) || "",
+        detailAddress: pickString(order, ["street"]) || pickString(customer, ["street"]) || "",
+      });
     }
   }, [isOpen, order, user]);
 
+  // Set default provider when providers load
+  useEffect(() => {
+    if (providers?.length && !selectedProviderId) {
+      setSelectedProviderId(providers[0].id || providers[0].provider);
+    }
+  }, [providers, selectedProviderId]);
+
   if (!isOpen) return null;
 
-  const handleUpdateField = (field: keyof typeof form, value: string) => {
-    setForm(prev => ({ ...prev, [field]: value }));
+  const handleUpdateField = (field: keyof typeof form, value: string | number) => {
+    setForm(prev => ({ ...prev, [field]: String(value) }));
+  };
+
+  const buildCalculateFeeParams = () => {
+    if (providerType === "jt-express") {
+      return {
+        weight: Number(form.weight) || 0.5,
+        selfAddress: 0,
+        productType: form.jtProductType,
+        goodsType: "bm000010",
+        goodsValue: Number(form.goodsValue) || 0,
+        codMoney: Number(form.codMoney) || 0,
+        sender: {
+          prov: senderAddress.provinceName,
+          city: null,
+          area: senderAddress.districtName,
+        },
+        receiver: {
+          prov: receiverAddress.provinceName,
+          city: null,
+          area: receiverAddress.districtName,
+        }
+      };
+    } else if (providerType === "ghn") {
+      return {
+        service_type_id: form.ghnServiceTypeId,
+        to_district_id: Number(receiverAddress.districtId) || 0,
+        to_ward_code: receiverAddress.wardCode || "",
+        weight: (Number(form.weight) || 0.5) * 1000, // GHN uses grams
+        length: Number(form.length) || 10,
+        width: Number(form.width) || 10,
+        height: Number(form.height) || 10,
+        insurance_value: Number(form.goodsValue) || 0,
+      };
+    } else if (providerType === "ghtk") {
+      return {
+        pick_province: senderAddress.provinceName,
+        pick_district: senderAddress.districtName,
+        province: receiverAddress.provinceName,
+        district: receiverAddress.districtName,
+        address: receiverAddress.detailAddress,
+        weight: (Number(form.weight) || 0.5) * 1000,
+        value: Number(form.goodsValue) || 0,
+        transport: form.ghtkTransport,
+      };
+    }
+    throw new Error("Provider không hợp lệ");
   };
 
   const handleCalculateFee = async () => {
     try {
+      const bizContent = buildCalculateFeeParams();
       const result = await calculateFees.mutateAsync({
-        senderProv: form.senderProv,
-        senderArea: form.senderArea,
-        receiverProv: form.receiverProv,
-        receiverArea: form.receiverArea,
-        weight: form.weight,
+        provider: providerType,
+        bizContent
       });
-      if (result) {
-        alert(`Phí dự tính: ${formatCurrency(result.fee)}`);
-      }
+      
+      let feeValue = 0;
+      if (providerType === "jt-express") feeValue = result.price;
+      else if (providerType === "ghn") feeValue = result.total;
+      else if (providerType === "ghtk") feeValue = result.fee?.fee || 0;
+
+      alert(`Phí dự tính: ${formatCurrency(feeValue)}`);
     } catch (err: any) {
-      alert(err.message);
+      alert(err.message || "Có lỗi khi tính phí");
     }
   };
 
-  const handleSubmit = async () => {
-    try {
-      const bizContent = {
-        txlogisticId: `LT${Date.now()}`, // Simple generation logic
-        expressType: "EZ",
-        ...form,
+  const buildCreateOrderParams = () => {
+    const rawComments = (order?.commentIds || order?.comments || []) as unknown[];
+    let itemsRaw = Array.isArray(rawComments)
+      ? rawComments
+          .map((c) => asRecord(c))
+          .filter((c) => Object.keys(c).length > 0)
+          .filter((c) => pickString(c, ["status"]) !== "BACKUP")
+          .map((c, index) => ({
+            name: pickString(c, ["text", "content"]) || `Sản phẩm ${index + 1}`,
+            sku: pickString(c, ["sku", "productSku", "code"]),
+            price: pickNumber(c, ["price"]) ?? 0,
+            quantity: pickNumber(c, ["quantity"]) ?? 1,
+          }))
+      : [];
+
+    if (itemsRaw.length === 0) {
+      itemsRaw = extractCollection(order?.items).map((item) => ({
+        name: pickString(item, ["productName", "name", "title"]) || "Sản phẩm không tên",
+        sku: pickString(item, ["sku", "code"]),
+        price: pickNumber(item, ["price"]) ?? 0,
+        quantity: pickNumber(item, ["quantity", "count"]) ?? 1,
+      }));
+    }
+    
+    if (providerType === "jt-express") {
+      return {
+        txlogisticId: `LT${Date.now()}`,
+        orderType: "1",
+        selfAddress: 0,
+        serviceType: form.jtServiceType,
+        deliveryType: "1",
         sender: {
           name: form.senderName,
           mobile: form.senderMobile,
-          prov: form.senderProv,
+          prov: senderAddress.provinceName,
           city: "",
-          area: form.senderArea,
-          address: form.senderAddress,
+          area: senderAddress.districtName,
+          address: senderAddress.detailAddress,
         },
         receiver: {
           name: form.receiverName,
           mobile: form.receiverMobile,
-          prov: form.receiverProv,
+          prov: receiverAddress.provinceName,
           city: "",
-          area: form.receiverArea,
-          address: form.receiverAddress,
+          area: receiverAddress.districtName,
+          address: receiverAddress.detailAddress,
+        },
+        goodsType: "bm000010",
+        productType: form.jtProductType,
+        packageInfo: { weight: form.weight },
+        payType: form.jtPayType,
+        expressType: "EZ",
+        partSign: "0",
+        totalQuantity: Number(form.totalQuantity) || 1,
+        itemsValue: form.goodsValue,
+        goodsValue: form.goodsValue,
+        codMoney: form.codMoney,
+        remark: form.remark,
+      };
+    } else if (providerType === "ghn") {
+      const mappedItems = itemsRaw.length ? itemsRaw.map(item => ({
+        name: pickString(item, ["name", "productName"]) || "Sản phẩm",
+        quantity: pickNumber(item, ["quantity"]) || 1,
+        price: pickNumber(item, ["price"]) || 0,
+        weight: Math.round(((Number(form.weight) || 0.5) * 1000) / itemsRaw.length)
+      })) : [{
+        name: "Sản phẩm tổng hợp",
+        quantity: Number(form.totalQuantity) || 1,
+        price: Number(form.goodsValue) || 0,
+        weight: (Number(form.weight) || 0.5) * 1000
+      }];
+
+      return {
+        to_name: form.receiverName,
+        to_phone: form.receiverMobile,
+        to_address: receiverAddress.detailAddress,
+        to_ward_code: receiverAddress.wardCode || "",
+        to_district_id: Number(receiverAddress.districtId) || 0,
+        weight: (Number(form.weight) || 0.5) * 1000,
+        length: Number(form.length) || 10,
+        width: Number(form.width) || 10,
+        height: Number(form.height) || 10,
+        service_type_id: Number(form.ghnServiceTypeId),
+        payment_type_id: Number(form.ghnPaymentTypeId),
+        required_note: "CHOTHUHANG",
+        items: mappedItems,
+        cod_amount: Number(form.codMoney) || 0,
+        note: form.remark,
+        client_order_code: `LT${Date.now()}`
+      };
+    } else if (providerType === "ghtk") {
+      const mappedProducts = itemsRaw.length ? itemsRaw.map(item => ({
+        name: pickString(item, ["name", "productName"]) || "Sản phẩm",
+        weight: Math.round(((Number(form.weight) || 0.5) * 1000) / itemsRaw.length),
+        quantity: pickNumber(item, ["quantity"]) || 1,
+        price: pickNumber(item, ["price"]) || 0,
+      })) : [{
+        name: "Sản phẩm tổng hợp",
+        weight: (Number(form.weight) || 0.5) * 1000,
+        quantity: Number(form.totalQuantity) || 1,
+        price: Number(form.goodsValue) || 0,
+      }];
+
+      return {
+        products: mappedProducts,
+        order: {
+          id: `LT${Date.now()}`,
+          pick_name: form.senderName,
+          pick_address: senderAddress.detailAddress,
+          pick_province: senderAddress.provinceName,
+          pick_district: senderAddress.districtName,
+          pick_ward: senderAddress.wardName,
+          pick_tel: form.senderMobile,
+          name: form.receiverName,
+          address: receiverAddress.detailAddress,
+          province: receiverAddress.provinceName,
+          district: receiverAddress.districtName,
+          ward: receiverAddress.wardName,
+          tel: form.receiverMobile,
+          is_freeship: form.ghtkIsFreeship,
+          pick_money: Number(form.codMoney) || 0,
+          value: Number(form.goodsValue) || 0,
+          note: form.remark,
+          weight_option: "gram",
+          total_weight: (Number(form.weight) || 0.5) * 1000,
+          transport: form.ghtkTransport
         }
       };
-      
-      await createOrder.mutateAsync(bizContent as any);
+    }
+    throw new Error("Provider không hợp lệ");
+  };
+
+  const handleSubmit = async () => {
+    try {
+      const bizContent = buildCreateOrderParams();
+      await createOrder.mutateAsync({
+        provider: providerType,
+        bizContent
+      });
       alert("Tạo đơn giao hàng thành công!");
       onClose();
     } catch (err: any) {
-      alert(err.message);
+      alert(err.message || "Có lỗi khi tạo đơn");
     }
   };
 
@@ -195,7 +401,7 @@ export function DeliveryModal({ isOpen, onClose, order }: DeliveryModalProps) {
             </div>
             <div>
               <h4 className="text-2xl font-black text-[var(--foreground)] tracking-tight">
-                Giao hàng nhanh
+                Giao hàng đa kênh
               </h4>
               <p className="text-sm text-[var(--muted)] font-bold uppercase tracking-widest">
                 Đơn hàng #{pickString(order, ["orderCode"]) || "N/A"}
@@ -210,12 +416,64 @@ export function DeliveryModal({ isOpen, onClose, order }: DeliveryModalProps) {
           </button>
         </div>
 
-        {/* Layout with all sections */}
-        <div className="flex-1 overflow-y-auto p-8 no-scrollbar bg-[var(--surface-subdued)]/30">
+        {/* Layout with all sections (Bỏ no-scrollbar để hiện thanh cuộn, thêm min-h-0 và max-h) */}
+        <div className="flex-1 overflow-y-auto min-h-0 max-h-[calc(95vh-180px)] p-8 bg-[var(--surface-subdued)]/30">
           <div className="grid grid-cols-12 gap-8">
             
             {/* Left Column: Receiver Info */}
             <div className="col-span-12 lg:col-span-7 space-y-6">
+              
+              <div className="rounded-3xl bg-[var(--surface)] border border-[var(--border)] p-8 shadow-sm space-y-6">
+                <SectionTitle icon={<Building2 className="text-[var(--primary)]" />} title="Đơn vị vận chuyển" />
+                <div className="grid grid-cols-4 gap-4">
+                  {providers?.map(p => {
+                    const uniqueId = p.id || p.provider;
+                    // Chuẩn hoá tên ngắn gọn để tránh tràn chữ
+                    const getShortName = (name: string) => {
+                      const lower = name.toLowerCase();
+                      if (lower.includes("ghn") || lower.includes("giao hàng nhanh")) return "GHN";
+                      if (lower.includes("ghtk") || lower.includes("giao hàng tiết kiệm") || lower.includes("giao hang tiet")) return "GHTK";
+                      if (lower.includes("viettel")) return "ViettelPost";
+                      if (lower.includes("j&t") || lower.includes("jt")) return "J&T Express";
+                      return name;
+                    };
+                    return (
+                      <button
+                        key={uniqueId}
+                        onClick={() => setSelectedProviderId(uniqueId)}
+                        className={`h-14 rounded-2xl font-black text-xs border-2 transition-all ${
+                          selectedProviderId === uniqueId 
+                            ? "border-[var(--primary)] bg-[var(--primary-soft)] text-[var(--primary)] shadow-sm"
+                            : "border-[var(--border)] bg-[var(--surface)] text-[var(--muted)] hover:border-[var(--primary)]/50"
+                        }`}
+                      >
+                        {getShortName(p.displayName || p.name || "")}
+                      </button>
+                    );
+                  })}
+                  {(!providers || providers.length === 0) && (
+                    <div className="col-span-3 text-center text-sm text-[var(--muted)] py-4">
+                      {loadingProviders ? "Đang tải danh sách..." : "Không có cấu hình đối tác vận chuyển."}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Chế độ chọn địa chỉ (Global) */}
+              <div className="rounded-3xl bg-[var(--surface)] border border-[var(--border)] p-6 shadow-sm flex items-center justify-between">
+                <div>
+                  <h5 className="font-black text-sm text-[var(--foreground)] uppercase tracking-wider">Cách chọn địa chỉ giao hàng</h5>
+                  <p className="text-xs text-[var(--muted)] font-medium">Áp dụng đồng bộ cho cả người gửi và người nhận</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setAddressMode(addressMode === "new" ? "old" : "new")}
+                  className="px-4 py-2.5 rounded-2xl bg-[var(--primary-soft)] text-[var(--primary)] font-black text-xs hover:bg-[var(--primary)] hover:text-white transition-all active:scale-95 border border-[var(--primary)]/20"
+                >
+                  {addressMode === "new" ? "DÙNG ĐỊA CHỈ CŨ (3 CẤP)" : "DÙNG ĐỊA CHỈ MỚI (2 CẤP)"}
+                </button>
+              </div>
+
               <div className="rounded-3xl bg-[var(--surface)] border border-[var(--border)] p-8 shadow-sm space-y-8">
                 <SectionTitle icon={<User className="text-[var(--primary)]" />} title="Thông tin người nhận" />
                 <div className="grid grid-cols-2 gap-6">
@@ -237,45 +495,13 @@ export function DeliveryModal({ isOpen, onClose, order }: DeliveryModalProps) {
                   </FormField>
                 </div>
                 
-                <div className="grid grid-cols-2 gap-6">
-                  <FormField label="Tỉnh / Thành">
-                    <select 
-                      value={form.receiverProv}
-                      onChange={e => {
-                        handleUpdateField("receiverProv", e.target.value);
-                        handleUpdateField("receiverArea", "");
-                      }}
-                      className={CONTROL_CLASS + " w-full"}
-                    >
-                      <option value="">Chọn Tỉnh/Thành</option>
-                      {Array.isArray(provinces) && provinces.map(p => (
-                        <option key={p.code} value={p.name}>{p.fullName}</option>
-                      ))}
-                    </select>
-                  </FormField>
-                  <FormField label="Quận / Huyện">
-                    <select 
-                      value={form.receiverArea}
-                      onChange={e => handleUpdateField("receiverArea", e.target.value)}
-                      disabled={!receiverProvinceCode}
-                      className={CONTROL_CLASS + " w-full"}
-                    >
-                      <option value="">Chọn Quận/Huyện</option>
-                      {Array.isArray(receiverWards) && receiverWards.map(w => (
-                        <option key={w.code} value={w.name}>{w.fullName}</option>
-                      ))}
-                    </select>
-                  </FormField>
-                </div>
-                
-                <FormField label="Địa chỉ chi tiết (Số nhà, tên đường...)">
-                  <textarea 
-                    value={form.receiverAddress}
-                    onChange={e => handleUpdateField("receiverAddress", e.target.value)}
-                    className={CONTROL_CLASS + " w-full h-28 pt-3 resize-none"}
-                    placeholder="VD: 123 Đường ABC, Phường 1..."
-                  />
-                </FormField>
+                <AddressCascadingSelect 
+                  provider={providerType}
+                  addressMode={addressMode}
+                  providerConfigId={selectedProviderId}
+                  value={receiverAddress}
+                  onChange={setReceiverAddress}
+                />
               </div>
 
               {/* Sender Info (Editable) */}
@@ -300,46 +526,13 @@ export function DeliveryModal({ isOpen, onClose, order }: DeliveryModalProps) {
                   </FormField>
                 </div>
 
-                <div className="grid grid-cols-2 gap-6">
-                  <FormField label="Tỉnh / Thành gửi">
-                    <select 
-                      value={form.senderProv}
-                      onChange={e => {
-                        handleUpdateField("senderProv", e.target.value);
-                        handleUpdateField("senderArea", "");
-                      }}
-                      className={CONTROL_CLASS + " w-full"}
-                    >
-                      <option value="">Chọn Tỉnh/Thành</option>
-                      {Array.isArray(provinces) && provinces.map(p => (
-                        <option key={p.code} value={p.name}>{p.fullName}</option>
-                      ))}
-                    </select>
-                  </FormField>
-                  <FormField label="Quận / Huyện gửi">
-                    <select 
-                      value={form.senderArea}
-                      onChange={e => handleUpdateField("senderArea", e.target.value)}
-                      disabled={!senderProvinceCode}
-                      className={CONTROL_CLASS + " w-full"}
-                    >
-                      <option value="">Chọn Quận/Huyện</option>
-                      {Array.isArray(senderWards) && senderWards.map(w => (
-                        <option key={w.code} value={w.name}>{w.fullName}</option>
-                      ))}
-                    </select>
-                  </FormField>
-                </div>
-
-                <FormField label="Địa chỉ kho chi tiết">
-                  <input 
-                    type="text"
-                    value={form.senderAddress}
-                    onChange={e => handleUpdateField("senderAddress", e.target.value)}
-                    className={CONTROL_CLASS + " w-full"}
-                    placeholder="Số nhà, tên đường..."
-                  />
-                </FormField>
+                <AddressCascadingSelect 
+                  provider={providerType}
+                  addressMode={addressMode}
+                  providerConfigId={selectedProviderId}
+                  value={senderAddress}
+                  onChange={setSenderAddress}
+                />
               </div>
             </div>
 
@@ -385,6 +578,30 @@ export function DeliveryModal({ isOpen, onClose, order }: DeliveryModalProps) {
                   </FormField>
                 </div>
 
+                <div className="grid grid-cols-3 gap-4">
+                  <FormField label="Dài (cm)">
+                    <input 
+                      type="number" value={form.length}
+                      onChange={e => handleUpdateField("length", e.target.value)}
+                      className={CONTROL_CLASS + " w-full"}
+                    />
+                  </FormField>
+                  <FormField label="Rộng (cm)">
+                    <input 
+                      type="number" value={form.width}
+                      onChange={e => handleUpdateField("width", e.target.value)}
+                      className={CONTROL_CLASS + " w-full"}
+                    />
+                  </FormField>
+                  <FormField label="Cao (cm)">
+                    <input 
+                      type="number" value={form.height}
+                      onChange={e => handleUpdateField("height", e.target.value)}
+                      className={CONTROL_CLASS + " w-full"}
+                    />
+                  </FormField>
+                </div>
+
                 <FormField label="Ghi chú đơn hàng">
                   <input 
                     type="text"
@@ -399,27 +616,64 @@ export function DeliveryModal({ isOpen, onClose, order }: DeliveryModalProps) {
               <div className="rounded-3xl bg-[var(--surface)] border border-[var(--border)] p-8 shadow-sm space-y-6">
                 <SectionTitle icon={<Settings2 className="text-[var(--primary)]" />} title="Vận chuyển & Thanh toán" />
                 
-                <FormField label="Loại dịch vụ">
-                  <select value={form.productType} onChange={e => handleUpdateField("productType", e.target.value)} className={CONTROL_CLASS + " w-full"}>
-                    <option value="EXPRESS">Chuyển phát tiêu chuẩn (J&T)</option>
-                    <option value="FAST">Giao hàng nhanh</option>
-                    <option value="SUPER">Siêu tốc</option>
-                  </select>
-                </FormField>
+                {providerType === "jt-express" && (
+                  <>
+                    <FormField label="Loại dịch vụ J&T">
+                      <select value={form.jtProductType} onChange={e => handleUpdateField("jtProductType", e.target.value)} className={CONTROL_CLASS + " w-full"}>
+                        <option value="EXPRESS">Chuyển phát tiêu chuẩn (J&T)</option>
+                        <option value="FAST">Giao hàng nhanh</option>
+                        <option value="SUPER">Siêu tốc</option>
+                      </select>
+                    </FormField>
+                    <FormField label="Hình thức trả cước J&T">
+                      <select value={form.jtPayType} onChange={e => handleUpdateField("jtPayType", e.target.value)} className={CONTROL_CLASS + " w-full"}>
+                        <option value="PP_PM">Người gửi trả sau (Cuối tháng)</option>
+                        <option value="PP_CASH">Người gửi trả tiền mặt</option>
+                        <option value="CC_CASH">Người nhận trả tiền mặt</option>
+                      </select>
+                    </FormField>
+                  </>
+                )}
 
-                <FormField label="Hình thức trả cước">
-                  <select value={form.payType} onChange={e => handleUpdateField("payType", e.target.value)} className={CONTROL_CLASS + " w-full"}>
-                    <option value="PP_PM">Người gửi trả sau (Cuối tháng)</option>
-                    <option value="PP_CASH">Người gửi trả tiền mặt</option>
-                    <option value="CC_CASH">Người nhận trả tiền mặt</option>
-                  </select>
-                </FormField>
+                {providerType === "ghn" && (
+                  <>
+                    <FormField label="Dịch vụ GHN">
+                      <select value={form.ghnServiceTypeId} onChange={e => handleUpdateField("ghnServiceTypeId", e.target.value)} className={CONTROL_CLASS + " w-full"}>
+                        <option value={2}>Chuyển phát thương mại điện tử</option>
+                        <option value={5}>Chuyển phát truyền thống</option>
+                      </select>
+                    </FormField>
+                    <FormField label="Bên thanh toán phí GHN">
+                      <select value={form.ghnPaymentTypeId} onChange={e => handleUpdateField("ghnPaymentTypeId", e.target.value)} className={CONTROL_CLASS + " w-full"}>
+                        <option value={1}>Người gửi (Shop) thanh toán</option>
+                        <option value={2}>Người nhận (Khách hàng) thanh toán</option>
+                      </select>
+                    </FormField>
+                  </>
+                )}
+
+                {providerType === "ghtk" && (
+                  <>
+                    <FormField label="Phương thức vận chuyển GHTK">
+                      <select value={form.ghtkTransport} onChange={e => handleUpdateField("ghtkTransport", e.target.value)} className={CONTROL_CLASS + " w-full"}>
+                        <option value="road">Đường bộ (Chuẩn)</option>
+                        <option value="fly">Đường bay (Nhanh)</option>
+                      </select>
+                    </FormField>
+                    <FormField label="Hình thức trả cước GHTK">
+                      <select value={form.ghtkIsFreeship} onChange={e => handleUpdateField("ghtkIsFreeship", e.target.value)} className={CONTROL_CLASS + " w-full"}>
+                        <option value="1">Shop trả phí (Freeship)</option>
+                        <option value="0">Khách trả phí</option>
+                      </select>
+                    </FormField>
+                  </>
+                )}
 
                 <div className="pt-4">
                   <button 
                     onClick={handleCalculateFee}
-                    disabled={calculateFees.isPending}
-                    className="w-full h-14 rounded-2xl bg-[var(--primary-soft)] hover:bg-[var(--primary)] hover:text-white text-[var(--primary)] border border-[var(--primary)]/10 font-black text-xs transition-all flex items-center justify-center gap-3 shadow-sm active:scale-95"
+                    disabled={calculateFees.isPending || !providers?.length}
+                    className="w-full h-14 rounded-2xl bg-[var(--primary-soft)] hover:bg-[var(--primary)] hover:text-white text-[var(--primary)] border border-[var(--primary)]/10 font-black text-xs transition-all flex items-center justify-center gap-3 shadow-sm active:scale-95 disabled:opacity-50"
                   >
                     <Calculator className="w-5 h-5" />
                     {calculateFees.isPending ? "ĐANG TÍNH PHÍ..." : "DỰ TÍNH PHÍ VẬN CHUYỂN"}
@@ -446,11 +700,11 @@ export function DeliveryModal({ isOpen, onClose, order }: DeliveryModalProps) {
               </button>
               <button 
                 onClick={handleSubmit}
-                disabled={createOrder.isPending}
+                disabled={createOrder.isPending || !providers?.length}
                 className="h-14 px-10 rounded-2xl bg-[var(--primary)] hover:bg-[var(--primary-strong)] text-xs font-black text-white shadow-lg shadow-[var(--primary)]/15 transition-all flex items-center gap-3 active:scale-[0.97] disabled:opacity-50"
               >
                 <Send className="w-4 h-4" />
-                {createOrder.isPending ? "ĐANG XỬ LÝ..." : "GỬI ĐƠN GIAO Hàng"}
+                {createOrder.isPending ? "ĐANG XỬ LÝ..." : "GỬI ĐƠN GIAO HÀNG"}
               </button>
            </div>
         </div>

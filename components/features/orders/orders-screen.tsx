@@ -22,6 +22,9 @@ import {
   PRIMARY_BUTTON_CLASS
 } from "@/components/ui/workspace-shared";
 import { DeliveryModal } from "./delivery-modal";
+import { OrderStatusBadge } from "./order-status-badge";
+import { OrderDetailModal } from "./order-detail-modal";
+import { ORDER_STATUS_OPTIONS, getOrderStatusLabel } from "@/lib/utils/order-status";
 
 import { 
   ShoppingBag, 
@@ -72,6 +75,7 @@ function Toast({ message, type = "success" }: { message: string; type?: "success
 export function OrdersScreen() {
   const [query, setQuery] = useState("");
   const search = useDeferredValue(query);
+  const [statusFilter, setStatusFilter] = useState("");
   const [selectedOrderId, setSelectedOrderId] = useState("");
   const [selectedBatchIds, setSelectedBatchIds] = useState<Set<string>>(new Set());
   const [isPrinting, setIsPrinting] = useState(false);
@@ -101,7 +105,7 @@ export function OrdersScreen() {
   // Reset page when filter changes
   React.useEffect(() => {
     setPage(1);
-  }, [search, period, customStartDate, customEndDate]);
+  }, [search, period, customStartDate, customEndDate, statusFilter]);
 
   const dateRange = React.useMemo(() => {
     const now = new Date();
@@ -135,7 +139,7 @@ export function OrdersScreen() {
     page, 
     search, 
     startDate: dateRange.startDate || undefined, 
-    endDate: dateRange.endDate || undefined
+    endDate: dateRange.endDate || undefined,
   });
 
   const state = {
@@ -147,7 +151,10 @@ export function OrdersScreen() {
   const [exportState, setExportState] = useState("");
   const doExport = useExportOrders();
 
-  const orders = extractCollection(state.data);
+  let orders = extractCollection(state.data);
+  if (statusFilter) {
+    orders = orders.filter((o: any) => o.status === statusFilter);
+  }
 
 
   const ordersData = asRecord(extractApiData(state.data));
@@ -403,6 +410,19 @@ export function OrdersScreen() {
                   />
                 </div>
               )}
+
+              <select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                className="h-9 rounded-lg border border-[var(--border)] bg-[var(--surface)] px-2 text-xs text-[var(--foreground)] outline-none focus:border-[var(--primary)]"
+              >
+                <option value="">Tất cả trạng thái</option>
+                {ORDER_STATUS_OPTIONS.map((status) => (
+                  <option key={status} value={status}>
+                    {getOrderStatusLabel(status)}
+                  </option>
+                ))}
+              </select>
             </div>
           </div>
 
@@ -516,10 +536,7 @@ export function OrdersScreen() {
                         {formatCurrency(pickNumber(order, ["totalPrice", "amount"]) ?? 0)}
                       </td>
                       <td className="px-4 py-2.5 text-center">
-                        <span className="relative inline-flex items-center gap-1.5 rounded-full bg-orange-50 border border-orange-200 px-2.5 py-0.5 text-[11px] font-semibold text-orange-700">
-                          <span className="flex h-1.5 w-1.5 rounded-full bg-orange-500 animate-pulse"></span>
-                          Chờ xử lý
-                        </span>
+                        <OrderStatusBadge status={pickString(order, ["status"])} size="sm" />
                       </td>
                     </tr>
                   );
@@ -579,185 +596,13 @@ export function OrdersScreen() {
       </Panel>
 
       {selectedOrderId && selectedOrder && typeof document !== "undefined" && createPortal(
-        <div className="fixed inset-0 z-[9990] flex items-center justify-center bg-black/30 p-4">
-          <div 
-            className="absolute inset-0 z-0" 
-            onClick={() => setSelectedOrderId("")}
-          />
-          <div className="relative z-10 flex w-full max-w-2xl max-h-[90vh] flex-col bg-[var(--surface)] shadow-xl rounded-2xl border border-[var(--border)] overflow-hidden">
-                <div className="flex items-center justify-between border-b border-[var(--border)] p-5 shrink-0">
-                  <div className="flex items-center gap-3">
-                    <div className="h-10 w-10 rounded-xl bg-[var(--primary)] flex items-center justify-center text-white">
-                      <ShoppingBag className="w-5 h-5" />
-                    </div>
-                    <div>
-                      <h4 className="text-lg font-semibold text-[var(--foreground)]">
-                        Chi tiết đơn hàng
-                      </h4>
-                      <div className="flex items-center gap-2">
-                        <span className="font-mono text-xs bg-[var(--primary-soft)] text-[var(--primary)] px-2 py-0.5 rounded font-medium">
-                          #{pickString(selectedOrder, ["orderCode", "code"]) || "Order"}
-                        </span>
-                        <span className="text-xs text-[var(--muted)] font-medium">• {formatDateTime(pickString(selectedOrder, ["createdAt", "updatedAt"]))}</span>
-                      </div>
-                    </div>
-                  </div>
-                  <button
-                    onClick={() => setSelectedOrderId("")}
-                    className="flex h-9 w-9 items-center justify-center rounded-lg text-[var(--muted)] hover:bg-red-50 hover:text-red-500 transition-colors"
-                  >
-                    <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12" /></svg>
-                  </button>
-                </div>
-
-                <div className="flex-1 overflow-y-auto p-5 space-y-5 no-scrollbar">
-                  {/* Summary Grid */}
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="rounded-lg border border-[var(--border)] bg-[var(--surface-muted)] p-3">
-                      <p className="text-[10px] font-medium uppercase tracking-wider text-[var(--muted)] mb-1">Số tiền cần thu</p>
-                      <h3 className="text-lg font-bold text-[var(--primary)]">
-                        {formatCurrency(pickNumber(selectedOrder, ["totalPrice", "amount"]) ?? 0)}
-                      </h3>
-                    </div>
-                    <div className="rounded-lg border border-[var(--border)] bg-[var(--surface-muted)] p-3">
-                      <p className="text-[10px] font-medium uppercase tracking-wider text-[var(--muted)] mb-1">Tiền cọc</p>
-                      <h3 className="text-lg font-bold text-[#16a34a]">
-                        {formatCurrency(pickNumber(selectedOrder, ["deposit"]) ?? 0)}
-                      </h3>
-                    </div>
-                  </div>
-
-                  {/* Customer Info Section Group */}
-                  <div className="space-y-3">
-                    <h5 className="text-[10px] font-medium uppercase tracking-widest text-[var(--muted)] flex items-center gap-2 px-1">
-                       <User className="w-3.5 h-3.5" /> Thông tin khách hàng
-                    </h5>
-                    <div className="rounded-lg border border-[var(--border)] bg-[var(--surface)] divide-y divide-[var(--border)]">
-                      <div className="p-3 flex justify-between items-center">
-                        <span className="text-xs font-medium text-[var(--muted)]">Khách hàng</span>
-                        <div className="flex items-center gap-2">
-                          <div className="h-7 w-7 overflow-hidden rounded-full ring-1 ring-[var(--border)] shadow-sm bg-[color:var(--primary-soft)] flex items-center justify-center text-[var(--primary)] shrink-0 text-xs relative">
-                            {pickString(asRecord(selectedOrder.customerId), ["avatar"]) ? (
-                              <>
-                                <img 
-                                  src={pickString(asRecord(selectedOrder.customerId), ["avatar"])!} 
-                                  alt="Avatar" 
-                                  className="h-full w-full object-cover" 
-                                  onError={(e) => {
-                                    (e.target as HTMLImageElement).style.display = 'none';
-                                    (e.target as HTMLImageElement).parentElement?.classList.add('fallback-active');
-                                  }} 
-                                />
-                                <div className="absolute inset-0 items-center justify-center bg-[color:var(--primary-soft)] text-[var(--primary)] font-bold hidden [.fallback-active_&]:flex uppercase">
-                                  {(pickString(asRecord(selectedOrder.customerId), ["igName", "fullName", "fbName"]) || pickString(selectedOrder, ["igName", "customerName"]) || "K").charAt(0).toUpperCase()}
-                                </div>
-                              </>
-                            ) : (
-                              <span className="font-bold uppercase">
-                                {(pickString(asRecord(selectedOrder.customerId), ["igName", "fullName", "fbName"]) || pickString(selectedOrder, ["igName", "customerName"]) || "K").charAt(0).toUpperCase()}
-                              </span>
-                            )}
-                          </div>
-                          <span className="text-xs font-semibold text-[var(--foreground)]">
-                            {pickString(asRecord(selectedOrder.customerId), ["igName", "fullName", "fbName"]) || pickString(selectedOrder, ["igName", "customerName"]) || "Khách hàng"}
-                          </span>
-                        </div>
-                      </div>
-                      <div className="p-3 flex justify-between items-center">
-                        <span className="text-xs font-medium text-[var(--muted)]">Điện thoại</span>
-                        <span className="text-xs font-semibold text-[var(--primary)]">{pickString(selectedOrder, ["phone"]) || "Chưa cập nhật"}</span>
-                      </div>
-                      <div className="p-3">
-                        <span className="text-xs font-medium text-[var(--muted)] block mb-1">Địa chỉ giao hàng</span>
-                        <span className="text-xs font-medium text-[var(--foreground)] leading-relaxed">{compactAddress(asRecord(selectedOrder.shippingAddress || selectedOrder)) || "Chưa cập nhật địa chỉ"}</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Order Items Section */}
-                  <div className="space-y-3">
-                    <h5 className="text-[10px] font-medium uppercase tracking-widest text-[var(--muted)] flex items-center gap-2 px-1">
-                       <ShoppingBag className="w-3.5 h-3.5" /> Sản phẩm trong đơn ({extractCollection(selectedOrder.items).length})
-                    </h5>
-                    <div className="rounded-lg border border-[var(--border)] bg-[var(--surface)] overflow-hidden">
-                      <table className="w-full text-left text-xs">
-                        <thead className="bg-[var(--surface-muted)] text-[var(--muted)] border-b border-[var(--border)]">
-                          <tr>
-                            <th className="px-4 py-2.5 font-medium uppercase tracking-wider text-[11px]">Mặt hàng</th>
-                            <th className="px-4 py-2.5 font-medium uppercase tracking-wider text-center text-[11px]">SL</th>
-                            <th className="px-4 py-2.5 font-medium uppercase tracking-wider text-right text-[11px]">Giá</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-[var(--border)]">
-                          {extractCollection(selectedOrder.items).length > 0 ? (
-                            extractCollection(selectedOrder.items).map((item, idx) => (
-                              <tr key={idx} className="hover:bg-[var(--hover)] transition-colors">
-                                <td className="px-4 py-2.5">
-                                  <p className="font-medium text-[var(--foreground)] text-xs">{pickString(item, ["productName", "name", "title"]) || "Sản phẩm không tên"}</p>
-                                  <p className="text-[10px] text-[var(--muted)]">#{pickString(item, ["sku", "code"]) || "NO-SKU"}</p>
-                                </td>
-                                <td className="px-4 py-2.5 text-center font-semibold text-xs">{pickNumber(item, ["quantity", "count"]) || 1}</td>
-                                <td className="px-4 py-2.5 text-right font-medium text-[var(--foreground)] text-xs">{formatCurrency(pickNumber(item, ["price"]) ?? 0)}</td>
-                              </tr>
-                            ))
-                          ) : (
-                            <tr>
-                              <td colSpan={3} className="px-4 py-8 text-center text-[var(--muted)] italic">Không tìm thấy thông tin sản phẩm chi tiết</td>
-                            </tr>
-                          )}
-                        </tbody>
-                        <tfoot className="font-semibold border-t border-[var(--border)]">
-                          <tr>
-                            <td colSpan={2} className="px-4 py-2.5 text-right text-[var(--muted)] uppercase tracking-wider text-xs">Tổng cộng</td>
-                            <td className="px-4 py-2.5 text-right text-[var(--primary)] text-xs">{formatCurrency(pickNumber(selectedOrder, ["totalPrice", "amount"]) ?? 0)}</td>
-                          </tr>
-                        </tfoot>
-                      </table>
-                    </div>
-                  </div>
-
-                  {/* Notes Section */}
-                  <div className="space-y-3 pb-4">
-                    <h5 className="text-[10px] font-medium uppercase tracking-widest text-[var(--muted)] flex items-center gap-2 px-1">
-                       <Truck className="w-3.5 h-3.5" /> Ghi chú & Vận chuyển
-                    </h5>
-                    <div className="rounded-lg border border-[var(--border)] bg-[var(--surface-muted)] p-4 space-y-3">
-                       <div>
-                         <p className="text-[10px] font-medium text-[var(--muted)] uppercase tracking-wider mb-1">Ghi chú đơn hàng</p>
-                         <p className="text-xs font-medium text-[var(--foreground)] italic">
-                            {pickString(selectedOrder, ["note", "customerNote"]) || "Không có ghi chú nào cho đơn hàng này."}
-                         </p>
-                       </div>
-                       <div className="pt-3 border-t border-[var(--border)]/50">
-                         <p className="text-[10px] font-medium text-[var(--muted)] uppercase tracking-wider mb-1">Trạng thái vận chuyển</p>
-                         <div className="flex items-center gap-2">
-                           <div className="w-1.5 h-1.5 rounded-full bg-orange-500 animate-pulse" />
-                           <span className="text-xs font-medium text-orange-600">Đang chờ chuẩn bị hàng</span>
-                         </div>
-                       </div>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="p-5 border-t border-[var(--border)] shrink-0 grid grid-cols-2 gap-3">
-                  <button
-                    onClick={() => setIsDeliveryModalOpen(true)}
-                    className="h-11 rounded-lg bg-orange-600 hover:bg-orange-700 text-xs font-semibold text-white transition-colors flex items-center justify-center gap-2"
-                  >
-                    <Truck className="w-4 h-4" />
-                    GIAO HÀNG
-                  </button>
-                  <button
-                    onClick={() => handlePrintSingle(selectedOrder)}
-                    disabled={isPrinting}
-                    className="h-11 rounded-lg bg-[var(--accent-green)] hover:bg-[var(--accent-green-strong)] text-xs font-semibold text-white transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
-                  >
-                    <Printer className="w-4 h-4" />
-                    {isPrinting ? "ĐANG IN..." : "IN VẬN ĐƠN"}
-                  </button>
-                </div>
-          </div>
-        </div>,
+        <OrderDetailModal
+          order={selectedOrder}
+          onClose={() => setSelectedOrderId("")}
+          onOpenDelivery={() => setIsDeliveryModalOpen(true)}
+          onPrint={() => handlePrintSingle(selectedOrder)}
+          isPrinting={isPrinting}
+        />,
         document.body
       )}
 

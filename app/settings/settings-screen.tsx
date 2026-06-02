@@ -49,6 +49,7 @@ export function SettingsScreen() {
     checkStatus,
     printViaBridge,
     saveBridgeConfig,
+    checkBridgeUpdate,
   } = useLocalBridge();
 
   const [localConfig, setLocalConfig] = useState<BridgeConfig>({
@@ -62,6 +63,7 @@ export function SettingsScreen() {
 
   const [isSaving, setIsSaving] = useState(false);
   const [isTesting, setIsTesting] = useState(false);
+  const [isCheckingUpdate, setIsCheckingUpdate] = useState(false);
   const [feedbackMsg, setFeedbackMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
   // Chỉ đồng bộ config từ bridge 1 lần duy nhất khi kết nối lần đầu
@@ -92,6 +94,24 @@ export function SettingsScreen() {
       setFeedbackMsg({ type: "error", text: "Lỗi kết nối: " + (e.message || e) });
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleCheckUpdate = async () => {
+    setIsCheckingUpdate(true);
+    setFeedbackMsg(null);
+    try {
+      const res = await checkBridgeUpdate();
+      if (res.success) {
+        setFeedbackMsg({ type: "success", text: res.message });
+        setTimeout(() => setFeedbackMsg(null), 6000);
+      } else {
+        setFeedbackMsg({ type: "error", text: res.message || "Không thể kiểm tra cập nhật." });
+      }
+    } catch (e: any) {
+      setFeedbackMsg({ type: "error", text: "Lỗi kết nối: " + (e.message || e) });
+    } finally {
+      setIsCheckingUpdate(false);
     }
   };
 
@@ -408,7 +428,7 @@ export function SettingsScreen() {
                                 Quét lại kết nối
                               </button>
                               <a
-                                href="https://github.com/TrHau03/LiveTrackerWeb/releases"
+                                href="https://github.com/duyzxje/LiveTrackerLocalBridge/releases"
                                 target="_blank"
                                 rel="noreferrer"
                                 className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-red-600 hover:bg-red-700 dark:bg-red-700 dark:hover:bg-red-600 px-3 py-1.5 text-xs font-semibold text-white hover:-translate-y-0.5 active:translate-y-0 transition shadow-sm ml-auto"
@@ -620,7 +640,7 @@ export function SettingsScreen() {
                               <button
                                 type="button"
                                 onClick={handleTestPrint}
-                                disabled={isSaving || isTesting}
+                                disabled={isSaving || isTesting || isCheckingUpdate}
                                 className="inline-flex h-9 items-center justify-center gap-1.5 rounded-lg border border-[var(--border)] bg-white dark:bg-[var(--surface)] hover:bg-[var(--hover)] hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-50 disabled:pointer-events-none px-4 text-xs font-semibold text-[var(--foreground)] transition-all duration-200"
                               >
                                 {isTesting ? (
@@ -632,6 +652,25 @@ export function SettingsScreen() {
                                   <>
                                     <Play className="h-3 w-3 stroke-[2.5]" />
                                     In thử hóa đơn
+                                  </>
+                                )}
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={handleCheckUpdate}
+                                disabled={isSaving || isTesting || isCheckingUpdate}
+                                className="inline-flex h-9 items-center justify-center gap-1.5 rounded-lg border border-[var(--border)] bg-white dark:bg-[var(--surface)] hover:bg-[var(--hover)] hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-50 disabled:pointer-events-none px-4 text-xs font-semibold text-[var(--foreground)] transition-all duration-200"
+                              >
+                                {isCheckingUpdate ? (
+                                  <>
+                                    <RefreshCw className="h-3 w-3 animate-spin" />
+                                    Đang kiểm tra...
+                                  </>
+                                ) : (
+                                  <>
+                                    <RefreshCw className="h-3 w-3" />
+                                    Kiểm tra cập nhật Bridge
                                   </>
                                 )}
                               </button>
