@@ -18,6 +18,12 @@ export async function fetchMyOrders(
     sortBy?: string;
     sortOrder?: "asc" | "desc";
     customerId?: string;
+    hasDeposit?: boolean;
+    phone?: string;
+    orderCode?: string;
+    customerName?: string;
+    walkInCustomer?: boolean;
+    tagId?: string;
   },
 ) {
   return proxyRequest(session, {
@@ -32,6 +38,12 @@ export async function fetchMyOrders(
       customerId: query?.customerId || undefined,
       sortBy: query?.sortBy ?? "createdAt",
       sortOrder: query?.sortOrder ?? "desc",
+      hasDeposit: query?.hasDeposit !== undefined ? String(query.hasDeposit) : undefined,
+      phone: query?.phone || undefined,
+      orderCode: query?.orderCode || undefined,
+      customerName: query?.customerName || undefined,
+      walkInCustomer: query?.walkInCustomer !== undefined ? String(query.walkInCustomer) : undefined,
+      tagId: query?.tagId || undefined,
     },
   });
 }

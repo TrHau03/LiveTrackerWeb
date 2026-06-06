@@ -1,12 +1,14 @@
 "use client";
 
 import React, { useState, useDeferredValue } from "react";
-import { createPortal } from "react-dom";
+import { createPortal, flushSync } from "react-dom";
+import { createRoot } from "react-dom/client";
 import { useOrders, useExportOrders } from "@/hooks/use-orders";
 import { useMetrics } from "@/hooks/use-metrics";
 import { useHeaderStore } from "@/lib/store/header-store";
 import { useSettingsStore } from "@/stores/settings-store";
 import { usePrintSettings } from "@/hooks/usePrintSettings";
+import { useTags } from "@/hooks/use-tags";
 import { asRecord, extractApiData, extractCollection, pickString, pickNumber, formatCurrency, formatDateTime } from "@/lib/proxy-client";
 import { printReceiptHtml, printReceipt } from "@/lib/printUtils";
 import { OrderReceipt } from "@/components/print/OrderReceipt";
@@ -102,10 +104,27 @@ export function OrdersScreen() {
   const [customEndDate, setCustomEndDate] = useState("");
   const [isDeliveryModalOpen, setIsDeliveryModalOpen] = useState(false);
 
+  // Advanced filter states
+  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
+  const [hasDepositFilter, setHasDepositFilter] = useState<boolean | undefined>(undefined);
+  const [walkInCustomerFilter, setWalkInCustomerFilter] = useState<boolean | undefined>(undefined);
+  const [selectedTagId, setSelectedTagId] = useState<string>("");
+  const [orderPhone, setOrderPhone] = useState("");
+  const [orderAddress, setOrderAddress] = useState("");
+  const [sortBy, setSortBy] = useState("createdAt");
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
+
+  const { data: tagsData = [] } = useTags();
+  const tags = extractCollection(tagsData);
+
   // Reset page when filter changes
   React.useEffect(() => {
     setPage(1);
-  }, [search, period, customStartDate, customEndDate, statusFilter]);
+  }, [
+    search, period, customStartDate, customEndDate, statusFilter,
+    hasDepositFilter, walkInCustomerFilter, selectedTagId, orderPhone,
+    orderAddress, sortBy, sortOrder
+  ]);
 
   const dateRange = React.useMemo(() => {
     const now = new Date();
@@ -140,6 +159,12 @@ export function OrdersScreen() {
     search, 
     startDate: dateRange.startDate || undefined, 
     endDate: dateRange.endDate || undefined,
+    hasDeposit: hasDepositFilter,
+    phone: orderPhone.trim() || undefined,
+    walkInCustomer: walkInCustomerFilter,
+    tagId: selectedTagId || undefined,
+    sortBy,
+    sortOrder
   });
 
   const state = {
@@ -228,7 +253,6 @@ export function OrdersScreen() {
     try {
       const settings = await getPrintSettings("order");
       const shopInfo = { name: "MINI SHOP", address: "", phone: "" };
-      const { createRoot } = await import("react-dom/client");
 
       for (let i = 0; i < ordersToPrint.length; i++) {
         setPrintProgress({ current: i + 1, total: ordersToPrint.length });
@@ -239,9 +263,8 @@ export function OrdersScreen() {
         document.body.appendChild(container);
 
         const root = createRoot(container);
-        await new Promise<void>(resolve => {
+        flushSync(() => {
           root.render(<OrderReceipt order={ordersToPrint[i]} settings={settings} shopInfo={shopInfo} />);
-          setTimeout(resolve, 150);
         });
 
         const receiptEl = container.querySelector(".receipt") as HTMLElement;
@@ -260,12 +283,12 @@ export function OrdersScreen() {
           }
         }
 
-        setTimeout(() => {
-          root.unmount();
-          if (container.parentNode) document.body.removeChild(container);
-        }, 2000);
+        root.unmount();
+        if (container.parentNode) document.body.removeChild(container);
 
-        await new Promise(r => setTimeout(r, 600));
+        if (i < ordersToPrint.length - 1) {
+          await new Promise(r => setTimeout(r, 200));
+        }
       }
     } catch (e) {
       console.error("Batch print error:", e);
@@ -282,7 +305,6 @@ export function OrdersScreen() {
     try {
       const settings = await getPrintSettings("order");
       const shopInfo = { name: "MINI SHOP", address: "", phone: "" };
-      const { createRoot } = await import("react-dom/client");
 
       const container = document.createElement("div");
       container.style.position = "absolute";
@@ -290,9 +312,8 @@ export function OrdersScreen() {
       document.body.appendChild(container);
 
       const root = createRoot(container);
-      await new Promise<void>(resolve => {
+      flushSync(() => {
         root.render(<OrderReceipt order={order} settings={settings} shopInfo={shopInfo} />);
-        setTimeout(resolve, 150);
       });
 
       const receiptEl = container.querySelector(".receipt") as HTMLElement;
@@ -313,7 +334,7 @@ export function OrdersScreen() {
       setTimeout(() => {
         root.unmount();
         if (container.parentNode) document.body.removeChild(container);
-      }, 2000);
+      }, 300);
     } catch (e) {
       console.error("Print error:", e);
     } finally {
@@ -423,6 +444,19 @@ export function OrdersScreen() {
                   </option>
                 ))}
               </select>
+
+              <button
+                type="button"
+                onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
+                className={`h-9 px-3 rounded-lg border text-xs font-semibold flex items-center gap-1.5 transition-all select-none ${
+                  showAdvancedFilters 
+                    ? "bg-[var(--primary)] text-white border-[var(--primary)] shadow-sm" 
+                    : "bg-[var(--surface)] text-[var(--foreground-soft)] border-[var(--border)] hover:bg-[var(--hover)]"
+                }`}
+              >
+                <Filter className="w-3.5 h-3.5" />
+                Bộ lọc nâng cao
+              </button>
             </div>
           </div>
 
@@ -440,6 +474,121 @@ export function OrdersScreen() {
             )}
           </div>
         </div>
+
+        {/* Advanced Filter Panel */}
+        {showAdvancedFilters && (
+          <div className="mb-4 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 p-4 rounded-xl border border-[var(--border)] bg-[var(--surface)] shadow-inner animate-[fadeIn_0.2s_ease-out]">
+            {/* Lọc Trạng thái cọc */}
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-bold text-[var(--muted)] uppercase tracking-wider block">Trạng thái cọc</label>
+              <select
+                value={hasDepositFilter === undefined ? "" : String(hasDepositFilter)}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setHasDepositFilter(val === "" ? undefined : val === "true");
+                }}
+                className={`${CONTROL_CLASS} w-full text-xs h-9`}
+              >
+                <option value="">Tất cả</option>
+                <option value="true">Đã cọc tiền</option>
+                <option value="false">Chưa cọc tiền</option>
+              </select>
+            </div>
+
+            {/* Lọc Khách vãng lai */}
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-bold text-[var(--muted)] uppercase tracking-wider block">Khách vãng lai</label>
+              <select
+                value={walkInCustomerFilter === undefined ? "" : String(walkInCustomerFilter)}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setWalkInCustomerFilter(val === "" ? undefined : val === "true");
+                }}
+                className={`${CONTROL_CLASS} w-full text-xs h-9`}
+              >
+                <option value="">Tất cả</option>
+                <option value="true">Chỉ khách vãng lai</option>
+                <option value="false">Không bao gồm khách vãng lai</option>
+              </select>
+            </div>
+
+            {/* Lọc theo Nhãn (Tags) */}
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-bold text-[var(--muted)] uppercase tracking-wider block">Lọc theo Nhãn (Tag)</label>
+              <select
+                value={selectedTagId}
+                onChange={(e) => setSelectedTagId(e.target.value)}
+                className={`${CONTROL_CLASS} w-full text-xs h-9`}
+              >
+                <option value="">Tất cả nhãn</option>
+                {tags.map((tag: any) => (
+                  <option key={tag._id} value={tag._id}>
+                    {tag.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Số điện thoại */}
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-bold text-[var(--muted)] uppercase tracking-wider block">Số điện thoại</label>
+              <input
+                type="text"
+                value={orderPhone}
+                onChange={(e) => setOrderPhone(e.target.value)}
+                placeholder="Nhập SĐT cần lọc..."
+                className={`${CONTROL_CLASS} w-full text-xs h-9`}
+              />
+            </div>
+
+            {/* Sắp xếp cột */}
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-bold text-[var(--muted)] uppercase tracking-wider block">Sắp xếp theo</label>
+              <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value)}
+                className={`${CONTROL_CLASS} w-full text-xs h-9`}
+              >
+                <option value="createdAt">Ngày tạo</option>
+                <option value="totalPrice">Tổng thanh toán</option>
+                <option value="quantity">Số lượng sản phẩm</option>
+              </select>
+            </div>
+
+            {/* Thứ tự sắp xếp */}
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-bold text-[var(--muted)] uppercase tracking-wider block">Thứ tự</label>
+              <select
+                value={sortOrder}
+                onChange={(e) => setSortOrder(e.target.value as "asc" | "desc")}
+                className={`${CONTROL_CLASS} w-full text-xs h-9`}
+              >
+                <option value="desc">Giảm dần (Mới nhất / Lớn nhất)</option>
+                <option value="asc">Tăng dần (Cũ nhất / Nhỏ nhất)</option>
+              </select>
+            </div>
+
+            {/* Nút reset nhanh bộ lọc */}
+            <div className="sm:col-span-2 flex items-end justify-end gap-2.5">
+              <button
+                type="button"
+                onClick={() => {
+                  setHasDepositFilter(undefined);
+                  setWalkInCustomerFilter(undefined);
+                  setSelectedTagId("");
+                  setOrderPhone("");
+                  setOrderAddress("");
+                  setSortBy("createdAt");
+                  setSortOrder("desc");
+                }}
+                className="inline-flex h-9 items-center justify-center gap-1.5 rounded-lg border border-red-200 bg-red-50 px-4 text-xs font-semibold text-red-600 hover:bg-red-100 active:scale-95 transition-all duration-150"
+              >
+                <RefreshCcw className="w-3.5 h-3.5" />
+                Reset bộ lọc
+              </button>
+            </div>
+          </div>
+        )}
 
         {exportState ? (
           <div className="mb-3 rounded-lg border border-[var(--border)] bg-[var(--surface)] px-4 py-2.5 text-sm text-[var(--muted)]">

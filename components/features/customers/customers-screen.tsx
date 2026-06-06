@@ -7,6 +7,7 @@ import { useOrders } from "@/hooks/use-orders";
 import { useHeaderStore } from "@/lib/store/header-store";
 import { asRecord, extractApiData, extractCollection, pickString, pickNumber } from "@/lib/proxy-client";
 import { Pencil, ShoppingBag } from "lucide-react";
+import { OrderStatusBadge } from "@/components/features/orders/order-status-badge";
 
 import {
   Hero,
@@ -453,6 +454,7 @@ export function CustomersScreen() {
                         const date = pickString(order, ["createdAt"]) || "";
                         const total = pickNumber(order, ["totalPrice", "amount"]) || 0;
                         const qty = pickNumber(order, ["quantity", "itemsCount"]) || 0;
+                        const status = pickString(order, ["status"]);
                         return (
                           <div
                             key={`${pickString(order, ["id", "_id"]) || idx}`}
@@ -476,10 +478,7 @@ export function CustomersScreen() {
                             </div>
                             <div className="flex items-center justify-between pt-1 border-t border-[var(--border)]/30 mt-1">
                               <span className="text-[10px] text-[var(--muted)] font-medium">Trạng thái</span>
-                              <span className="inline-flex items-center gap-1 rounded-full bg-orange-50 dark:bg-orange-950/20 px-2 py-0.5 text-[9px] font-semibold text-orange-700 dark:text-orange-400 border border-orange-200/50">
-                                <span className="h-1 w-1 rounded-full bg-orange-500 animate-pulse"></span>
-                                Chờ xử lý
-                              </span>
+                              <OrderStatusBadge status={status} size="sm" />
                             </div>
                           </div>
                         );

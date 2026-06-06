@@ -15,11 +15,43 @@ import {
   exportOrdersExcel 
 } from "@/lib/services/orders-service";
 
-export function useOrders(queryMeta?: { page?: number; limit?: number; search?: string; startDate?: string; endDate?: string; customerId?: string }) {
+export function useOrders(queryMeta?: { 
+  page?: number; 
+  limit?: number; 
+  search?: string; 
+  startDate?: string; 
+  endDate?: string; 
+  customerId?: string;
+  hasDeposit?: boolean;
+  phone?: string;
+  orderCode?: string;
+  customerName?: string;
+  walkInCustomer?: boolean;
+  tagId?: string;
+  sortBy?: string;
+  sortOrder?: "asc" | "desc";
+}) {
   const { logout, patchSession, session } = useSession();
 
   return useQuery({
-    queryKey: ["orders", session.user?.id, queryMeta?.page, queryMeta?.limit, queryMeta?.search, queryMeta?.startDate, queryMeta?.endDate, queryMeta?.customerId],
+    queryKey: [
+      "orders", 
+      session.user?.id, 
+      queryMeta?.page, 
+      queryMeta?.limit, 
+      queryMeta?.search, 
+      queryMeta?.startDate, 
+      queryMeta?.endDate, 
+      queryMeta?.customerId,
+      queryMeta?.hasDeposit,
+      queryMeta?.phone,
+      queryMeta?.orderCode,
+      queryMeta?.customerName,
+      queryMeta?.walkInCustomer,
+      queryMeta?.tagId,
+      queryMeta?.sortBy,
+      queryMeta?.sortOrder
+    ],
     queryFn: async () => {
       const response = await fetchMyOrders(session, {
         page: queryMeta?.page || 1,
@@ -28,6 +60,14 @@ export function useOrders(queryMeta?: { page?: number; limit?: number; search?: 
         fromDate: queryMeta?.startDate,
         toDate: queryMeta?.endDate,
         customerId: queryMeta?.customerId,
+        hasDeposit: queryMeta?.hasDeposit,
+        phone: queryMeta?.phone,
+        orderCode: queryMeta?.orderCode,
+        customerName: queryMeta?.customerName,
+        walkInCustomer: queryMeta?.walkInCustomer,
+        tagId: queryMeta?.tagId,
+        sortBy: queryMeta?.sortBy,
+        sortOrder: queryMeta?.sortOrder,
       });
       applyAuthResponses([response.response], patchSession, logout);
       return response.data;

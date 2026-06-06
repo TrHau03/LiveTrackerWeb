@@ -14,7 +14,10 @@ import {
   GhtkCreateOrderBizContent,
   GhtkCalculateFeesResult,
   GhnProvince,
-  GhnWard
+  GhnWard,
+  DeliveryProviderConfig,
+  DeliveryProviderConfigUpsertPayload,
+  DeliveryOrderHistoryDetail,
 } from "@/lib/types/delivery";
 import { 
   fetchDeliveryProviders, 
@@ -26,7 +29,13 @@ import {
   calculateGhtkFees,
   createGhtkOrder,
   fetchGhnProvinces,
-  fetchGhnWards
+  fetchGhnWards,
+  fetchProviderConfig,
+  upsertProviderConfig,
+  registerGhnShop,
+  cancelDeliveryOrder,
+  fetchDeliveryOrderDetail,
+  fetchDeliveryOrderById,
 } from "@/lib/services/delivery-service";
 import { applyAuthResponses } from "@/hooks/use-auth-sync";
 import { extractApiData } from "@/lib/proxy-client";
@@ -42,6 +51,33 @@ export function useDeliveryProviders() {
       return extractApiData<DeliveryProvider[]>(response.data) || [];
     },
     enabled: !!session.accessToken,
+  });
+}
+
+export function useProviderConfig(provider: string) {
+  const { logout, patchSession, session } = useSession();
+
+  return useQuery({
+    queryKey: ["delivery-provider-config", provider],
+    queryFn: async () => {
+      const response = await fetchProviderConfig(session, provider);
+      applyAuthResponses([response.response], patchSession, logout);
+      return extractApiData<DeliveryProviderConfig | null>(response.data);
+    },
+    enabled: !!session.accessToken && !!provider,
+  });
+}
+
+export function useUpsertProviderConfig() {
+  const { logout, patchSession, session } = useSession();
+
+  return useMutation({
+    mutationFn: async ({ provider, body }: { provider: string; body: DeliveryProviderConfigUpsertPayload }) => {
+      const response = await upsertProviderConfig(session, provider, body);
+      applyAuthResponses([response.response], patchSession, logout);
+      if (!response.ok) throw new Error("Cập nhật cấu hình thất bại");
+      return extractApiData<DeliveryProviderConfig>(response.data);
+    },
   });
 }
 
@@ -85,17 +121,67 @@ export function useCreateDeliveryOrder() {
   });
 }
 
-export function useDeliveryOrders(query?: { page?: number; limit?: number; search?: string }) {
+export function useDeliveryOrders(query?: {
+  page?: number;
+  limit?: number;
+  search?: string;
+  provider?: string;
+  typeCode?: string;
+  status?: string;
+  sortBy?: string;
+  sortOrder?: string;
+}) {
   const { logout, patchSession, session } = useSession();
 
   return useQuery({
-    queryKey: ["delivery-orders", query?.page, query?.limit, query?.search],
+    queryKey: ["delivery-orders", query],
     queryFn: async () => {
       const response = await fetchDeliveryOrders(session, query);
       applyAuthResponses([response.response], patchSession, logout);
-      return extractApiData<{ items: DeliveryOrderHistory[] }>(response.data);
+      return extractApiData<{ items: DeliveryOrderHistory[]; pagination: { page: number; limit: number; total: number; totalPages: number } }>(response.data);
     },
     enabled: !!session.accessToken,
+  });
+}
+
+export function useDeliveryOrderById(id: string) {
+  const { logout, patchSession, session } = useSession();
+
+  return useQuery({
+    queryKey: ["delivery-order-detail", id],
+    queryFn: async () => {
+      if (!id) return null;
+      const response = await fetchDeliveryOrderById(session, id);
+      applyAuthResponses([response.response], patchSession, logout);
+      return extractApiData<DeliveryOrderHistoryDetail>(response.data);
+    },
+    enabled: !!session.accessToken && !!id,
+  });
+}
+
+export function useCancelDeliveryOrder() {
+  const { logout, patchSession, session } = useSession();
+
+  return useMutation({
+    mutationFn: async ({ provider, body }: { provider: string; body: { bizContent: any; providerConfigId?: string } }) => {
+      const response = await cancelDeliveryOrder(session, provider, body);
+      applyAuthResponses([response.response], patchSession, logout);
+      if (!response.ok) throw new Error("Hủy vận đơn thất bại");
+      return extractApiData<any>(response.data);
+    },
+  });
+}
+
+export function useDeliveryOrderDetail(provider: string) {
+  const { logout, patchSession, session } = useSession();
+
+  return useMutation({
+    mutationFn: async (body: { bizContent: any; providerConfigId?: string }) => {
+      const response = await fetchDeliveryOrderDetail(session, provider, body);
+      applyAuthResponses([response.response], patchSession, logout);
+      if (!response.ok) throw new Error("Lấy chi tiết vận đơn thất bại");
+      return extractApiData<any>(response.data);
+    },
   });
 }
 
@@ -127,4 +213,18 @@ export function useGhnWards(provinceId?: number, providerConfigId?: string) {
     enabled: !!session.accessToken && !!provinceId,
   });
 }
+
+export function useRegisterGhnShop() {
+  const { logout, patchSession, session } = useSession();
+
+  return useMutation({
+    mutationFn: async ({ body, providerConfigId, ghnToken }: { body: { bizContent: any }; providerConfigId?: string; ghnToken?: string }) => {
+      const response = await registerGhnShop(session, body, providerConfigId, ghnToken);
+      applyAuthResponses([response.response], patchSession, logout);
+      if (!response.ok) throw new Error("Đăng ký shop GHN thất bại");
+      return extractApiData<any>(response.data);
+    },
+  });
+}
+
 

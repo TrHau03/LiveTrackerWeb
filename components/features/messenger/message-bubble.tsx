@@ -1,6 +1,7 @@
 "use client";
 
 import React, { memo, useCallback, useState } from "react";
+import { createPortal } from "react-dom";
 import type { Message, TemplateButton } from "@/types";
 
 // ─── Utilities ───────────────────────────────────────────────────────────────
@@ -172,14 +173,198 @@ const TemplateButtonsBlock = memo(function TemplateButtonsBlock({
 // ─── ImageViewer ─────────────────────────────────────────────────────────────
 
 function ImageViewer({ url, onClose }: { url: string; onClose: () => void }) {
+  const [isZoomed, setIsZoomed] = useState(false);
+  const [isMounted, setIsMounted] = useState(false);
+
+  // Trigger intro animation on mount
+  React.useEffect(() => {
+    const timer = setTimeout(() => setIsMounted(true), 50);
+    return () => clearTimeout(timer);
+  }, []);
+
+  // Close on Escape key press
+  React.useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        onClose();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [onClose]);
+
+  const handleDownload = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    try {
+      const response = await fetch(url);
+      const blob = await response.blob();
+      const blobUrl = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = blobUrl;
+      const filename = url.split("/").pop()?.split("?")[0] || "downloaded_image.jpg";
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(blobUrl);
+    } catch (error) {
+      // Fallback if CORS issues occur
+      const link = document.createElement("a");
+      link.href = url;
+      link.target = "_blank";
+      link.download = "image.jpg";
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+  };
+
+  const toggleZoom = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setIsZoomed(!isZoomed);
+  };
+
   return (
     <div className="msg-image-viewer" onClick={onClose}>
-      <button type="button" className="msg-image-viewer-close" onClick={onClose}>
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2">
-          <path d="M18 6L6 18M6 6l12 12" />
-        </svg>
-      </button>
-      <img src={url} alt="Preview" className="msg-image-viewer-img" onClick={(e) => e.stopPropagation()} />
+      <div className="msg-image-viewer-controls" onClick={(e) => e.stopPropagation()}>
+        <button
+          type="button"
+          className="msg-image-viewer-btn"
+          onClick={handleDownload}
+          title="Tải ảnh xuống"
+        >
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+            <polyline points="7 10 12 15 17 10" />
+            <line x1="12" y1="15" x2="12" y2="3" />
+          </svg>
+        </button>
+        <button
+          type="button"
+          className="msg-image-viewer-btn"
+          onClick={onClose}
+          title="Đóng (Esc)"
+        >
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <line x1="18" y1="6" x2="6" y2="18" />
+            <line x1="6" y1="6" x2="18" y2="18" />
+          </svg>
+        </button>
+      </div>
+
+      <div className="msg-image-viewer-content">
+        <img
+          src={url}
+          alt="Preview"
+          className={`msg-image-viewer-img ${isMounted ? "is-mounted" : ""} ${isZoomed ? "is-zoomed" : ""}`}
+          onClick={toggleZoom}
+        />
+      </div>
+
+      <style jsx global>{`
+        .msg-image-viewer {
+          position: fixed;
+          inset: 0;
+          z-index: 99999;
+          background: rgba(0, 0, 0, 0);
+          backdrop-filter: blur(0px);
+          -webkit-backdrop-filter: blur(0px);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          cursor: pointer;
+          overflow: auto;
+          transition: background-color 0.25s ease-out, backdrop-filter 0.25s ease-out, -webkit-backdrop-filter 0.25s ease-out;
+          animation: viewer-fade-in 0.25s ease-out forwards;
+        }
+
+        .msg-image-viewer-controls {
+          position: fixed;
+          top: 20px;
+          right: 20px;
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          z-index: 100000;
+          background: rgba(0, 0, 0, 0.5);
+          backdrop-filter: blur(10px);
+          -webkit-backdrop-filter: blur(10px);
+          padding: 8px 16px;
+          border-radius: 30px;
+          border: 1px solid rgba(255, 255, 255, 0.15);
+          box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+        }
+
+        .msg-image-viewer-btn {
+          background: transparent;
+          border: none;
+          width: 36px;
+          height: 36px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          cursor: pointer;
+          border-radius: 50%;
+          transition: background-color 0.2s, transform 0.15s;
+        }
+
+        .msg-image-viewer-btn:hover {
+          background: rgba(255, 255, 255, 0.15);
+          transform: scale(1.05);
+        }
+
+        .msg-image-viewer-btn:active {
+          transform: scale(0.95);
+        }
+
+        .msg-image-viewer-content {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          min-width: 100%;
+          min-height: 100%;
+          padding: 40px;
+          box-sizing: border-box;
+        }
+
+        .msg-image-viewer-img {
+          max-width: 90vw;
+          max-height: 85vh;
+          object-fit: contain;
+          border-radius: 4px;
+          cursor: zoom-in;
+          box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+          user-select: none;
+          -webkit-user-drag: none;
+          opacity: 0;
+          transform: scale(0.95);
+          transition: transform 0.3s cubic-bezier(0.2, 0, 0.2, 1), opacity 0.25s ease-out;
+        }
+
+        .msg-image-viewer-img.is-mounted {
+          opacity: 1;
+          transform: scale(1);
+        }
+
+        .msg-image-viewer-img.is-mounted.is-zoomed {
+          transform: scale(1.6);
+          cursor: zoom-out;
+          margin: 20vh 20vw;
+        }
+
+        @keyframes viewer-fade-in {
+          from {
+            background: rgba(0, 0, 0, 0);
+            backdrop-filter: blur(0px);
+            -webkit-backdrop-filter: blur(0px);
+          }
+          to {
+            background: rgba(0, 0, 0, 0.93);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+          }
+        }
+      `}</style>
     </div>
   );
 }
@@ -241,6 +426,12 @@ export const MessageBubble = memo(function MessageBubble({
 }: MessageBubbleProps) {
   const isShop = message.fromShop;
   const [viewerUrl, setViewerUrl] = useState<string | null>(null);
+  const [mounted, setMounted] = useState(false);
+
+  React.useEffect(() => {
+    setMounted(true);
+    return () => setMounted(false);
+  }, []);
 
   const hasAttachments = message.attachmentUrls && message.attachmentUrls.length > 0;
   const isTemplateMessage = message.messageType === "template" && message.templateData;
@@ -334,9 +525,12 @@ export const MessageBubble = memo(function MessageBubble({
       </div>
 
       {/* Image Viewer Modal */}
-      {viewerUrl && (
-        <ImageViewer url={viewerUrl} onClose={() => setViewerUrl(null)} />
-      )}
+      {viewerUrl && mounted && typeof document !== "undefined" &&
+        createPortal(
+          <ImageViewer url={viewerUrl} onClose={() => setViewerUrl(null)} />,
+          document.body
+        )
+      }
 
       <style jsx>{`
         .msg-row {
@@ -464,42 +658,6 @@ export const MessageBubble = memo(function MessageBubble({
           max-height: 280px;
           border-radius: 18px;
           object-fit: cover;
-        }
-
-        .msg-image-viewer {
-          position: fixed;
-          inset: 0;
-          z-index: 9999;
-          background: rgba(0, 0, 0, 0.85);
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          cursor: pointer;
-        }
-        .msg-image-viewer-close {
-          position: absolute;
-          top: 16px;
-          right: 16px;
-          background: rgba(255, 255, 255, 0.15);
-          border: none;
-          border-radius: 50%;
-          width: 40px;
-          height: 40px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          cursor: pointer;
-          transition: background 150ms;
-        }
-        .msg-image-viewer-close:hover {
-          background: rgba(255, 255, 255, 0.25);
-        }
-        .msg-image-viewer-img {
-          max-width: 90vw;
-          max-height: 90vh;
-          object-fit: contain;
-          border-radius: 8px;
-          cursor: default;
         }
 
         @keyframes spin {

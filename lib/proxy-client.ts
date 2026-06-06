@@ -132,7 +132,7 @@ export type JsonRecord = Record<string, string | number | boolean>;
 export type ProxyRequestOptions = {
   path: string;
   scope?: ApiScope;
-  method?: "GET" | "POST" | "PATCH" | "DELETE";
+  method?: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
   query?: Record<string, string | number | boolean | undefined | null>;
   headers?: Record<string, string>;
   body?: unknown;

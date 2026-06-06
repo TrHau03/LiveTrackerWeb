@@ -32,6 +32,11 @@ export const appNavigation = [
     shortLabel: "Đơn",
   },
   {
+    href: "/delivery",
+    label: "Giao hàng",
+    shortLabel: "GH",
+  },
+  {
     href: "/customers",
     label: "Khách hàng",
     shortLabel: "Khách",

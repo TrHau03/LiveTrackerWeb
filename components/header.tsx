@@ -4,6 +4,7 @@ import React from "react";
 import { usePathname } from "next/navigation";
 import { useConfigHeader } from "@/hooks/use-config-header";
 import { useHeaderStore } from "@/lib/store/header-store";
+import { NotificationDropdown } from "@/components/notification-dropdown";
 
 
 
@@ -90,6 +91,9 @@ export function Header() {
                 })}
               </div>
             )}
+
+            {/* Notification Dropdown */}
+            <NotificationDropdown />
           </div>
         </div>
 

@@ -1,25 +1,79 @@
 /**
- * useTags — React Query hook cho danh sách nhãn khách hàng.
+ * useTags — React Query hooks for managing system tags.
  */
-import { useQuery } from "@tanstack/react-query";
-
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useSession } from "@/components/session-provider";
-import { proxyRequest } from "@/lib/proxy-client";
 import { applyAuthResponses } from "@/hooks/use-auth-sync";
+import { 
+  fetchMyTags, 
+  createTag, 
+  updateTag, 
+  deleteTag,
+  CreateTagDto,
+  UpdateTagDto
+} from "@/lib/services/tags-service";
 
-export function useTags() {
+export function useTags(query?: { page?: number; limit?: number }) {
   const { logout, patchSession, session } = useSession();
 
   return useQuery({
-    queryKey: ["tags", session.user?.id],
+    queryKey: ["tags", session.user?.id, query?.page, query?.limit],
     queryFn: async () => {
-      const response = await proxyRequest(session, {
-        path: "/tags/user/my-tags",
-      });
+      const response = await fetchMyTags(session, query);
       applyAuthResponses([response.response], patchSession, logout);
       return response.data;
     },
     enabled: !!session.accessToken,
-    staleTime: 5 * 60 * 1000, // Cache 5 phút
+  });
+}
+
+export function useCreateTag() {
+  const queryClient = useQueryClient();
+  const { logout, patchSession, session } = useSession();
+
+  return useMutation({
+    mutationFn: async (body: CreateTagDto) => {
+      const response = await createTag(session, body);
+      applyAuthResponses([response.response], patchSession, logout);
+      if (!response.ok) throw new Error((response.data as any)?.message || "Could not create tag");
+      return response.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["tags"] });
+    },
+  });
+}
+
+export function useUpdateTag() {
+  const queryClient = useQueryClient();
+  const { logout, patchSession, session } = useSession();
+
+  return useMutation({
+    mutationFn: async ({ tagId, body }: { tagId: string; body: UpdateTagDto }) => {
+      const response = await updateTag(session, tagId, body);
+      applyAuthResponses([response.response], patchSession, logout);
+      if (!response.ok) throw new Error((response.data as any)?.message || "Could not update tag");
+      return response.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["tags"] });
+    },
+  });
+}
+
+export function useDeleteTag() {
+  const queryClient = useQueryClient();
+  const { logout, patchSession, session } = useSession();
+
+  return useMutation({
+    mutationFn: async (tagId: string) => {
+      const response = await deleteTag(session, tagId);
+      applyAuthResponses([response.response], patchSession, logout);
+      if (!response.ok) throw new Error((response.data as any)?.message || "Could not delete tag");
+      return response.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["tags"] });
+    },
   });
 }

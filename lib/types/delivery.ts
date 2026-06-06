@@ -74,6 +74,9 @@ export interface DeliveryOrderHistory {
   statusName: string;
   createdAt: string;
   updatedAt: string;
+  lastCenterName?: string;
+  sortingCode?: string;
+  providerCreateOrderTime?: string;
 }
 
 // GHN Types
@@ -204,3 +207,178 @@ export interface GhtkCreateOrderBizContent {
     transport?: string;
   };
 }
+
+export interface DeliveryProviderConfig {
+  id: string;
+  provider: string;
+  apiAccount?: string;
+  customerCode?: string;
+  shopId?: string;
+  partnerCode?: string;
+  baseUrl?: string;
+  isActive?: boolean;
+  hasPrivateKey?: boolean;
+  hasCustomerKey?: boolean;
+  hasToken?: boolean;
+  hasReferToken?: boolean;
+  hasPassword?: boolean;
+  hasCustomerPassword?: boolean;
+  metadata?: any;
+  updatedAt?: string;
+  createdAt?: string;
+}
+
+export interface DeliveryProviderConfigUpsertPayload {
+  apiAccount?: string;
+  privateKey?: string;
+  customerCode?: string;
+  customerKey?: string;
+  password?: string;
+  token?: string;
+  shopId?: string;
+  partnerCode?: string;
+  referToken?: string;
+  baseUrl?: string;
+  isActive?: boolean;
+  metadata?: any;
+}
+
+export interface DeliveryDetailTrackingEvent {
+  time?: string;
+  description?: string;
+  typeCode?: number | string;
+  typeName?: string;
+  locationName?: string;
+  locationId?: string;
+  actorName?: string;
+  actorPhone?: string;
+  receivedAt?: string;
+  updatedAt?: string;
+  status?: string;
+}
+
+export interface DeliveryOrderHistoryDetail {
+  id: string;
+  orderId?: string;
+  provider: string;
+  status: string;
+  createdAt: string;
+  updatedAt: string;
+  shipment?: {
+    txlogisticId?: string;
+    billCode?: string;
+    orderCode?: string;
+    clientOrderCode?: string;
+    sortingCode?: string;
+    sortCode?: string;
+    labelId?: string;
+    partnerId?: string;
+    area?: string;
+    providerCreatedAt?: string;
+    createdAt?: string;
+    pickDate?: string;
+    deliverDate?: string;
+    orderDate?: string;
+    pickupTime?: string;
+    expectedDeliveryAt?: string;
+    leadtime?: string;
+    transportType?: string;
+  };
+  service?: {
+    orderType?: string;
+    serviceType?: string;
+    deliveryType?: string;
+    goodsType?: string;
+    payType?: string;
+    expressType?: string;
+    serviceTypeId?: number;
+    paymentTypeId?: number;
+    requiredNote?: string;
+    pickShift?: number[];
+  };
+  sender?: {
+    name?: string;
+    phone?: string;
+    mobile?: string;
+    prov?: string;
+    province?: string;
+    city?: string;
+    district?: string;
+    area?: string;
+    ward?: string;
+    address?: string;
+  };
+  receiver?: {
+    name?: string;
+    phone?: string;
+    mobile?: string;
+    prov?: string;
+    province?: string;
+    city?: string;
+    district?: string;
+    area?: string;
+    ward?: string;
+    address?: string;
+  };
+  returnAddress?: {
+    name?: string;
+    phone?: string;
+    province?: string;
+    district?: string;
+    ward?: string;
+    address?: string;
+  };
+  packageInfo?: {
+    weight?: number | string;
+    length?: number | string;
+    width?: number | string;
+    height?: number | string;
+    convertedWeight?: number;
+    content?: string;
+  };
+  items?: Array<{
+    itemName?: string;
+    name?: string;
+    englishName?: string;
+    quantity?: number | string;
+    number?: number | string;
+    itemValue?: number | string;
+    price?: number;
+    weight?: number;
+    code?: string;
+    category?: {
+      level1?: string;
+    };
+  }>;
+  amount?: {
+    goodsValue?: number | string;
+    codMoney?: number | string;
+    codAmount?: number;
+    insuranceValue?: number;
+    estimatedShippingFee?: number;
+    totalFee?: number | string;
+    codFee?: number;
+    insuranceFee?: number;
+    codFailedAmount?: number;
+    feeBreakdown?: {
+      mainService?: number;
+      insurance?: number;
+      coupon?: number;
+      returnFee?: number;
+      stationDo?: number;
+      stationPu?: number;
+      r2s?: number;
+      codFailedFee?: number;
+    };
+  };
+  isInsured?: boolean;
+  note?: string;
+  tracking?: {
+    currentCenterName?: string;
+    latestEvent?: DeliveryDetailTrackingEvent;
+    history?: DeliveryDetailTrackingEvent[];
+  };
+  logs?: DeliveryDetailTrackingEvent[];
+  latestLog?: DeliveryDetailTrackingEvent;
+}
+
