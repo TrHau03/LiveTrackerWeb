@@ -129,28 +129,61 @@ export function printReceiptHtml(receiptElement: HTMLElement): void {
   }, 300);
 }
 
-// ═══════════════════════════════════════════
-// RENDER RECEIPT TO IMAGE (for send-bill)
-// ═══════════════════════════════════════════
+// Eager-preload html2canvas ngay khi module này được import lần đầu tiên
+// để lần in đầu tiên không phải chờ tải thư viện
+let html2canvasInstance: any = null;
+let html2canvasLoadPromise: Promise<any> | null = null;
+
+function ensureHtml2Canvas(): Promise<any> {
+  if (html2canvasInstance) return Promise.resolve(html2canvasInstance);
+  if (!html2canvasLoadPromise && typeof window !== "undefined") {
+    html2canvasLoadPromise = import("html2canvas").then((m) => {
+      html2canvasInstance = m.default;
+      return html2canvasInstance;
+    });
+  }
+  return html2canvasLoadPromise || Promise.resolve(null);
+}
+
+// Trigger preload ngay khi file này được import
+if (typeof window !== "undefined") {
+  ensureHtml2Canvas();
+}
 
 export async function renderReceiptToImage(
   receiptElement: HTMLElement,
 ): Promise<Blob> {
-  const html2canvas = (await import("html2canvas")).default;
-  const canvas = await html2canvas(receiptElement, {
-    width: 576,
-    backgroundColor: "#ffffff",
-    scale: 1,
-  });
+  const h2c = await ensureHtml2Canvas();
 
-  return new Promise((resolve, reject) => {
-    canvas.toBlob(
-      (blob: Blob | null) =>
-        blob ? resolve(blob) : reject(new Error("Cannot convert to blob")),
-      "image/jpeg",
-      0.6,
-    );
-  });
+  // Tạo và chèn style chứa RECEIPT_CSS vào head của tài liệu để html2canvas áp dụng đúng định dạng chiều rộng (576px)
+  const styleEl = document.createElement("style");
+  styleEl.innerHTML = RECEIPT_CSS;
+  document.head.appendChild(styleEl);
+
+  try {
+    const canvas = await h2c(receiptElement, {
+      width: 576,
+      backgroundColor: "#ffffff",
+      scale: 1,
+      logging: false,
+      useCORS: true,
+      imageTimeout: 0, // Không chờ load ảnh bên ngoài
+    });
+
+    return new Promise((resolve, reject) => {
+      canvas.toBlob(
+        (blob: Blob | null) =>
+          blob ? resolve(blob) : reject(new Error("Cannot convert to blob")),
+        "image/jpeg",
+        0.6,
+      );
+    });
+  } finally {
+    // Đảm bảo gỡ bỏ style đã chèn sau khi render xong để không ảnh hưởng đến giao diện chính
+    if (styleEl.parentNode) {
+      document.head.removeChild(styleEl);
+    }
+  }
 }
 
 // ═══════════════════════════════════════════
@@ -161,57 +194,43 @@ export async function printReceipt(
   receiptElement: HTMLElement,
 ): Promise<{ success: boolean; error?: string; isOffline?: boolean }> {
   try {
-    // 1. Ping thử xem Local Bridge có đang online hay không (Timeout 500ms)
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 500);
-    const statusResp = await fetch("http://127.0.0.1:13579/status", {
-      signal: controller.signal,
-    }).catch(() => null);
-    clearTimeout(timeoutId);
+    // 1. Render HTML sang tệp ảnh JPEG chất lượng cao trực tiếp (đã tối ưu hóa tốc độ bằng cache)
+    const imageBlob = await renderReceiptToImage(receiptElement);
 
-    if (statusResp && statusResp.ok) {
-      // 2. Bridge hoạt động -> Render HTML sang tệp ảnh JPEG chất lượng cao
-      const imageBlob = await renderReceiptToImage(receiptElement);
+    // 2. Gửi tệp ảnh in trực tiếp qua cổng POST /print của Bridge (bỏ qua bước ping status để tiết kiệm thời gian)
+    const formData = new FormData();
+    formData.append("image", imageBlob, "receipt.jpg");
 
-      // 3. Gửi tệp ảnh in trực tiếp qua cổng POST /print của Bridge
-      const formData = new FormData();
-      formData.append("image", imageBlob, "receipt.jpg");
+    const printResp = await fetch("http://127.0.0.1:13579/print", {
+      method: "POST",
+      body: formData,
+      mode: "cors",
+    } as RequestInit);
 
-      const printResp = await fetch("http://127.0.0.1:13579/print", {
-        method: "POST",
-        body: formData,
-      });
+    if (!printResp.ok) {
+      const errJson = await printResp.json().catch(() => ({}));
+      return {
+        success: false,
+        error: errJson.message || `Lỗi máy in: HTTP ${printResp.status}`,
+      };
+    }
 
-      if (!printResp.ok) {
-        const errJson = await printResp.json().catch(() => ({}));
-        return {
-          success: false,
-          error: errJson.message || `Lỗi máy in: HTTP ${printResp.status}`,
-        };
-      }
-
-      const printResult = await printResp.json();
-      if (printResult.success) {
-        return { success: true };
-      } else {
-        return {
-          success: false,
-          error: printResult.message || "Lỗi gửi lệnh in thô.",
-        };
-      }
+    const printResult = await printResp.json();
+    if (printResult.success) {
+      return { success: true };
+    } else {
+      return {
+        success: false,
+        error: printResult.message || "Lỗi gửi lệnh in thô.",
+      };
     }
   } catch (e) {
+    // Bất kỳ lỗi kết nối mạng nào (Bridge chưa bật) sẽ được bắt ở đây và trả về trạng thái ngoại tuyến ngay lập tức
     return {
       success: false,
       isOffline: true,
-      error: "Không tìm thấy chương trình Local Bridge đang chạy ngầm.",
+      error: "Không tìm thấy chương trình Local Bridge đang chạy ngầm hoặc kết nối bị từ chối.",
     };
   }
-
-  return {
-    success: false,
-    isOffline: true,
-    error: "Chương trình Local Bridge máy in đang ngoại tuyến (Offline).",
-  };
 }
 

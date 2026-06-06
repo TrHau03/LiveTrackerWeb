@@ -12,7 +12,7 @@ import { appNavigation } from "@/lib/site";
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const isViewportLocked = pathname === "/livestreams" || pathname === "/customers" || pathname === "/messenger" || pathname === "/settings";
+  const isViewportLocked = pathname === "/livestreams" || pathname === "/customers" || pathname === "/messenger" || pathname === "/settings" || pathname === "/delivery";
   const { authStatus, isAuthenticated, logout, session } = useSession();
   const { theme, toggleTheme } = useTheme();
   const [isCollapsed, setIsCollapsed] = React.useState(false);
@@ -217,15 +217,17 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 ? "px-2 sm:px-3 pt-2 pb-0 flex flex-col overflow-hidden"
                 : pathname === "/customers"
                   ? "px-2 sm:px-3 pt-2 pb-0 flex flex-col overflow-hidden"
-                  : pathname === "/orders"
-                    ? "px-2 sm:px-3 pt-2 pb-24 lg:pb-8"
-                    : pathname === "/"
+                  : pathname === "/delivery"
+                    ? "px-2 sm:px-3 pt-2 pb-0 flex flex-col overflow-hidden"
+                    : pathname === "/orders"
                       ? "px-2 sm:px-3 pt-2 pb-24 lg:pb-8"
-                      : pathname === "/settings"
-                        ? "px-2 sm:px-3 pt-2 pb-0 flex flex-col overflow-hidden"
-                        : isViewportLocked
-                          ? "px-4 sm:px-6 lg:px-8 pt-6 pb-0 flex flex-col overflow-hidden"
-                          : "px-4 sm:px-6 lg:px-8 pt-6 pb-24 lg:pb-8"
+                      : pathname === "/"
+                        ? "px-2 sm:px-3 pt-2 pb-24 lg:pb-8"
+                        : pathname === "/settings"
+                          ? "px-2 sm:px-3 pt-2 pb-0 flex flex-col overflow-hidden"
+                          : isViewportLocked
+                            ? "px-4 sm:px-6 lg:px-8 pt-6 pb-0 flex flex-col overflow-hidden"
+                            : "px-4 sm:px-6 lg:px-8 pt-6 pb-24 lg:pb-8"
           }`}>
             <div className={`w-full h-full ${isViewportLocked ? "flex flex-col flex-1 overflow-hidden" : "block w-full mx-auto"}`}>{children}</div>
           </main>
@@ -301,6 +303,17 @@ function NavIcon({ href, active }: { href: string; active: boolean }) {
     return (
       <svg viewBox="0 0 24 24" fill={active ? "currentColor" : "none"} stroke="currentColor" strokeWidth="1.8" className={className}>
         <path d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
+      </svg>
+    );
+  }
+
+  if (href === "/delivery") {
+    return (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className={className}>
+        <rect x="1" y="3" width="15" height="13" rx="2" ry="2" />
+        <polygon points="16 8 20 8 23 11 23 16 16 16 16 8" />
+        <circle cx="5.5" cy="18.5" r="2.5" />
+        <circle cx="18.5" cy="18.5" r="2.5" />
       </svg>
     );
   }

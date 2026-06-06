@@ -15,11 +15,32 @@ import type {
   GhtkCreateOrderBizContent,
   GhtkCalculateFeesBizContent,
   GhtkCalculateFeesResult,
+  DeliveryProviderConfig,
+  DeliveryProviderConfigUpsertPayload,
+  DeliveryOrderHistoryDetail,
 } from "../types/delivery";
 
 export async function fetchDeliveryProviders(session: SessionSettings) {
   return proxyRequest<DeliveryProvider[]>(session, {
     path: "/delivery/providers",
+  });
+}
+
+export async function fetchProviderConfig(session: SessionSettings, provider: string) {
+  return proxyRequest<DeliveryProviderConfig | null>(session, {
+    path: `/delivery/providers/${provider}/config`,
+  });
+}
+
+export async function upsertProviderConfig(
+  session: SessionSettings,
+  provider: string,
+  body: DeliveryProviderConfigUpsertPayload,
+) {
+  return proxyRequest<DeliveryProviderConfig>(session, {
+    path: `/delivery/providers/${provider}/config`,
+    method: "PUT",
+    body,
   });
 }
 
@@ -81,6 +102,25 @@ export async function fetchGhnWards(session: SessionSettings, provinceId: number
   });
 }
 
+export async function registerGhnShop(
+  session: SessionSettings,
+  body: { bizContent: any },
+  providerConfigId?: string,
+  ghnToken?: string,
+) {
+  const extraHeaders: Record<string, string> = {};
+  if (ghnToken) {
+    extraHeaders["x-ghn-token"] = ghnToken;
+  }
+  return proxyRequest<{ success: boolean; data: any }>(session, {
+    path: "/delivery/providers/ghn/shop/register",
+    method: "POST",
+    body,
+    query: providerConfigId ? { providerConfigId } : undefined,
+    headers: extraHeaders,
+  });
+}
+
 export async function createGhtkOrder(
   session: SessionSettings,
   body: GhtkCreateOrderBizContent,
@@ -103,20 +143,62 @@ export async function calculateGhtkFees(
   });
 }
 
+export async function cancelDeliveryOrder(
+  session: SessionSettings,
+  provider: string,
+  body: { bizContent: any; providerConfigId?: string },
+) {
+  return proxyRequest<{ success: boolean; data?: any }>(session, {
+    path: `/delivery/providers/${provider}/cancel-order`,
+    method: "POST",
+    body,
+  });
+}
+
+export async function fetchDeliveryOrderDetail(
+  session: SessionSettings,
+  provider: string,
+  body: { bizContent: any; providerConfigId?: string },
+) {
+  return proxyRequest<any>(session, {
+    path: `/delivery/providers/${provider}/order-detail`,
+    method: "POST",
+    body,
+  });
+}
+
 export async function fetchDeliveryOrders(
   session: SessionSettings,
   query?: {
     page?: number;
     limit?: number;
     search?: string;
+    provider?: string;
+    typeCode?: string;
+    status?: string;
+    sortBy?: string;
+    sortOrder?: string;
   },
 ) {
-  return proxyRequest<{ items: DeliveryOrderHistory[] }>(session, {
+  const queryParams: any = {};
+  if (query?.page) queryParams.page = query.page;
+  if (query?.limit) queryParams.limit = query.limit;
+  if (query?.search) queryParams.search = query.search;
+  if (query?.provider) queryParams.provider = query.provider;
+  if (query?.typeCode) queryParams.typeCode = query.typeCode;
+  if (query?.status) queryParams.status = query.status;
+  if (query?.sortBy) queryParams.sortBy = query.sortBy;
+  if (query?.sortOrder) queryParams.sortOrder = query.sortOrder;
+
+  return proxyRequest<{ items: DeliveryOrderHistory[]; pagination: { page: number; limit: number; total: number; totalPages: number } }>(session, {
     path: "/delivery/orders",
-    query: {
-      page: query?.page ?? 1,
-      limit: query?.limit ?? 20,
-      search: query?.search,
-    },
+    query: queryParams,
   });
 }
+
+export async function fetchDeliveryOrderById(session: SessionSettings, id: string) {
+  return proxyRequest<DeliveryOrderHistoryDetail>(session, {
+    path: `/delivery/orders/${id}`,
+  });
+}
+

@@ -2,6 +2,7 @@
 
 import React, { useState } from "react";
 import { useSettingsStore } from "@/stores/settings-store";
+import { useSearchParams } from "next/navigation";
 import { useHeaderStore } from "@/lib/store/header-store";
 import type { LiveStats } from "@/hooks/use-comments";
 import { useSession } from "@/components/session-provider";
@@ -18,6 +19,16 @@ export function LivestreamsScreen() {
   const activeLiveId = useSettingsStore(state => state.activeLiveId);
   const setActiveLiveId = useSettingsStore(state => state.setActiveLiveId);
   const [mobileView, setMobileView] = useState<"list" | "detail">("list");
+
+  const searchParams = useSearchParams();
+  const queryLiveId = searchParams.get("liveId");
+
+  React.useEffect(() => {
+    if (queryLiveId) {
+      setActiveLiveId(queryLiveId);
+      setMobileView("detail");
+    }
+  }, [queryLiveId, setActiveLiveId]);
   const [liveStats, setLiveStats] = useState<LiveStats>({ totalOrder: 0, totalComment: 0, totalItems: 0 });
   const [filterQuery, setFilterQuery] = useState("");
   const { session } = useSession();

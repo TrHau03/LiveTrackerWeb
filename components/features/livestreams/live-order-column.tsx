@@ -1,7 +1,8 @@
 "use client";
 
 import React, { useState, useEffect, useCallback, useRef } from "react";
-import { createPortal } from "react-dom";
+import { createPortal, flushSync } from "react-dom";
+import { createRoot } from "react-dom/client";
 import Link from "next/link";
 import { useSession } from "@/components/session-provider";
 import { useQueryClient } from "@tanstack/react-query";
@@ -484,13 +485,13 @@ export function LiveOrderColumn({
                       container.style.left = "-9999px";
                       document.body.appendChild(container);
 
-                      const { createRoot } = await import("react-dom/client");
                       const root = createRoot(container);
-                      root.render(
-                        <OrderReceipt order={selectedOrder} settings={settings} shopInfo={shopInfo} />
-                      );
+                      flushSync(() => {
+                        root.render(
+                          <OrderReceipt order={selectedOrder} settings={settings} shopInfo={shopInfo} />
+                        );
+                      });
 
-                      await new Promise(r => setTimeout(r, 150));
                       const receiptEl = container.querySelector(".receipt") as HTMLElement;
                       if (receiptEl) {
                         const result = await printReceipt(receiptEl);
@@ -509,7 +510,7 @@ export function LiveOrderColumn({
                       setTimeout(() => {
                         root.unmount();
                         if (container.parentNode) document.body.removeChild(container);
-                      }, 2000);
+                      }, 300);
                     }
 
                     if (mode === "send_only" || mode === "print_and_send") {
@@ -522,15 +523,15 @@ export function LiveOrderColumn({
                         container.style.left = "-9999px";
                         document.body.appendChild(container);
 
-                        const { createRoot } = await import("react-dom/client");
                         const root = createRoot(container);
-                        root.render(
-                          <div style={{ padding: "20px" }}>
-                            <OrderReceipt order={selectedOrder} settings={settings} shopInfo={shopInfo} />
-                          </div>
-                        );
+                        flushSync(() => {
+                          root.render(
+                            <div style={{ padding: "20px" }}>
+                              <OrderReceipt order={selectedOrder} settings={settings} shopInfo={shopInfo} />
+                            </div>
+                          );
+                        });
 
-                        await new Promise(r => setTimeout(r, 200));
                         const receiptEl = container.querySelector(".receipt") as HTMLElement;
                         
                         if (receiptEl && session.accessToken) {

@@ -1,7 +1,8 @@
 "use client";
 
 import React, { useState, useEffect, useRef, startTransition, useCallback } from "react";
-import { createPortal } from "react-dom";
+import { createPortal, flushSync } from "react-dom";
+import { createRoot } from "react-dom/client";
 import { useSession } from "@/components/session-provider";
 import { useQueryClient } from "@tanstack/react-query";
 import { useCommentsStream, type LiveStats } from "@/hooks/use-comments";
@@ -582,11 +583,9 @@ export function LiveCommentColumn({
       container.style.top = "-9999px";
       document.body.appendChild(container);
 
-      // We need to render React component to HTML manually
-      const { createRoot } = await import("react-dom/client");
+      // Dùng static import createRoot (đã preload) + flushSync để render đồng bộ tức thì
       const root = createRoot(container);
-
-      await new Promise<void>((resolve) => {
+      flushSync(() => {
         root.render(
           <CommentReceipt
             comment={{
@@ -602,8 +601,6 @@ export function LiveCommentColumn({
             actionType={actionType}
           />
         );
-        // Give React time to render
-        setTimeout(resolve, 100);
       });
 
       const receiptEl = container.querySelector(".receipt") as HTMLElement;
@@ -619,11 +616,11 @@ export function LiveCommentColumn({
         }
       }
 
-      // Cleanup after print
+      // Cleanup nhanh sau khi in xong
       setTimeout(() => {
         root.unmount();
         if (container.parentNode) document.body.removeChild(container);
-      }, 2000);
+      }, 300);
     } catch (err) {
       console.error("Print error:", err);
     }

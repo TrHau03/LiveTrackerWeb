@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 
 import { absoluteUrl } from "@/lib/site";
+import { LivestreamsScreen } from "@/components/features/livestreams/livestreams-screen";
 
 export const metadata: Metadata = {
   title: "Livestreams",
@@ -11,8 +13,16 @@ export const metadata: Metadata = {
   },
 };
 
-import { LivestreamsScreen } from "@/components/features/livestreams/livestreams-screen";
-
 export default function LivestreamsPage() {
-  return <LivestreamsScreen />;
+  return (
+    <Suspense
+      fallback={
+        <div className="flex items-center justify-center p-8 text-sm text-[var(--muted)]">
+          Đang tải danh sách livestream...
+        </div>
+      }
+    >
+      <LivestreamsScreen />
+    </Suspense>
+  );
 }
