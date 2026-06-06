@@ -3,13 +3,13 @@
 import React, { useState } from "react";
 import { useSettingsStore } from "@/stores/settings-store";
 import { useSearchParams } from "next/navigation";
-import { useHeaderStore } from "@/lib/store/header-store";
+import { useHeaderStore } from "@/stores/header-store";
 import type { LiveStats } from "@/hooks/use-comments";
 import { useSession } from "@/components/session-provider";
 import { proxyRequest, extractApiData } from "@/lib/proxy-client";
 import { ChatPanel } from "../messenger/chat-panel";
 import { AlertTriangle, Printer, RefreshCw, AlertCircle, ChevronDown } from "lucide-react";
-import { useLocalBridge } from "@/hooks/useLocalBridge";
+import { useLocalBridge } from "@/hooks/use-local-bridge";
 
 import { LiveListColumn } from "./live-list-column";
 import { LiveCommentColumn } from "./live-comment-column";

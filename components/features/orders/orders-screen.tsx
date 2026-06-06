@@ -5,12 +5,12 @@ import { createPortal, flushSync } from "react-dom";
 import { createRoot } from "react-dom/client";
 import { useOrders, useExportOrders } from "@/hooks/use-orders";
 import { useMetrics } from "@/hooks/use-metrics";
-import { useHeaderStore } from "@/lib/store/header-store";
+import { useHeaderStore } from "@/stores/header-store";
 import { useSettingsStore } from "@/stores/settings-store";
-import { usePrintSettings } from "@/hooks/usePrintSettings";
+import { usePrintSettings } from "@/hooks/use-print-settings";
 import { useTags } from "@/hooks/use-tags";
 import { asRecord, extractApiData, extractCollection, pickString, pickNumber, formatCurrency, formatDateTime } from "@/lib/proxy-client";
-import { printReceiptHtml, printReceipt } from "@/lib/printUtils";
+import { printReceiptHtml, printReceipt } from "@/lib/utils/print-utils";
 import { OrderReceipt } from "@/components/print/OrderReceipt";
 import { BridgeSetupModal } from "@/components/print/BridgeSetupModal";
 import { 

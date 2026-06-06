@@ -4,7 +4,7 @@ import React, { useCallback, useEffect, useState } from "react";
 import type { Conversation } from "@/types";
 import { ConversationList } from "./conversation-list";
 import { ChatPanel } from "./chat-panel";
-import { useHeaderStore } from "@/lib/store/header-store";
+import { useHeaderStore } from "@/stores/header-store";
 
 // ─── Component ───────────────────────────────────────────────────────────────
 
