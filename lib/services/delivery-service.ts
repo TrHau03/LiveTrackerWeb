@@ -18,7 +18,7 @@ import type {
   DeliveryProviderConfig,
   DeliveryProviderConfigUpsertPayload,
   DeliveryOrderHistoryDetail,
-} from "../types/delivery";
+} from "@/types/delivery";
 
 export async function fetchDeliveryProviders(session: SessionSettings) {
   return proxyRequest<DeliveryProvider[]>(session, {
