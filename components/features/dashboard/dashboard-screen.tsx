@@ -32,7 +32,7 @@ import {
   UsersIcon,
   DollarSign,
 } from "lucide-react";
-import { useHeaderStore } from "@/lib/store/header-store";
+import { useHeaderStore } from "@/stores/header-store";
 
 export function DashboardScreen() {
   const { session } = useSession();

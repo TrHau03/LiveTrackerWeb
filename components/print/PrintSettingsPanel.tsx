@@ -1,12 +1,12 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
-import { usePrintSettings } from "@/hooks/usePrintSettings";
+import { usePrintSettings } from "@/hooks/use-print-settings";
 import { updatePrintTemplate } from "@/lib/services/print-settings-service";
 import { useSession } from "@/components/session-provider";
 import { OrderReceipt } from "./OrderReceipt";
 import { CommentReceipt } from "./CommentReceipt";
-import { RECEIPT_CSS } from "@/lib/printUtils";
+import { RECEIPT_CSS } from "@/lib/utils/print-utils";
 import type { PrintContentSettings } from "@/types";
 
 export function PrintSettingsPanel() {

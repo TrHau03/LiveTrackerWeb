@@ -18,7 +18,7 @@ import {
   DeliveryProviderConfig,
   DeliveryProviderConfigUpsertPayload,
   DeliveryOrderHistoryDetail,
-} from "@/lib/types/delivery";
+} from "@/types/delivery";
 import { 
   fetchDeliveryProviders, 
   calculateJtExpressFees, 

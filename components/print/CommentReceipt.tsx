@@ -5,7 +5,7 @@
 "use client";
 
 import React from "react";
-import { formatPrintDate, formatPrintTime, formatPrintCurrency } from "@/lib/printUtils";
+import { formatPrintDate, formatPrintTime, formatPrintCurrency } from "@/lib/utils/print-utils";
 import type { PrintContentSettings } from "@/types";
 
 export type CommentReceiptProps = {

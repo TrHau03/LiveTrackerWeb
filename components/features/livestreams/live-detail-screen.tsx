@@ -4,7 +4,7 @@ import React, { useState, useEffect, useRef, startTransition } from "react";
 import Link from "next/link";
 import { useSession } from "@/components/session-provider";
 import { useQuery } from "@tanstack/react-query";
-import { useHeaderStore } from "@/lib/store/header-store";
+import { useHeaderStore } from "@/stores/header-store";
 import { streamProxyRequest, proxyRequest, asRecord, extractApiData, extractCollection, pickString, pickNumber, pickBoolean } from "@/lib/proxy-client";
 import { applyAuthResponses } from "@/hooks/use-auth-sync";
 import { ChatPanel } from "../messenger/chat-panel";

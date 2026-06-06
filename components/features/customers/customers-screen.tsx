@@ -4,7 +4,7 @@ import React, { useState, useDeferredValue } from "react";
 import Link from "next/link";
 import { useCustomers, useCustomerDetail, useUpdateCustomerProfile } from "@/hooks/use-customers";
 import { useOrders } from "@/hooks/use-orders";
-import { useHeaderStore } from "@/lib/store/header-store";
+import { useHeaderStore } from "@/stores/header-store";
 import { asRecord, extractApiData, extractCollection, pickString, pickNumber } from "@/lib/proxy-client";
 import { Pencil, ShoppingBag } from "lucide-react";
 import { OrderStatusBadge } from "@/components/features/orders/order-status-badge";

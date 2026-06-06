@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useMemo } from "react";
 import { useDeliveryOrders, useDeliveryProviders } from "@/hooks/use-delivery";
-import { useHeaderStore } from "@/lib/store/header-store";
+import { useHeaderStore } from "@/stores/header-store";
 import { DeliveryDetailModal } from "./delivery-detail-modal";
 import { Search, Filter, RefreshCw, Eye, Trash2, ArrowUpDown, ChevronLeft, ChevronRight } from "lucide-react";
 import { CONTROL_CLASS, SECONDARY_BUTTON_CLASS } from "@/components/ui/workspace-shared";
