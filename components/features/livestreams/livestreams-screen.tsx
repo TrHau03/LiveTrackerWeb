@@ -43,24 +43,15 @@ export function LivestreamsScreen() {
   const { isConnected: isBridgeConnected, isChecking: isBridgeChecking, checkStatus } = useLocalBridge();
   const [showTroubleshoot, setShowTroubleshoot] = useState(false);
 
-  // Sync connection status to dynamic Header as customContent (Connected badge)
+  // Sync connection status to dynamic Header
   React.useEffect(() => {
     setHeader({
       title: "Phiên Live",
       subtitle: "Theo dõi và chốt đơn thời gian thực",
       showDateRange: false,
-      customContent: isBridgeConnected ? (
-        <div className="flex items-center gap-1.5 rounded-full bg-emerald-500/10 px-2.5 py-1 text-xs font-semibold text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 shadow-[0_2px_8px_rgba(16,185,129,0.08)] select-none">
-          <span className="relative flex h-2 w-2">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-            <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-          </span>
-          Local Bridge: Connected
-        </div>
-      ) : null,
     });
     return () => resetHeader();
-  }, [setHeader, resetHeader, isBridgeConnected]);
+  }, [setHeader, resetHeader]);
 
   const handleStartQuickChat = async (username: string) => {
     if (!username) return;

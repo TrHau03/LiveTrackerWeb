@@ -96,32 +96,34 @@ export function Header() {
             )}
 
             {/* Local Bridge Status */}
-            <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-[var(--border)] bg-[var(--surface-muted)] text-xs shrink-0 select-none">
-              {isBridgeChecking ? (
-                <div className="flex items-center gap-1 text-[var(--muted)]" title="Đang kiểm tra kết nối với cầu nối in ấn...">
-                  <RefreshCw className="h-3.5 w-3.5 animate-spin text-[var(--primary)]" />
-                  <span className="hidden sm:inline">Đang quét...</span>
-                </div>
-              ) : isBridgeConnected ? (
-                <div className="flex items-center gap-1.5 text-green-600 dark:text-green-400 font-medium" title="Cầu nối máy in nhiệt đang hoạt động">
-                  <span className="relative flex h-2 w-2">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-                    <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
-                  </span>
-                  <Printer className="h-3.5 w-3.5 text-green-600 dark:text-green-400" />
-                  <span className="hidden sm:inline text-[11px] font-bold">Bridge Online</span>
-                </div>
-              ) : (
-                <div className="flex items-center gap-1.5 text-red-500 dark:text-red-400 font-medium" title="Không kết nối được với ứng dụng in ấn cục bộ">
-                  <span className="relative flex h-2 w-2">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-                    <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
-                  </span>
-                  <Printer className="h-3.5 w-3.5 text-red-500 dark:text-red-400" />
-                  <span className="hidden sm:inline text-[11px] font-bold">Bridge Offline</span>
-                </div>
-              )}
-            </div>
+            {pathname === "/livestreams" && (
+              <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-[var(--border)] bg-[var(--surface-muted)] text-xs shrink-0 select-none">
+                {isBridgeChecking ? (
+                  <div className="flex items-center gap-1 text-[var(--muted)]" title="Đang kiểm tra kết nối với cầu nối in ấn...">
+                    <RefreshCw className="h-3.5 w-3.5 animate-spin text-[var(--primary)]" />
+                    <span className="hidden sm:inline">Đang quét...</span>
+                  </div>
+                ) : isBridgeConnected ? (
+                  <div className="flex items-center gap-1.5 text-green-600 dark:text-green-400 font-medium" title="Cầu nối máy in nhiệt đang hoạt động">
+                    <span className="relative flex h-2 w-2">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
+                    </span>
+                    <Printer className="h-3.5 w-3.5 text-green-600 dark:text-green-400" />
+                    <span className="hidden sm:inline text-[11px] font-bold">Bridge Online</span>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-1.5 text-red-500 dark:text-red-400 font-medium" title="Không kết nối được với ứng dụng in ấn cục bộ">
+                    <span className="relative flex h-2 w-2">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
+                    </span>
+                    <Printer className="h-3.5 w-3.5 text-red-500 dark:text-red-400" />
+                    <span className="hidden sm:inline text-[11px] font-bold">Bridge Offline</span>
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Notification Dropdown */}
             <NotificationDropdown />

@@ -115,7 +115,7 @@ export function LiveListColumn({
     isLive: pickBoolean(live, ["isLive"]) ?? false,
     comments: pickNumber(live, ["totalComment", "totalComments"]) ?? 0,
     orders: pickNumber(live, ["totalOrder", "totalOrders"]) ?? 0,
-    updatedAt: pickString(live, ["lastWebhookAt", "updatedAt", "createdAt"]),
+    updatedAt: pickString(live, ["createdAt", "lastWebhookAt", "updatedAt"]),
     owner: pickString(asRecord(live.user), ["fullName", "name"]) || session.user?.fullName || "Owner",
     igLiveId: pickString(live, ["igLiveId"]) || "instagram-live",
     shopId: pickString(live, ["shopId"]) || pickString(asRecord(live.shop), ["id", "_id"]),
