@@ -3,6 +3,9 @@
 import React from "react";
 import { usePathname } from "next/navigation";
 import { useConfigHeader } from "@/hooks/use-config-header";
+import { useTheme } from "@/components/theme-provider";
+
+import { HeaderDateRangePicker } from "@/components/header-date-range-picker";
 import { useHeaderStore } from "@/stores/header-store";
 import { NotificationDropdown } from "@/components/notification-dropdown";
 import { useLocalBridge } from "@/hooks/use-local-bridge";
@@ -15,6 +18,9 @@ export function Header() {
   const dynamicHeader = useHeaderStore();
   const pathname = usePathname();
   const { isConnected: isBridgeConnected, isChecking: isBridgeChecking } = useLocalBridge();
+  const { theme } = useTheme();
+
+
 
   const isCompactPadding =
     pathname === "/livestreams" ||
@@ -39,7 +45,7 @@ export function Header() {
         {/* Main Row: Title & Controls */}
         <div className="flex items-center justify-between gap-4">
           <div className="flex-1 min-w-0">
-            <h1 className="text-base sm:text-lg font-semibold text-[var(--header-fg)] truncate">
+            <h1 className="text-base sm:text-lg font-bold text-[var(--header-fg)] truncate">
               {title}
             </h1>
             {subtitle && (
@@ -60,14 +66,21 @@ export function Header() {
             {/* Date Range Controls */}
             {showDateRange && (
               <div className="hidden md:flex items-center gap-2">
-                <div className="flex items-center gap-2 rounded-lg bg-[var(--surface)] px-3 py-2 text-xs font-medium text-[var(--foreground-soft)] border border-[var(--border)] hover:border-[var(--primary)] transition cursor-pointer">
-                  <svg className="h-3.5 w-3.5 text-[var(--muted)]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
-                  <span>{dynamicHeader.startDate || "10-06-2021"}</span>
-                </div>
-                <span className="text-[var(--muted)] text-xs">→</span>
-                <div className="flex items-center gap-2 rounded-lg bg-[var(--surface)] px-3 py-2 text-xs font-medium text-[var(--foreground-soft)] border border-[var(--border)] hover:border-[var(--primary)] transition cursor-pointer">
-                  <span>{dynamicHeader.endDate || "10-10-2021"}</span>
-                </div>
+                {dynamicHeader.onDateRangeChange ? (
+                  <HeaderDateRangePicker
+                    startDate={dynamicHeader.startDate}
+                    endDate={dynamicHeader.endDate}
+                    onDateRangeChange={dynamicHeader.onDateRangeChange}
+                    theme={theme}
+                  />
+                ) : (
+                  <div className="flex items-center gap-2 rounded-lg bg-[var(--surface)] px-3.5 py-2 text-xs font-semibold text-[var(--foreground-soft)] border border-[var(--border)] select-none shadow-sm">
+                    <svg className="h-3.5 w-3.5 text-[var(--muted)]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+                    <span className="font-mono">{dynamicHeader.startDate || "10-06-2021"}</span>
+                    <span className="text-[var(--muted)] font-normal mx-0.5">→</span>
+                    <span className="font-mono">{dynamicHeader.endDate || "10-10-2021"}</span>
+                  </div>
+                )}
               </div>
             )}
 
@@ -78,8 +91,8 @@ export function Header() {
                   if (action.hidden) return null;
                   const buttonClasses = {
                     primary: "inline-flex h-9 items-center justify-center rounded-lg bg-[var(--accent-green)] px-4 text-xs font-semibold text-white shadow-sm transition hover:bg-[var(--accent-green-strong)]",
-                    secondary: "inline-flex h-9 items-center justify-center rounded-lg border border-[var(--border)] bg-[var(--surface)] px-4 text-xs font-medium text-[var(--foreground)] transition hover:bg-[var(--hover)]",
-                    danger: "inline-flex h-9 items-center justify-center rounded-lg border border-red-200 bg-red-50 px-4 text-xs font-medium text-red-600 transition hover:bg-red-100",
+                    secondary: "inline-flex h-9 items-center justify-center rounded-lg border border-[var(--border)] bg-[var(--surface)] px-4 text-xs font-semibold text-[var(--foreground)] transition hover:bg-[var(--hover)]",
+                    danger: "inline-flex h-9 items-center justify-center rounded-lg border border-red-200 bg-red-50 px-4 text-xs font-semibold text-red-600 transition hover:bg-red-100",
                   };
                   return (
                     <button
@@ -138,8 +151,8 @@ export function Header() {
               if (action.hidden) return null;
               const buttonClasses = {
                 primary: "inline-flex h-8 items-center justify-center rounded-lg bg-[var(--accent-green)] px-3 text-xs font-semibold text-white transition hover:bg-[var(--accent-green-strong)]",
-                secondary: "inline-flex h-8 items-center justify-center rounded-lg border border-[var(--border)] bg-[var(--surface)] px-3 text-xs font-medium text-[var(--foreground)] transition hover:bg-[var(--hover)]",
-                danger: "inline-flex h-8 items-center justify-center rounded-lg border border-red-200 bg-red-50 px-3 text-xs font-medium text-red-600 transition hover:bg-red-100",
+                secondary: "inline-flex h-8 items-center justify-center rounded-lg border border-[var(--border)] bg-[var(--surface)] px-3 text-xs font-semibold text-[var(--foreground)] transition hover:bg-[var(--hover)]",
+                danger: "inline-flex h-8 items-center justify-center rounded-lg border border-red-200 bg-red-50 px-3 text-xs font-semibold text-red-600 transition hover:bg-red-100",
               };
               return (
                 <button key={action.id || action.label || `btn-${idx}`} onClick={action.onClick} className={`${buttonClasses[action.variant || "secondary"]} ${action.className || ""}`}>

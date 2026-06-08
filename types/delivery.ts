@@ -261,6 +261,7 @@ export interface DeliveryOrderHistoryDetail {
   id: string;
   orderId?: string;
   provider: string;
+  providerConfigId?: string;
   status: string;
   createdAt: string;
   updatedAt: string;

@@ -1,7 +1,7 @@
 "use client";
 
-import { FormEvent, useState, useEffect } from "react";
-import { Eye, EyeOff, Zap, Layout } from "lucide-react";
+import { FormEvent, useState, useEffect, useRef } from "react";
+import { Eye, EyeOff, Zap, Layout, Sparkles, ShieldCheck } from "lucide-react";
 
 import { useSession } from "@/components/session-provider";
 
@@ -27,6 +27,27 @@ export function AuthScreen() {
   const [otpSuccess, setOtpSuccess] = useState("");
   const [cooldown, setCooldown] = useState(0);
   const [tempRegisterEmail, setTempRegisterEmail] = useState("");
+
+  // Refs for auto-focus
+  const emailInputRef = useRef<HTMLInputElement>(null);
+  const fullNameInputRef = useRef<HTMLInputElement>(null);
+  const passwordInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (mode === "login") {
+      if (email) {
+        // Nếu đã có sẵn email (ví dụ từ OTP qua), focus vào mật khẩu
+        passwordInputRef.current?.focus();
+      } else {
+        emailInputRef.current?.focus();
+      }
+    } else if (mode === "register") {
+      fullNameInputRef.current?.focus();
+    } else if (mode === "otp") {
+      const firstOtpInput = document.getElementById("otp-0");
+      firstOtpInput?.focus();
+    }
+  }, [mode]);
 
   const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -117,6 +138,7 @@ export function AuthScreen() {
 
     if (res.success) {
       setOtpSuccess("Xác thực tài khoản thành công! Vui lòng đăng nhập lại.");
+      setEmail(tempRegisterEmail); // Điền sẵn email đăng nhập
       setTimeout(() => {
         setMode("login");
         setOtpSuccess("");
@@ -154,30 +176,59 @@ export function AuthScreen() {
       <div className="relative w-full max-w-[1100px] h-full max-h-[720px] flex flex-col lg:flex-row overflow-hidden rounded-2xl lg:rounded-3xl bg-[var(--surface)] border border-[var(--border)] shadow-[var(--shadow-strong)]">
 
         {/* Left Section - Promo Area */}
-        <section className="hidden lg:flex w-full lg:w-3/5 flex-col items-start justify-center px-12 xl:px-16 relative z-10 bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-950/20 dark:to-indigo-950/20">
-          <div className="max-w-lg py-8">
-            <h1 className="text-4xl xl:text-5xl font-bold text-[var(--foreground)] leading-tight tracking-tight">
-              Live Tracker
+        <section className="hidden lg:flex w-full lg:w-3/5 flex-col items-start justify-center px-12 xl:px-16 relative z-10 bg-gradient-to-br from-slate-50 via-blue-50/50 to-indigo-50 dark:from-slate-950 dark:via-blue-950/20 dark:to-indigo-950/20 overflow-hidden border-r border-[var(--border)]">
+          {/* Ambient light glow orbs */}
+          <div className="absolute top-1/4 -left-20 w-72 h-72 rounded-full bg-blue-400/10 dark:bg-blue-600/5 blur-3xl pointer-events-none animate-pulse-slow" />
+          <div className="absolute bottom-1/4 -right-20 w-72 h-72 rounded-full bg-indigo-400/10 dark:bg-indigo-600/5 blur-3xl pointer-events-none animate-pulse-slow" />
+
+          {/* Subtle Dot Grid Background */}
+          <div className="absolute inset-0 bg-[radial-gradient(#e2e8f0_1px,transparent_1px)] dark:bg-[radial-gradient(#1e293b_1px,transparent_1px)] [background-size:16px_16px] opacity-60 pointer-events-none" />
+
+          <div className="max-w-lg py-6 relative z-10 w-full">
+            {/* Active Status Badge */}
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-blue-500/10 text-blue-600 dark:text-blue-400 mb-6 border border-blue-500/20 animate-fade-in">
+              <Zap className="w-3 h-3 fill-current animate-pulse" />
+              <span>Hệ thống quản lý livestream & hội thoại</span>
+            </div>
+
+            <h1 className="text-4xl xl:text-5xl font-extrabold leading-tight tracking-tight">
+              <span className="bg-clip-text text-transparent bg-gradient-to-r from-blue-600 via-indigo-600 to-violet-600 dark:from-blue-400 dark:via-indigo-400 dark:to-violet-400">
+                LiveTracker
+              </span>
             </h1>
-            <h2 className="mt-4 text-xl xl:text-2xl font-semibold text-[var(--foreground-soft)] leading-snug">
-              Control Room cho đội ngũ bán hàng Realtime
+            <h2 className="mt-3.5 text-lg xl:text-xl font-bold text-[var(--foreground-soft)] leading-snug">
+              Trung tâm Điều hành Bán hàng Livestream
             </h2>
-            <p className="mt-6 text-sm text-[var(--muted)] leading-relaxed">
-              Theo dõi livestream, tự động hoá chốt đơn, quản lý khách hàng và vận hành kho bãi chỉ trong một nền tảng duy nhất.
+            <p className="mt-4 text-xs xl:text-sm text-[var(--muted)] leading-relaxed">
+              Theo dõi hiệu suất livestream, quản lý tin nhắn khách hàng, lên đơn nhanh và vận hành giao hàng trên một nền tảng tập trung.
             </p>
 
-            <div className="mt-10 grid grid-cols-2 gap-6">
+            {/* 4 Feature cards */}
+            <div className="mt-8 grid grid-cols-2 gap-4">
               <PromoFeature
-                icon={<Zap className="w-4 h-4 text-[var(--primary)]" />}
-                title="Realtime Processing"
-                desc="Xử lý hàng ngàn bình luận mỗi giây"
+                icon={<Zap className="w-4 h-4 text-blue-600 dark:text-blue-400" />}
+                title="Xử lý tức thì"
+                desc="Cập nhật chỉ số livestream và bình luận ngay lập tức"
               />
               <PromoFeature
-                icon={<Layout className="w-4 h-4 text-[var(--primary)]" />}
-                title="Modern Dashboard"
-                desc="Giao diện sạch sẽ, tối ưu vận hành"
+                icon={<Layout className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />}
+                title="Bảng điều khiển"
+                desc="Quản lý hiệu suất kinh doanh trực quan"
+              />
+              <PromoFeature
+                icon={<Sparkles className="w-4 h-4 text-violet-600 dark:text-violet-400" />}
+                title="Trung tâm tin nhắn"
+                desc="Trực chat và lên đơn ngay khi nhắn tin"
+              />
+              <PromoFeature
+                icon={<ShieldCheck className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />}
+                title="Tích hợp vận chuyển"
+                desc="Kết nối trực tiếp các đơn vị vận chuyển"
               />
             </div>
+
+            {/* Realtime Simulator Widget */}
+            <RealtimeSimulator />
           </div>
         </section>
 
@@ -226,6 +277,7 @@ export function AuthScreen() {
                     <>
                       <div className="relative animate-slide-up">
                         <input
+                          ref={fullNameInputRef}
                           type="text"
                           disabled={isSubmittingRegister}
                           value={fullName}
@@ -251,6 +303,7 @@ export function AuthScreen() {
 
                   <div className="relative">
                     <input
+                      ref={emailInputRef}
                       type="email"
                       disabled={mode === "register" ? isSubmittingRegister : isLoggingIn}
                       value={email}
@@ -263,6 +316,7 @@ export function AuthScreen() {
 
                   <div className="relative">
                     <input
+                      ref={passwordInputRef}
                       type={showPassword ? "text" : "password"}
                       disabled={mode === "register" ? isSubmittingRegister : isLoggingIn}
                       value={password}
@@ -427,6 +481,17 @@ export function AuthScreen() {
                           prevInput?.focus();
                         }
                       }}
+                      onPaste={(e) => {
+                        e.preventDefault();
+                        const pastedData = e.clipboardData.getData("text").replace(/[^0-9]/g, "");
+                        if (pastedData.length === 6) {
+                          const nextOtp = pastedData.split("");
+                          setOtpValues(nextOtp);
+                          // Focus vào ô cuối cùng
+                          const lastInput = document.getElementById("otp-5");
+                          lastInput?.focus();
+                        }
+                      }}
                       className="w-11 h-11 text-center rounded-lg bg-[var(--surface-muted)] border border-[var(--border)] text-[var(--foreground)] text-lg font-bold focus:bg-[var(--surface)] focus:border-[var(--primary)] focus:ring-2 focus:ring-blue-100 dark:focus:ring-blue-900/30 transition-all outline-none disabled:opacity-50"
                     />
                   ))}
@@ -494,13 +559,101 @@ export function AuthScreen() {
 
 function PromoFeature({ icon, title, desc }: { icon: React.ReactNode; title: string; desc: string }) {
   return (
-    <div className="flex flex-col gap-2.5">
-      <div className="w-10 h-10 flex items-center justify-center rounded-lg bg-[var(--primary-soft)] border border-[var(--border)]">
+    <div className="group flex flex-col gap-2.5 p-3 rounded-xl bg-white/60 dark:bg-white/5 border border-[var(--border)] hover:border-blue-300 dark:hover:border-blue-700 backdrop-blur-sm transition-all duration-300 hover:shadow-md hover:-translate-y-0.5 cursor-default">
+      <div className="w-9 h-9 flex items-center justify-center rounded-lg bg-white dark:bg-white/10 border border-[var(--border)] group-hover:scale-110 transition-transform duration-300">
         {icon}
       </div>
       <div>
-        <h4 className="text-[var(--foreground)] font-semibold text-sm">{title}</h4>
-        <p className="text-[var(--muted)] text-xs mt-0.5">{desc}</p>
+        <h4 className="text-[var(--foreground)] font-semibold text-[13px] leading-tight">{title}</h4>
+        <p className="text-[var(--muted)] text-[11px] mt-0.5 leading-snug">{desc}</p>
+      </div>
+    </div>
+  );
+}
+
+// Simulated realtime data for the live stream monitor widget
+const SIMULATED_COMMENTS = [
+  { user: "Ngọc Linh", text: "Lấy size M áo xanh", avatar: "NL" },
+  { user: "Minh Tuấn", text: "Cho xin giá combo 3 cái", avatar: "MT" },
+  { user: "Hà Phương", text: "Còn hàng không shop?", avatar: "HP" },
+  { user: "Thanh Hải", text: "Đặt 2 cái giao Đà Nẵng", avatar: "TH" },
+  { user: "Thuỳ Dung", text: "Inbox shop ơi", avatar: "TD" },
+  { user: "Bảo Ngọc", text: "Lấy 1 đen size L", avatar: "BN" },
+  { user: "Quốc Việt", text: "Ship về HCM bao lâu?", avatar: "QV" },
+  { user: "Mai Anh", text: "Combo có giảm thêm không ạ?", avatar: "MA" },
+];
+
+function RealtimeSimulator() {
+  const [comments, setComments] = useState<typeof SIMULATED_COMMENTS>([]);
+  const [viewers, setViewers] = useState(1247);
+  const [orders, setOrders] = useState(84);
+
+  useEffect(() => {
+    // Initialize with first 2 comments
+    setComments(SIMULATED_COMMENTS.slice(0, 2));
+
+    let commentIndex = 2;
+
+    const interval = setInterval(() => {
+      // Add a new comment
+      setComments((prev) => {
+        const next = SIMULATED_COMMENTS[commentIndex % SIMULATED_COMMENTS.length];
+        commentIndex++;
+        const updated = [...prev, next];
+        // Keep only last 3 comments visible
+        if (updated.length > 3) return updated.slice(-3);
+        return updated;
+      });
+
+      // Randomly fluctuate viewers
+      setViewers((v) => v + Math.floor(Math.random() * 11) - 3);
+
+      // Occasionally increment orders
+      if (Math.random() > 0.5) {
+        setOrders((o) => o + 1);
+      }
+    }, 3500);
+
+    return () => clearInterval(interval);
+  }, []);
+
+  return (
+    <div className="mt-8 p-4 rounded-xl bg-white/70 dark:bg-white/5 border border-[var(--border)] backdrop-blur-sm animate-fade-in">
+      {/* Header */}
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-2">
+          <span className="relative flex h-2 w-2">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
+            <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500" />
+          </span>
+          <span className="text-[11px] font-bold text-red-500 uppercase tracking-wider">Đang phát trực tiếp</span>
+        </div>
+        <div className="flex items-center gap-3 text-[11px] text-[var(--muted)] font-medium">
+          <span className="flex items-center gap-1">
+            👁 <span className="tabular-nums">{viewers.toLocaleString()}</span>
+          </span>
+          <span className="flex items-center gap-1">
+            📦 <span className="tabular-nums">{orders}</span> đơn
+          </span>
+        </div>
+      </div>
+
+      {/* Comment stream */}
+      <div className="space-y-2 min-h-[84px]">
+        {comments.map((c, i) => (
+          <div
+            key={`${c.avatar}-${i}`}
+            className="flex items-start gap-2 animate-slide-up"
+          >
+            <div className="w-6 h-6 rounded-full bg-gradient-to-br from-blue-500 to-indigo-500 flex items-center justify-center text-white text-[9px] font-bold shrink-0">
+              {c.avatar}
+            </div>
+            <div className="flex-1 min-w-0">
+              <span className="text-[11px] font-semibold text-[var(--foreground)]">{c.user}</span>
+              <p className="text-[10px] text-[var(--muted)] leading-snug truncate">{c.text}</p>
+            </div>
+          </div>
+        ))}
       </div>
     </div>
   );

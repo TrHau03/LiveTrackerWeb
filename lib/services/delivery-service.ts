@@ -1,4 +1,4 @@
-import { proxyRequest } from "@/lib/proxy-client";
+import { proxyRequest, proxyDownload } from "@/lib/proxy-client";
 import type { SessionSettings } from "@/lib/workspace-session";
 import type { 
   DeliveryProvider, 
@@ -201,4 +201,71 @@ export async function fetchDeliveryOrderById(session: SessionSettings, id: strin
     path: `/delivery/orders/${id}`,
   });
 }
+
+export async function printGhnOrder(
+  session: SessionSettings,
+  body: { bizContent: { order_code: string; printSize?: string }; providerConfigId?: string },
+) {
+  return proxyRequest<{ success: boolean; data: { token: string; printSize: string; printUrl: string; orderCodes: string[] } }>(session, {
+    path: "/delivery/providers/ghn/print-order",
+    method: "POST",
+    body,
+  });
+}
+
+export async function printGhnOrders(
+  session: SessionSettings,
+  body: { bizContent: { order_codes: string[]; printSize?: string }; providerConfigId?: string },
+) {
+  return proxyRequest<{ success: boolean; data: { token: string; printSize: string; printUrl: string; orderCodes: string[] } }>(session, {
+    path: "/delivery/providers/ghn/print-orders",
+    method: "POST",
+    body,
+  });
+}
+
+export async function printGhtkOrder(
+  session: SessionSettings,
+  body: { bizContent: { trackingOrder: string; pageSize?: string; original?: string }; providerConfigId?: string },
+) {
+  return proxyDownload(session, {
+    path: "/delivery/providers/ghtk/print-order",
+    method: "POST",
+    body,
+  });
+}
+
+export async function printGhtkOrders(
+  session: SessionSettings,
+  body: { bizContent: { trackingOrders: string[]; pageSize?: string; original?: string }; providerConfigId?: string },
+) {
+  return proxyDownload(session, {
+    path: "/delivery/providers/ghtk/print-orders",
+    method: "POST",
+    body,
+  });
+}
+
+export async function printJtExpressOrder(
+  session: SessionSettings,
+  body: { bizContent: { txlogisticId?: string; billCode?: string }; providerConfigId?: string },
+) {
+  return proxyRequest<{ success: boolean; data: { txlogisticId: string; labelUrl: string } }>(session, {
+    path: "/delivery/providers/jt-express/print-order",
+    method: "POST",
+    body,
+  });
+}
+
+export async function printJtExpressOrders(
+  session: SessionSettings,
+  body: { bizContent: { txlogisticIds?: string[] }; providerConfigId?: string },
+) {
+  return proxyRequest<{ success: boolean; data: Array<{ txlogisticId: string; labelUrl: string }> }>(session, {
+    path: "/delivery/providers/jt-express/print-orders",
+    method: "POST",
+    body,
+  });
+}
+
 
