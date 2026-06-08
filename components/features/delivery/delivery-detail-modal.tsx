@@ -1,8 +1,8 @@
 "use client";
 
 import React, { useState } from "react";
-import { useDeliveryOrderById, useCancelDeliveryOrder } from "@/hooks/use-delivery";
-import { X, Copy, Truck, MapPin, Calendar, Circle, CreditCard, ChevronRight, AlertTriangle, Trash2, RefreshCw } from "lucide-react";
+import { useDeliveryOrderById, useCancelDeliveryOrder, usePrintDeliveryOrder } from "@/hooks/use-delivery";
+import { X, Copy, Truck, MapPin, Calendar, Circle, CreditCard, ChevronRight, AlertTriangle, Trash2, RefreshCw, Printer } from "lucide-react";
 import { formatDateTime, formatCurrency } from "@/lib/proxy-client";
 import { SECONDARY_BUTTON_CLASS, CONTROL_CLASS } from "@/components/ui/workspace-shared";
 import { DeliveryDetailTrackingEvent } from "@/types/delivery";
@@ -46,6 +46,28 @@ interface DeliveryDetailModalProps {
 export function DeliveryDetailModal({ orderId, isOpen, onClose, onRefreshList }: DeliveryDetailModalProps) {
   const { data: detail, isLoading, refetch } = useDeliveryOrderById(orderId);
   const cancelOrder = useCancelDeliveryOrder();
+  const { mutate: printOrder, isPending: isPrinting } = usePrintDeliveryOrder();
+
+  const handlePrint = () => {
+    if (!detail) return;
+    const provider = detail.provider;
+    const trackingCode = detail.shipment?.txlogisticId || detail.shipment?.orderCode || detail.shipment?.billCode || detail.shipment?.labelId;
+
+    if (!trackingCode) {
+      alert("Không thể tìm thấy mã vận đơn để thực hiện in.");
+      return;
+    }
+
+    printOrder({
+      provider,
+      orderCode: trackingCode,
+      providerConfigId: detail.providerConfigId,
+    }, {
+      onError: (err: any) => {
+        alert(err?.message || "In vận đơn thất bại.");
+      }
+    });
+  };
 
   const [cancelReason, setCancelReason] = useState("Hủy đơn hàng từ LiveTracker Web");
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
@@ -174,12 +196,30 @@ export function DeliveryDetailModal({ orderId, isOpen, onClose, onRefreshList }:
               <p className="text-[10px] text-[var(--muted)] mt-0.5 uppercase font-mono">ID: {orderId}</p>
             </div>
           </div>
-          <button
-            onClick={onClose}
-            className="p-1.5 rounded-lg text-[var(--muted)] hover:bg-[var(--hover)] transition"
-          >
-            <X className="w-5 h-5" />
-          </button>
+          <div className="flex items-center gap-2">
+            {detail && primaryCode && (
+              <button
+                type="button"
+                onClick={handlePrint}
+                disabled={isPrinting}
+                className="p-1.5 rounded-lg text-[var(--muted)] hover:text-blue-500 hover:bg-blue-500/10 transition flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                title="In vận đơn"
+              >
+                {isPrinting ? (
+                  <RefreshCw className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Printer className="w-4 h-4" />
+                )}
+                <span className="text-xs font-semibold hidden sm:inline">In vận đơn</span>
+              </button>
+            )}
+            <button
+              onClick={onClose}
+              className="p-1.5 rounded-lg text-[var(--muted)] hover:bg-[var(--hover)] transition cursor-pointer"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
         </div>
 
         {isLoading ? (

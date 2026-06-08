@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Manrope } from "next/font/google";
 
 import { AppShell } from "@/components/app-shell";
 import { SessionProvider } from "@/components/session-provider";
@@ -8,6 +9,12 @@ import "@/lib/i18n/i18n";
 import { absoluteUrl, siteConfig } from "@/lib/site";
 
 import "./globals.css";
+
+const manrope = Manrope({
+  subsets: ["latin", "vietnamese"],
+  weight: ["300", "400", "500", "600", "700", "800"],
+  variable: "--font-manrope",
+});
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteConfig.url),
@@ -47,7 +54,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="vi" className="h-full antialiased" suppressHydrationWarning>
+    <html lang="vi" className={`h-full antialiased ${manrope.variable}`} suppressHydrationWarning>
       <body className="min-h-full" suppressHydrationWarning>
         <ThemeProvider>
           <ReactQueryProvider>

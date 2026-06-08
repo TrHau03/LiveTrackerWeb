@@ -45,7 +45,7 @@ export function Header() {
         {/* Main Row: Title & Controls */}
         <div className="flex items-center justify-between gap-4">
           <div className="flex-1 min-w-0">
-            <h1 className="text-base sm:text-lg font-semibold text-[var(--header-fg)] truncate">
+            <h1 className="text-base sm:text-lg font-bold text-[var(--header-fg)] truncate">
               {title}
             </h1>
             {subtitle && (
@@ -91,8 +91,8 @@ export function Header() {
                   if (action.hidden) return null;
                   const buttonClasses = {
                     primary: "inline-flex h-9 items-center justify-center rounded-lg bg-[var(--accent-green)] px-4 text-xs font-semibold text-white shadow-sm transition hover:bg-[var(--accent-green-strong)]",
-                    secondary: "inline-flex h-9 items-center justify-center rounded-lg border border-[var(--border)] bg-[var(--surface)] px-4 text-xs font-medium text-[var(--foreground)] transition hover:bg-[var(--hover)]",
-                    danger: "inline-flex h-9 items-center justify-center rounded-lg border border-red-200 bg-red-50 px-4 text-xs font-medium text-red-600 transition hover:bg-red-100",
+                    secondary: "inline-flex h-9 items-center justify-center rounded-lg border border-[var(--border)] bg-[var(--surface)] px-4 text-xs font-semibold text-[var(--foreground)] transition hover:bg-[var(--hover)]",
+                    danger: "inline-flex h-9 items-center justify-center rounded-lg border border-red-200 bg-red-50 px-4 text-xs font-semibold text-red-600 transition hover:bg-red-100",
                   };
                   return (
                     <button
@@ -151,8 +151,8 @@ export function Header() {
               if (action.hidden) return null;
               const buttonClasses = {
                 primary: "inline-flex h-8 items-center justify-center rounded-lg bg-[var(--accent-green)] px-3 text-xs font-semibold text-white transition hover:bg-[var(--accent-green-strong)]",
-                secondary: "inline-flex h-8 items-center justify-center rounded-lg border border-[var(--border)] bg-[var(--surface)] px-3 text-xs font-medium text-[var(--foreground)] transition hover:bg-[var(--hover)]",
-                danger: "inline-flex h-8 items-center justify-center rounded-lg border border-red-200 bg-red-50 px-3 text-xs font-medium text-red-600 transition hover:bg-red-100",
+                secondary: "inline-flex h-8 items-center justify-center rounded-lg border border-[var(--border)] bg-[var(--surface)] px-3 text-xs font-semibold text-[var(--foreground)] transition hover:bg-[var(--hover)]",
+                danger: "inline-flex h-8 items-center justify-center rounded-lg border border-red-200 bg-red-50 px-3 text-xs font-semibold text-red-600 transition hover:bg-red-100",
               };
               return (
                 <button key={action.id || action.label || `btn-${idx}`} onClick={action.onClick} className={`${buttonClasses[action.variant || "secondary"]} ${action.className || ""}`}>

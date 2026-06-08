@@ -172,7 +172,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   title={isCollapsed ? item.label : ""}
                   className={`group relative flex items-center rounded-lg py-2.5 text-[13px] font-medium transition-colors duration-150 ${isCollapsed ? "justify-center px-2" : "gap-3 px-3"
                     } ${active
-                      ? "bg-[var(--sidebar-active-bg)] text-[var(--sidebar-active-fg)] font-semibold"
+                      ? "bg-[var(--sidebar-active-bg)] text-[var(--sidebar-active-fg)] font-medium"
                       : "text-[var(--sidebar-fg)] hover:text-[var(--sidebar-fg-hover)] hover:bg-[var(--hover)]"
                     }`}
                 >

@@ -415,7 +415,7 @@ export function OrdersScreen() {
           icon: <FileDown className="w-4 h-4" />,
           variant: "primary",
           onClick: handleExport,
-          className: "bg-emerald-600 hover:bg-emerald-700 text-white font-bold border-none"
+          className: "bg-emerald-600 hover:bg-emerald-700 text-white font-semibold border-none"
         }
       ]
     });

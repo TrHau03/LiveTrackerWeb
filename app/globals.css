@@ -1,4 +1,3 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
 @import "tailwindcss";
 
 @custom-variant dark (&:where(.dark, .dark *));
@@ -110,7 +109,7 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: "Inter", system-ui, -apple-system, sans-serif;
+  --font-sans: var(--font-manrope), system-ui, -apple-system, sans-serif;
   --font-mono: "SFMono-Regular", "SF Mono", Consolas, "Liberation Mono",
     Menlo, monospace;
 
@@ -165,7 +164,7 @@ body {
   min-height: 100vh;
   background: var(--background);
   color: var(--foreground);
-  font-family: "Inter", system-ui, -apple-system, sans-serif;
+  font-family: var(--font-manrope), system-ui, -apple-system, sans-serif;
   transition:
     background-color 200ms ease,
     color 200ms ease;

@@ -36,6 +36,12 @@ import {
   cancelDeliveryOrder,
   fetchDeliveryOrderDetail,
   fetchDeliveryOrderById,
+  printGhnOrder,
+  printGhnOrders,
+  printGhtkOrder,
+  printGhtkOrders,
+  printJtExpressOrder,
+  printJtExpressOrders,
 } from "@/lib/services/delivery-service";
 import { applyAuthResponses } from "@/hooks/use-auth-sync";
 import { extractApiData } from "@/lib/proxy-client";
@@ -226,5 +232,157 @@ export function useRegisterGhnShop() {
     },
   });
 }
+
+export function usePrintDeliveryOrder() {
+  const { logout, patchSession, session } = useSession();
+
+  return useMutation({
+    mutationFn: async ({ 
+      provider, 
+      orderCode, 
+      providerConfigId, 
+      options 
+    }: { 
+      provider: string; 
+      orderCode: string; 
+      providerConfigId?: string;
+      options?: { printSize?: string; pageSize?: string; original?: string }
+    }) => {
+      const normalizedProvider = provider.toLowerCase().trim();
+      
+      if (normalizedProvider.includes("ghn")) {
+        const response = await printGhnOrder(session, {
+          bizContent: { 
+            order_code: orderCode, 
+            printSize: options?.printSize 
+          },
+          providerConfigId,
+        });
+        applyAuthResponses([response.response], patchSession, logout);
+        if (!response.ok) throw new Error("Yêu cầu in vận đơn GHN thất bại");
+        const resData = extractApiData<{ printUrl: string }>(response.data);
+        if (resData?.printUrl) {
+          window.open(resData.printUrl, "_blank");
+        }
+        return resData;
+      } 
+      
+      if (normalizedProvider.includes("ghtk")) {
+        const response = await printGhtkOrder(session, {
+          bizContent: { 
+            trackingOrder: orderCode, 
+            pageSize: options?.pageSize, 
+            original: options?.original 
+          },
+          providerConfigId,
+        });
+        if (!response.ok) throw new Error("Yêu cầu in vận đơn GHTK thất bại");
+        if (response.url) {
+          window.open(response.url, "_blank");
+        }
+        return response;
+      }
+      
+      if (normalizedProvider.includes("j&t") || normalizedProvider.includes("jt")) {
+        const response = await printJtExpressOrder(session, {
+          bizContent: { 
+            txlogisticId: orderCode, 
+            billCode: orderCode 
+          },
+          providerConfigId,
+        });
+        applyAuthResponses([response.response], patchSession, logout);
+        if (!response.ok) throw new Error("Yêu cầu in vận đơn J&T Express thất bại");
+        const resData = extractApiData<{ labelUrl: string }>(response.data);
+        if (resData?.labelUrl) {
+          window.open(resData.labelUrl, "_blank");
+        }
+        return resData;
+      }
+
+      throw new Error(`Đơn vị vận chuyển ${provider} không hỗ trợ in trực tuyến`);
+    }
+  });
+}
+
+export function usePrintDeliveryOrders() {
+  const { logout, patchSession, session } = useSession();
+
+  return useMutation({
+    mutationFn: async ({ 
+      provider, 
+      orderCodes, 
+      providerConfigId, 
+      options 
+    }: { 
+      provider: string; 
+      orderCodes: string[]; 
+      providerConfigId?: string;
+      options?: { printSize?: string; pageSize?: string; original?: string }
+    }) => {
+      if (!orderCodes || orderCodes.length === 0) {
+        throw new Error("Không có đơn hàng nào được chọn để in");
+      }
+
+      const normalizedProvider = provider.toLowerCase().trim();
+      
+      if (normalizedProvider.includes("ghn")) {
+        const response = await printGhnOrders(session, {
+          bizContent: { 
+            order_codes: orderCodes, 
+            printSize: options?.printSize 
+          },
+          providerConfigId,
+        });
+        applyAuthResponses([response.response], patchSession, logout);
+        if (!response.ok) throw new Error("Yêu cầu in hàng loạt vận đơn GHN thất bại");
+        const resData = extractApiData<{ printUrl: string }>(response.data);
+        if (resData?.printUrl) {
+          window.open(resData.printUrl, "_blank");
+        }
+        return resData;
+      } 
+      
+      if (normalizedProvider.includes("ghtk")) {
+        const response = await printGhtkOrders(session, {
+          bizContent: { 
+            trackingOrders: orderCodes, 
+            pageSize: options?.pageSize, 
+            original: options?.original 
+          },
+          providerConfigId,
+        });
+        if (!response.ok) throw new Error("Yêu cầu in hàng loạt vận đơn GHTK thất bại");
+        if (response.url) {
+          window.open(response.url, "_blank");
+        }
+        return response;
+      }
+      
+      if (normalizedProvider.includes("j&t") || normalizedProvider.includes("jt")) {
+        const response = await printJtExpressOrders(session, {
+          bizContent: { 
+            txlogisticIds: orderCodes 
+          },
+          providerConfigId,
+        });
+        applyAuthResponses([response.response], patchSession, logout);
+        if (!response.ok) throw new Error("Yêu cầu in hàng loạt vận đơn J&T Express thất bại");
+        const resData = extractApiData<Array<{ labelUrl: string }>>(response.data);
+        if (Array.isArray(resData)) {
+          resData.forEach((item) => {
+            if (item.labelUrl) {
+              window.open(item.labelUrl, "_blank");
+            }
+          });
+        }
+        return resData;
+      }
+
+      throw new Error(`Đơn vị vận chuyển ${provider} không hỗ trợ in hàng loạt`);
+    }
+  });
+}
+
 
 
