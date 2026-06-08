@@ -4,9 +4,10 @@ import React, { useState, useEffect, useMemo } from "react";
 import { useDeliveryOrders, useDeliveryProviders } from "@/hooks/use-delivery";
 import { useHeaderStore } from "@/stores/header-store";
 import { DeliveryDetailModal } from "./delivery-detail-modal";
-import { Search, Filter, RefreshCw, Eye, Trash2, ArrowUpDown, ChevronLeft, ChevronRight } from "lucide-react";
+import { Search, Filter, RefreshCw, Eye, Trash2, ArrowUpDown, ChevronLeft, ChevronRight, Copy, Check } from "lucide-react";
 import { CONTROL_CLASS, SECONDARY_BUTTON_CLASS } from "@/components/ui/workspace-shared";
 import { formatDateTime } from "@/lib/proxy-client";
+import { Dropdown } from "@/components/ui/dropdown";
 
 export function DeliveryOrdersScreen() {
   const setHeader = useHeaderStore((state) => state.setHeader);
@@ -23,8 +24,76 @@ export function DeliveryOrdersScreen() {
   // Selected order for modal detail
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
 
+  // Copy state
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+
+  const handleCopy = (e: React.MouseEvent, text: string, id: string) => {
+    e.stopPropagation();
+    if (!text) return;
+    navigator.clipboard.writeText(text);
+    setCopiedId(id);
+    setTimeout(() => setCopiedId(null), 2000);
+  };
+
+  const isObjectId = (id: string) => /^[0-9a-fA-F]{24}$/.test(id);
+
+  const getProviderBadgeClass = (provider: string) => {
+    const p = provider.toLowerCase().trim();
+    if (p.includes("ghtk")) {
+      return "bg-emerald-500/10 text-emerald-600 border border-emerald-500/10";
+    }
+    if (p.includes("ghn")) {
+      return "bg-orange-500/10 text-orange-600 border border-orange-500/10";
+    }
+    if (p.includes("j&t") || p.includes("jt")) {
+      return "bg-red-500/10 text-red-600 border border-red-500/10";
+    }
+    if (p.includes("viettelpost") || p.includes("vtp") || p.includes("viettel post")) {
+      return "bg-red-500/10 text-red-600 border border-red-500/10";
+    }
+    return "bg-blue-500/10 text-blue-600 border border-blue-500/10";
+  };
+
+  const renderCreatedAt = (createdAt: string) => {
+    if (!createdAt) return <span className="text-[var(--muted)]">-</span>;
+    try {
+      const date = new Date(createdAt);
+      if (Number.isNaN(date.getTime())) return <span className="text-[var(--muted)]">{createdAt}</span>;
+      
+      const day = String(date.getDate()).padStart(2, '0');
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const year = date.getFullYear();
+      const hours = String(date.getHours()).padStart(2, '0');
+      const minutes = String(date.getMinutes()).padStart(2, '0');
+      
+      return (
+        <div className="space-y-0.5">
+          <span className="block text-[var(--foreground-soft)] font-medium">{day}/{month}/{year}</span>
+          <span className="block text-[10px] text-[var(--muted)]">{hours}:{minutes}</span>
+        </div>
+      );
+    } catch {
+      return <span className="text-[var(--muted)]">{createdAt}</span>;
+    }
+  };
+
   // Fetch providers list
   const { data: providers = [] } = useDeliveryProviders();
+
+  const providerOptions = React.useMemo(() => {
+    return providers.map((p) => {
+      const cleanLabel = p.displayName.replace(/\s*\(.*?\)\s*/g, "").trim();
+      return {
+        value: p.provider,
+        label: cleanLabel || p.displayName,
+      };
+    });
+  }, [providers]);
+
+  const statusOptions = React.useMemo(() => [
+    { value: "active", label: "Đang xử lý" },
+    { value: "cancelled", label: "Đã hủy" }
+  ], []);
 
   // Search input debounce
   useEffect(() => {
@@ -69,7 +138,7 @@ export function DeliveryOrdersScreen() {
         
         {/* Search & Provider Filters */}
         <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
-          <div className="relative w-full sm:w-64">
+          <div className="relative w-full sm:w-80">
             <span className="absolute inset-y-0 left-3 flex items-center pointer-events-none text-[var(--muted)]">
               <Search className="w-4 h-4" />
             </span>
@@ -77,39 +146,34 @@ export function DeliveryOrdersScreen() {
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className={`${CONTROL_CLASS} pl-9`}
+              className={`${CONTROL_CLASS} pl-9 w-full`}
               placeholder="Nhập mã vận đơn, mã đơn hàng..."
             />
           </div>
 
-          <select
+          <Dropdown
             value={providerFilter}
-            onChange={(e) => {
-              setProviderFilter(e.target.value);
+            onChange={(val) => {
+              setProviderFilter(val);
               setPage(1);
             }}
-            className={`${CONTROL_CLASS} w-full sm:w-44 font-medium`}
-          >
-            <option value="">Tất cả đơn vị</option>
-            {providers.map((p) => (
-              <option key={p.provider} value={p.provider}>
-                {p.displayName}
-              </option>
-            ))}
-          </select>
+            options={providerOptions}
+            placeholder="Tất cả đơn vị"
+            minWidth="176px"
+            heightClass="h-9"
+          />
 
-          <select
+          <Dropdown
             value={statusFilter}
-            onChange={(e) => {
-              setStatusFilter(e.target.value);
+            onChange={(val) => {
+              setStatusFilter(val);
               setPage(1);
             }}
-            className={`${CONTROL_CLASS} w-full sm:w-36 font-medium`}
-          >
-            <option value="">Trạng thái</option>
-            <option value="active">Đang xử lý</option>
-            <option value="cancelled">Đã hủy</option>
-          </select>
+            options={statusOptions}
+            placeholder="Trạng thái"
+            minWidth="144px"
+            heightClass="h-9"
+          />
         </div>
 
         {/* Action Buttons */}
@@ -155,24 +219,42 @@ export function DeliveryOrdersScreen() {
               <tbody>
                 {items.map((item) => {
                   const isCancelled = item.status === "cancelled" || item.status === "cancel";
-                  const primaryCode = item.billCode || item.txlogisticId || "";
+                  const primaryCode = item.txlogisticId || item.billCode || "";
                   const secondaryCode = item.orderId || "";
+                  const showSecondary = secondaryCode && !isObjectId(secondaryCode);
                   
                   return (
                     <tr 
                       key={item.id}
-                      className="border-b border-[var(--border)]/70 hover:bg-[var(--hover)]/30 transition-colors duration-150"
+                      onClick={() => setSelectedOrderId(item.id)}
+                      className="border-b border-[var(--border)]/70 hover:bg-[var(--hover)]/40 transition-colors duration-150 cursor-pointer group"
                     >
-                      <td className="px-5 py-4 font-medium">
-                        <div className="space-y-1">
-                          <span className="block font-mono font-bold text-[var(--foreground)]">{primaryCode || "Chưa cấp"}</span>
-                          {secondaryCode && (
-                            <span className="block font-mono text-[10px] text-[var(--muted)]">Gốc: {secondaryCode}</span>
+                      <td className="px-5 py-4 font-medium" onClick={e => e.stopPropagation()}>
+                        <div className="flex items-center gap-2">
+                          <div className="space-y-1">
+                            <span className="block font-mono font-bold text-[var(--foreground)]">{primaryCode || "Chưa cấp"}</span>
+                            {showSecondary && (
+                              <span className="block font-mono text-[10px] text-[var(--muted)]">Gốc: {secondaryCode}</span>
+                            )}
+                          </div>
+                          {primaryCode && (
+                            <button
+                              type="button"
+                              onClick={(e) => handleCopy(e, primaryCode, item.id)}
+                              className="p-1 rounded text-[var(--muted)] hover:bg-[var(--hover)] hover:text-[var(--primary)] opacity-0 group-hover:opacity-100 transition-opacity"
+                              title="Sao chép mã vận đơn"
+                            >
+                              {copiedId === item.id ? (
+                                <Check className="w-3.5 h-3.5 text-green-500" />
+                              ) : (
+                                <Copy className="w-3.5 h-3.5" />
+                              )}
+                            </button>
                           )}
                         </div>
                       </td>
                       <td className="px-5 py-4">
-                        <span className="inline-flex items-center gap-1 rounded-full bg-blue-500/10 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-[var(--primary)]">
+                        <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider ${getProviderBadgeClass(item.provider)}`}>
                           {item.provider}
                         </span>
                       </td>
@@ -188,12 +270,16 @@ export function DeliveryOrdersScreen() {
                         )}
                       </td>
                       <td className="px-5 py-4 text-[var(--foreground-soft)] font-medium">
-                        {item.lastCenterName || "N/A"}
+                        {item.lastCenterName && item.lastCenterName !== "N/A" ? (
+                          item.lastCenterName
+                        ) : (
+                          <span className="text-[var(--muted)] font-normal text-[11px]">-</span>
+                        )}
                       </td>
-                      <td className="px-5 py-4 text-[var(--muted)] font-medium">
-                        {formatDateTime(item.createdAt)}
+                      <td className="px-5 py-4 font-medium">
+                        {renderCreatedAt(item.createdAt)}
                       </td>
-                      <td className="px-5 py-4 text-right">
+                      <td className="px-5 py-4 text-right" onClick={e => e.stopPropagation()}>
                         <button
                           type="button"
                           onClick={() => setSelectedOrderId(item.id)}
@@ -211,11 +297,11 @@ export function DeliveryOrdersScreen() {
         )}
 
         {/* Pagination Footer */}
-        {pagination.totalPages > 1 && (
-          <div className="flex items-center justify-between px-5 py-4 border-t border-[var(--border)] shrink-0 bg-[var(--surface-muted)]/10">
-            <span className="text-[11px] text-[var(--muted)] font-semibold">
-              Hiển thị {items.length} trên tổng số {pagination.total} vận đơn
-            </span>
+        <div className="flex items-center justify-between px-5 py-4 border-t border-[var(--border)] shrink-0 bg-[var(--surface-muted)]/10">
+          <span className="text-[11px] text-[var(--muted)] font-semibold">
+            Hiển thị {items.length} trên tổng số {pagination.total} vận đơn
+          </span>
+          {pagination.totalPages > 1 && (
             <div className="flex items-center gap-2">
               <button
                 onClick={() => setPage(p => Math.max(1, p - 1))}
@@ -235,8 +321,8 @@ export function DeliveryOrdersScreen() {
                 <ChevronRight className="w-4 h-4" />
               </button>
             </div>
-          </div>
-        )}
+          )}
+        </div>
       </div>
 
       {/* Delivery Detail Modal */}

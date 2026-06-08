@@ -386,12 +386,12 @@ export function DeliveryModal({ isOpen, onClose, order }: DeliveryModalProps) {
   };
 
   return (
-    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/40 backdrop-blur-md p-4 animate-in fade-in duration-300">
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/40 backdrop-blur-md p-4 animate-fade-in">
       <div 
-        className="absolute inset-0 z-0" 
+        className="absolute inset-0 z-0 animate-fade-in" 
         onClick={onClose}
       />
-      <div className="relative z-10 flex w-full max-w-6xl max-h-[95vh] flex-col bg-[var(--surface)] shadow-2xl rounded-[2.5rem] border border-[var(--border)] overflow-hidden animate-in zoom-in-95 duration-300">
+      <div className="relative z-10 flex w-full max-w-6xl max-h-[95vh] flex-col bg-[var(--surface)] shadow-2xl rounded-[2.5rem] border border-[var(--border)] overflow-hidden animate-spring-scale">
         
         {/* Header */}
         <div className="flex items-center justify-between border-b border-[var(--border)] p-8 shrink-0 bg-[var(--surface-subdued)]">

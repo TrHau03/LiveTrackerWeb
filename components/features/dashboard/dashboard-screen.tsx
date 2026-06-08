@@ -17,6 +17,8 @@ import { useMetrics } from "@/hooks/use-metrics";
 import { useOrdersTimeSeries, useCommentsTimeSeries } from "@/hooks/use-time-series";
 import { useRevenueStatistics } from "@/hooks/use-statistics";
 import { useTheme } from "@/components/theme-provider";
+import { useRouter } from "next/navigation";
+import { OrderStatusBadge } from "@/components/features/orders/order-status-badge";
 
 import {
   StatCard,
@@ -31,16 +33,22 @@ import {
   MessageSquareIcon,
   UsersIcon,
   DollarSign,
+  ArrowRight,
 } from "lucide-react";
 import { useHeaderStore } from "@/stores/header-store";
 
 export function DashboardScreen() {
+  const router = useRouter();
   const { session } = useSession();
   const { theme } = useTheme();
-  const [period, setPeriod] = React.useState<"day" | "week" | "month" | "year">("month");
+  const [period, setPeriod] = React.useState<"day" | "week" | "month" | "year" | "custom">("month");
+  const [customRange, setCustomRange] = React.useState<{ startDate: string; endDate: string } | null>(null);
 
   // Tính toán khoảng thời gian dựa trên period
   const dateRange = React.useMemo(() => {
+    if (period === "custom" && customRange) {
+      return customRange;
+    }
     const end = new Date();
     const start = new Date();
     switch (period) {
@@ -61,11 +69,19 @@ export function DashboardScreen() {
       startDate: start.toISOString(),
       endDate: end.toISOString()
     };
-  }, [period]);
+  }, [period, customRange]);
 
   // Hooks cho dữ liệu thời gian thực
-  const { data: dashboardData, status: metricsStatus } = useMetrics({ ...dateRange, period });
-  const { data: revenueStats } = useRevenueStatistics({ ...dateRange, period });
+  const { data: dashboardData, status: metricsStatus } = useMetrics({
+    startDate: dateRange.startDate,
+    endDate: dateRange.endDate,
+    period: period === "custom" ? undefined : period
+  });
+  const { data: revenueStats } = useRevenueStatistics({
+    startDate: dateRange.startDate,
+    endDate: dateRange.endDate,
+    period: period === "custom" ? undefined : period
+  });
 
   const { data: ordersSeries, status: seriesStatus } = useOrdersTimeSeries({
     ...dateRange,
@@ -252,6 +268,11 @@ export function DashboardScreen() {
   const gridStroke = theme === "dark" ? "rgba(255, 255, 255, 0.06)" : "rgba(0, 0, 0, 0.06)";
   const textFill = theme === "dark" ? "#9CA3AF" : "#9CA3AF";
 
+  const handleDateRangeChange = React.useCallback((startIso: string, endIso: string) => {
+    setPeriod("custom");
+    setCustomRange({ startDate: startIso, endDate: endIso });
+  }, []);
+
   // Cập nhật Header chung
   React.useEffect(() => {
     const startStr = dateRange.startDate.split('T')[0].split('-').reverse().join('-');
@@ -262,26 +283,11 @@ export function DashboardScreen() {
       subtitle: "Đây là những gì đang diễn ra với shop của bạn.",
       startDate: startStr,
       endDate: endStr,
-      customContent: (
-        <div className="flex items-center gap-0.5 bg-[var(--surface-muted)] p-0.5 rounded-lg border border-[var(--border)]">
-          {periods.map((p) => (
-            <button
-              key={p.id}
-              onClick={() => setPeriod(p.id)}
-              className={`px-3 py-1.5 text-[11px] font-medium rounded-md transition-all ${period === p.id
-                ? "bg-[var(--surface)] text-[var(--foreground)] shadow-sm"
-                : "text-[var(--muted)] hover:text-[var(--foreground)]"
-                }`}
-            >
-              {p.label}
-            </button>
-          ))}
-        </div>
-      )
+      onDateRangeChange: handleDateRangeChange,
     });
 
     return () => resetHeader();
-  }, [period, dateRange, session.user, setHeader, resetHeader]);
+  }, [dateRange, session.user, setHeader, resetHeader, handleDateRangeChange]);
 
   return (
     <div className="space-y-4 pb-28 lg:pb-6 pt-0">
@@ -536,7 +542,7 @@ export function DashboardScreen() {
       <div className="grid gap-3.5">
         <Panel
           title="Đơn hàng gần đây"
-          action={<button className="text-[var(--muted)] text-xs font-medium hover:text-[var(--primary)] transition-colors flex items-center gap-1">Xem tất cả <TrendingUpIcon className="w-3 h-3 rotate-90" /></button>}
+          action={<button onClick={() => router.push("/orders")} className="text-[var(--muted)] text-xs font-medium hover:text-[var(--primary)] transition-colors flex items-center gap-1">Xem tất cả <TrendingUpIcon className="w-3 h-3 rotate-90" /></button>}
           className="h-full overflow-hidden"
         >
           {state.status === "loading" ? <LoadingState /> : null}
@@ -548,32 +554,81 @@ export function DashboardScreen() {
                 <tr>
                   <th className="px-4 py-2.5 font-medium uppercase tracking-wider text-[11px]">Mã đơn</th>
                   <th className="px-4 py-2.5 font-medium uppercase tracking-wider text-[11px]">Khách hàng</th>
-                  <th className="px-4 py-2.5 font-medium uppercase tracking-wider text-[11px]">Đơn giá</th>
                   <th className="px-4 py-2.5 font-medium uppercase tracking-wider text-center text-[11px]">Số lượng</th>
                   <th className="px-4 py-2.5 font-medium uppercase tracking-wider text-[11px]">Tổng tiền</th>
+                  <th className="px-4 py-2.5 font-medium uppercase tracking-wider text-center text-[11px]">Trạng thái</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[var(--border)]">
-                {recentOrders.map((order, index) => (
-                  <tr key={`${pickString(order, ["id", "_id", "orderCode"]) || index}`} className="transition-colors hover:bg-[var(--hover)] group">
-                    <td className="px-4 py-2.5 font-medium text-[var(--foreground-soft)] text-xs">#{pickString(order, ["orderCode", "code"])?.slice(-8) || "ORD-0000"}</td>
-                    <td className="px-4 py-2.5">
-                      <div className="flex items-center gap-2">
-                        <div className="h-6 w-6 rounded-full bg-[var(--primary-soft)] flex items-center justify-center">
-                          <UsersIcon className="w-3 h-3 text-[var(--primary)]" />
+                {recentOrders.map((order, index) => {
+                  const orderId = pickString(order, ["id", "_id", "orderCode"]) || "";
+                  const customerInfo = asRecord(order.customerId);
+                  const customerName = pickString(customerInfo, ["igName", "fullName", "fbName"]) || pickString(order, ["igName", "customerName"]) || "Khách hàng";
+                  const avatar = pickString(customerInfo, ["avatar"]);
+                  const quantity = pickNumber(order, ["quantity", "count"]) || 1;
+                  const totalPrice = pickNumber(order, ["totalPrice", "amount"]) || 0;
+                  const status = pickString(order, ["status"]);
+
+                  return (
+                    <tr
+                      key={`${orderId || index}`}
+                      onClick={() => {
+                        if (orderId) {
+                          sessionStorage.setItem("auto_select_order_id", orderId);
+                          router.push("/orders");
+                        }
+                      }}
+                      className="transition-all duration-200 hover:bg-[var(--hover)] cursor-pointer group"
+                    >
+                      <td className="px-4 py-3">
+                        <span className="font-mono text-xs font-semibold text-[var(--primary)] bg-[var(--primary-soft)] px-2.5 py-1 rounded-md transition-all group-hover:bg-[var(--primary)] group-hover:text-white">
+                          #{pickString(order, ["orderCode", "code"])?.slice(-8) || "ORD-0000"}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-2.5">
+                          <div className="h-7 w-7 overflow-hidden rounded-full ring-1 ring-[var(--border)] bg-[var(--primary-soft)] flex items-center justify-center text-[var(--primary)] shrink-0 relative">
+                            {avatar ? (
+                              <>
+                                <img
+                                  src={avatar}
+                                  alt={customerName}
+                                  className="h-full w-full object-cover"
+                                  onError={(e) => {
+                                    (e.target as HTMLImageElement).style.display = 'none';
+                                    (e.target as HTMLImageElement).parentElement?.classList.add('fallback-active');
+                                  }}
+                                />
+                                <div className="absolute inset-0 hidden items-center justify-center bg-[var(--primary-soft)] text-[var(--primary)] [.fallback-active_&]:flex">
+                                  <UsersIcon className="w-3.5 h-3.5" />
+                                </div>
+                              </>
+                            ) : (
+                              <UsersIcon className="w-3.5 h-3.5" />
+                            )}
+                          </div>
+                          <span className="font-semibold text-[var(--foreground)] text-xs group-hover:text-[var(--primary)] transition-colors">
+                            {customerName}
+                          </span>
                         </div>
-                        <span className="font-medium text-[var(--foreground)] text-xs">{pickString(order, ["igName", "customerName"]) || "Khách hàng"}</span>
-                      </div>
-                    </td>
-                    <td className="px-4 py-2.5 text-[var(--foreground-soft)] font-medium text-xs">{formatNumber(pickNumber(order, ["price"]) || 0)}đ</td>
-                    <td className="px-4 py-2.5 text-center">
-                      <span className="inline-block px-2 py-0.5 bg-[var(--surface-muted)] text-[var(--foreground-soft)] font-medium rounded text-[11px]">
-                        {pickNumber(order, ["quantity", "count"]) || 1}
-                      </span>
-                    </td>
-                    <td className="px-4 py-2.5 font-semibold text-[var(--primary)] text-xs">{formatNumber(pickNumber(order, ["totalPrice", "amount"]) || 0)}đ</td>
-                  </tr>
-                ))}
+                      </td>
+                      <td className="px-4 py-3 text-center">
+                        <span className="inline-flex items-center justify-center h-6 min-w-[24px] px-1.5 bg-[var(--surface-muted)] text-[var(--foreground-soft)] font-semibold rounded-full text-[11px]">
+                          {quantity}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 font-bold text-emerald-600 dark:text-emerald-400 text-xs">
+                        {formatNumber(totalPrice)}đ
+                      </td>
+                      <td className="px-4 py-3 text-center">
+                        <div className="flex items-center justify-center gap-2">
+                          <OrderStatusBadge status={status} size="sm" />
+                          <ArrowRight className="w-3.5 h-3.5 text-[var(--primary)] opacity-0 -translate-x-1 group-hover:opacity-100 group-hover:translate-x-0 transition-all duration-200 shrink-0" />
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>

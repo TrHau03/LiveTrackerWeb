@@ -91,9 +91,9 @@ export function OrderDetailModal({ order, onClose, onOpenDelivery, onPrint, isPr
   }
 
   return (
-    <div className="fixed inset-0 z-[9990] flex items-center justify-center bg-black/30 p-4">
-      <div className="absolute inset-0 z-0" onClick={onClose} />
-      <div className="relative z-10 flex w-full max-w-2xl max-h-[90vh] flex-col bg-[var(--surface)] shadow-xl rounded-2xl border border-[var(--border)] overflow-hidden">
+    <div className="fixed inset-0 z-[9990] flex items-center justify-center bg-black/30 p-4 animate-fade-in">
+      <div className="absolute inset-0 z-0 animate-fade-in" onClick={onClose} />
+      <div className="relative z-10 flex w-full max-w-2xl max-h-[90vh] flex-col bg-[var(--surface)] shadow-xl rounded-2xl border border-[var(--border)] overflow-hidden animate-spring-scale">
         <div className="flex items-center justify-between border-b border-[var(--border)] p-5 shrink-0">
           <div className="flex items-center gap-3">
             <div className="h-10 w-10 rounded-xl bg-[var(--primary)] flex items-center justify-center text-white">

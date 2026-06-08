@@ -2,7 +2,7 @@
 
 import React from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 
 import { AuthScreen } from "@/components/auth-screen";
 import { Header } from "@/components/header";
@@ -12,11 +12,17 @@ import { appNavigation } from "@/lib/site";
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const router = useRouter();
   const isViewportLocked = pathname === "/livestreams" || pathname === "/customers" || pathname === "/messenger" || pathname === "/settings" || pathname === "/delivery";
   const { authStatus, isAuthenticated, logout, session } = useSession();
   const { theme, toggleTheme } = useTheme();
   const [isCollapsed, setIsCollapsed] = React.useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = React.useState(false);
+
+  const handleLogout = async () => {
+    await logout();
+    router.push("/");
+  };
 
   // Close mobile menu when route changes
   React.useEffect(() => {
@@ -198,7 +204,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 )}
               </div>
               {!isCollapsed && (
-                <button onClick={() => void logout()} className="text-[var(--muted)] hover:text-red-500 transition-colors p-1 rounded-md hover:bg-red-50">
+                <button onClick={handleLogout} className="text-[var(--muted)] hover:text-red-500 transition-colors p-1 rounded-md hover:bg-red-50">
                   <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
                 </button>
               )}
