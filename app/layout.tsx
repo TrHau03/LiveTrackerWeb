@@ -10,10 +10,10 @@ import { absoluteUrl, siteConfig } from "@/lib/site";
 
 import "./globals.css";
 
-const manrope = Manrope({
+const inter = Inter({
   subsets: ["latin", "vietnamese"],
-  weight: ["300", "400", "500", "600", "700", "800"],
-  variable: "--font-manrope",
+  weight: ["300", "400", "500", "600", "700", "800", "900"],
+  variable: "--font-inter",
 });
 
 export const metadata: Metadata = {
@@ -54,7 +54,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="vi" className={`h-full antialiased ${manrope.variable}`} suppressHydrationWarning>
+    <html lang="vi" className={`h-full antialiased ${inter.variable}`} suppressHydrationWarning>
       <body className="min-h-full" suppressHydrationWarning>
         <ThemeProvider>
           <ReactQueryProvider>
