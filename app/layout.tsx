@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Manrope } from "next/font/google";
+import { Inter } from "next/font/google";
 
 import { AppShell } from "@/components/app-shell";
 import { SessionProvider } from "@/components/session-provider";
